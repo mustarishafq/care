@@ -1,0 +1,78 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class Complaint extends Model
+{
+    protected $fillable = [
+        'ticket_id',
+        'customer_name',
+        'customer_phone',
+        'order_number',
+        'product_id',
+        'quantity_affected',
+        'complaint_type_id',
+        'description',
+        'proof_files',
+        'courier_id',
+        'tracking_number',
+        'replacement_tracking_number',
+        'priority_id',
+        'status_id',
+        'assigned_department_id',
+        'assigned_user',
+        'assigned_user_name',
+        'resolution_notes',
+        'sla_deadline',
+        'sla_paused_at',
+        'sla_paused_duration',
+        'first_response_at',
+        'resolved_at',
+        'closed_at',
+    ];
+
+    public function product(): BelongsTo
+    {
+        return $this->belongsTo(Product::class);
+    }
+
+    public function complaintType(): BelongsTo
+    {
+        return $this->belongsTo(ComplaintType::class);
+    }
+
+    public function complaintStatus(): BelongsTo
+    {
+        return $this->belongsTo(ComplaintStatus::class, 'status_id');
+    }
+
+    public function courier(): BelongsTo
+    {
+        return $this->belongsTo(Courier::class);
+    }
+
+    public function priority(): BelongsTo
+    {
+        return $this->belongsTo(Priority::class);
+    }
+
+    public function assignedDepartment(): BelongsTo
+    {
+        return $this->belongsTo(Department::class, 'assigned_department_id');
+    }
+
+    protected function casts(): array
+    {
+        return [
+            'proof_files' => 'array',
+            'sla_deadline' => 'datetime',
+            'sla_paused_at' => 'datetime',
+            'first_response_at' => 'datetime',
+            'resolved_at' => 'datetime',
+            'closed_at' => 'datetime',
+        ];
+    }
+}

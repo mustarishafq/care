@@ -1,0 +1,30 @@
+{
+  "name": "Product",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Product name"
+    },
+    "sku": {
+      "type": "string",
+      "description": "Product SKU code"
+    },
+    "category": {
+      "type": "string",
+      "description": "Product category"
+    },
+    "description": {
+      "type": "string",
+      "description": "Product description"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether the product is active"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

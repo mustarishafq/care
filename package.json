@@ -1,0 +1,16 @@
+{
+  "name": "care",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev:full": "node scripts/dev-full.js",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "php artisan serve --port=8000",
+    "build:frontend": "npm run build --prefix frontend",
+    "install:all": "npm install --prefix frontend && composer install --working-dir=backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "name": "TicketActivity",
+  "type": "object",
+  "properties": {
+    "complaint_id": {
+      "type": "string",
+      "description": "Reference to the complaint ID"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "created",
+        "status_changed",
+        "assigned",
+        "note_added",
+        "attachment_uploaded",
+        "tracking_added",
+        "priority_changed",
+        "resolved",
+        "closed",
+        "reopened"
+      ],
+      "description": "Type of activity"
+    },
+    "description": {
+      "type": "string",
+      "description": "Human-readable activity description"
+    },
+    "old_value": {
+      "type": "string",
+      "description": "Previous value (for changes)"
+    },
+    "new_value": {
+      "type": "string",
+      "description": "New value (for changes)"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email of user who performed action"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "Name of user who performed action"
+    }
+  },
+  "required": [
+    "complaint_id",
+    "action_type",
+    "description"
+  ]
+}

@@ -1,0 +1,55 @@
+{
+  "name": "OmsConfig",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Configuration name/label"
+    },
+    "base_url": {
+      "type": "string",
+      "description": "OMS API base URL"
+    },
+    "api_key": {
+      "type": "string",
+      "description": "API key or token for authentication"
+    },
+    "auth_type": {
+      "type": "string",
+      "enum": [
+        "bearer",
+        "api_key_header",
+        "basic"
+      ],
+      "default": "bearer",
+      "description": "Authentication type"
+    },
+    "auth_header_name": {
+      "type": "string",
+      "description": "Custom header name if using api_key_header auth (e.g. X-API-Key)"
+    },
+    "update_order_endpoint": {
+      "type": "string",
+      "description": "Endpoint path to update order status (e.g. /orders/{order_number}/status)"
+    },
+    "status_mapping": {
+      "type": "object",
+      "description": "Map ResolveHub status \u2192 OMS status value"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this integration is active"
+    },
+    "last_test_result": {
+      "type": "string",
+      "description": "Result of last connection test"
+    }
+  },
+  "required": [
+    "name",
+    "base_url",
+    "api_key",
+    "update_order_endpoint"
+  ]
+}

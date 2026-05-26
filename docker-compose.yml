@@ -1,0 +1,77 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: care_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: secret
+      MYSQL_DATABASE: care
+      MYSQL_USER: care
+      MYSQL_PASSWORD: secret
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - care
+
+  redis:
+    image: redis:7-alpine
+    container_name: care_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - care
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: care_backend
+    restart: unless-stopped
+    depends_on:
+      - mysql
+      - redis
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: http://localhost:8000
+      FRONTEND_URL: http://localhost:5173
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: care
+      DB_USERNAME: care
+      DB_PASSWORD: secret
+      REDIS_HOST: redis
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      MAIL_MAILER: smtp
+    volumes:
+      - backend_storage:/var/www/html/storage
+    ports:
+      - "8000:8000"
+    networks:
+      - care
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: care_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    networks:
+      - care
+
+volumes:
+  mysql_data:
+  backend_storage:
+
+networks:
+  care:
+    driver: bridge

@@ -1,0 +1,45 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "properties": {
+    "recipient_email": {
+      "type": "string",
+      "description": "Email of notification recipient"
+    },
+    "title": {
+      "type": "string",
+      "description": "Notification title"
+    },
+    "message": {
+      "type": "string",
+      "description": "Notification message"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "ticket_assigned",
+        "status_changed",
+        "sla_warning",
+        "overdue",
+        "mention",
+        "general"
+      ],
+      "description": "Notification type"
+    },
+    "complaint_id": {
+      "type": "string",
+      "description": "Related complaint ID if applicable"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether notification has been read"
+    }
+  },
+  "required": [
+    "recipient_email",
+    "title",
+    "message",
+    "type"
+  ]
+}

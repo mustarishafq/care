@@ -1,0 +1,152 @@
+{
+  "name": "Complaint",
+  "type": "object",
+  "properties": {
+    "ticket_id": {
+      "type": "string",
+      "description": "Auto-generated ticket ID"
+    },
+    "customer_name": {
+      "type": "string",
+      "description": "Customer full name"
+    },
+    "customer_phone": {
+      "type": "string",
+      "description": "Customer phone number"
+    },
+    "order_number": {
+      "type": "string",
+      "description": "Order reference number"
+    },
+    "product_name": {
+      "type": "string",
+      "description": "Product name"
+    },
+    "quantity_affected": {
+      "type": "number",
+      "description": "Number of items affected"
+    },
+    "complaint_type": {
+      "type": "string",
+      "enum": [
+        "Damaged Product",
+        "Broken Item",
+        "Missing Item",
+        "Wrong Item",
+        "Leakage",
+        "Packaging Damage",
+        "Other"
+      ],
+      "description": "Type of complaint"
+    },
+    "description": {
+      "type": "string",
+      "description": "Detailed complaint description"
+    },
+    "proof_files": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "URLs of uploaded proof images/videos/docs"
+    },
+    "courier_name": {
+      "type": "string",
+      "description": "Courier/shipping company"
+    },
+    "tracking_number": {
+      "type": "string",
+      "description": "Shipment tracking number"
+    },
+    "replacement_tracking_number": {
+      "type": "string",
+      "description": "Replacement shipment tracking"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "Low",
+        "Medium",
+        "High",
+        "Urgent"
+      ],
+      "default": "Medium",
+      "description": "Ticket priority level"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "New Complaint",
+        "Under Review",
+        "Waiting for Customer",
+        "Approved Replacement",
+        "Rejected",
+        "Reprocessing by Fulfillment",
+        "Ready to Ship",
+        "Shipped",
+        "Delivered",
+        "Closed"
+      ],
+      "default": "New Complaint",
+      "description": "Current workflow status"
+    },
+    "assigned_department": {
+      "type": "string",
+      "enum": [
+        "Customer Service",
+        "Fulfillment",
+        "Logistics",
+        "Management"
+      ],
+      "description": "Department assigned"
+    },
+    "assigned_user": {
+      "type": "string",
+      "description": "Email of assigned user"
+    },
+    "assigned_user_name": {
+      "type": "string",
+      "description": "Name of assigned user"
+    },
+    "resolution_notes": {
+      "type": "string",
+      "description": "Final resolution notes"
+    },
+    "sla_deadline": {
+      "type": "string",
+      "format": "date-time",
+      "description": "SLA deadline for resolution"
+    },
+    "sla_paused_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when SLA was paused (Waiting for Customer)"
+    },
+    "sla_paused_duration": {
+      "type": "number",
+      "description": "Total seconds SLA has been paused (accumulated)"
+    },
+    "first_response_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp of first response"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when resolved"
+    },
+    "closed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when closed"
+    }
+  },
+  "required": [
+    "customer_name",
+    "order_number",
+    "product_name",
+    "complaint_type",
+    "description"
+  ]
+}

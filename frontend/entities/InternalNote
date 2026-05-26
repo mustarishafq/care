@@ -1,0 +1,37 @@
+{
+  "name": "InternalNote",
+  "type": "object",
+  "properties": {
+    "complaint_id": {
+      "type": "string",
+      "description": "Reference to the complaint ID"
+    },
+    "content": {
+      "type": "string",
+      "description": "Note content"
+    },
+    "author_email": {
+      "type": "string",
+      "description": "Email of note author"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "Name of note author"
+    },
+    "department": {
+      "type": "string",
+      "description": "Department of note author"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "File URLs attached to note"
+    }
+  },
+  "required": [
+    "complaint_id",
+    "content"
+  ]
+}

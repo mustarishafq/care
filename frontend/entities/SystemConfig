@@ -1,0 +1,28 @@
+{
+  "name": "SystemConfig",
+  "type": "object",
+  "properties": {
+    "key": {
+      "type": "string",
+      "description": "Config key identifier (e.g. complaint_types, departments, couriers, sla_settings)"
+    },
+    "label": {
+      "type": "string",
+      "description": "Display label"
+    },
+    "value": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Array of string values for list-type configs"
+    },
+    "json_value": {
+      "type": "object",
+      "description": "Object value for complex configs like SLA settings"
+    }
+  },
+  "required": [
+    "key"
+  ]
+}

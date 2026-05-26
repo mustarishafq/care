@@ -1,0 +1,439 @@
+import { db } from '@/api/db';
+
+import React, { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { useCurrentUser } from '@/lib/useCurrentUser';
+import { usePermissions } from '@/lib/usePermissions';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, User, Package, Truck, Clock, Loader2, ExternalLink, UserCheck, CornerUpLeft } from 'lucide-react';
+import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
+import { Link } from 'react-router-dom';
+import { format, differenceInHours } from 'date-fns';
+import { toast } from 'sonner';
+import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
+import { useComplaintStatuses } from '@/lib/useLookups';
+import { notifyStatusChange, invalidateNotificationQueries } from '@/lib/notifications';
+import { useDepartments } from '@/lib/useDepartments';
+import StatusBadge from '@/components/complaints/StatusBadge';
+import PriorityBadge from '@/components/complaints/PriorityBadge';
+import StatusProgressBar from '@/components/complaints/StatusProgressBar';
+import TicketTimeline from '@/components/complaints/TicketTimeline';
+import InternalNotes from '@/components/complaints/InternalNotes';
+
+export default function ComplaintDetail() {
+  const urlParams = new URLSearchParams(window.location.search);
+  const complaintId = window.location.pathname.split('/').pop();
+  const { user } = useCurrentUser();
+  const { hasPermission, loading: permLoading } = usePermissions();
+  const canChangeStatus = hasPermission('complaints.change_status');
+  const canAssign = hasPermission('complaints.assign');
+  const canEdit = hasPermission('complaints.edit');
+  const canAddNotes = hasPermission('complaints.add_notes');
+  const queryClient = useQueryClient();
+  const [updating, setUpdating] = useState(false);
+  const [assignOpen, setAssignOpen] = useState(false);
+
+  const { data: complaint, isLoading } = useQuery({
+    queryKey: ['complaint', complaintId],
+    queryFn: async () => {
+      const list = await db.entities.Complaint.filter({ id: complaintId });
+      return list[0];
+    },
+    enabled: !!complaintId,
+  });
+
+  const { data: activities = [] } = useQuery({
+    queryKey: ['activities', complaintId],
+    queryFn: () => db.entities.TicketActivity.filter({ complaint_id: complaintId }, '-created_date'),
+  });
+
+  const { data: notes = [] } = useQuery({
+    queryKey: ['notes', complaintId],
+    queryFn: () => db.entities.InternalNote.filter({ complaint_id: complaintId }, '-created_date'),
+  });
+
+  const { data: departments = [] } = useDepartments();
+  const { data: complaintStatuses = [] } = useComplaintStatuses();
+  const statusOrder = buildStatusOrder(complaintStatuses);
+
+  const updateComplaint = async (updates, activityDesc, actionType = 'status_changed', notifyRecipient = null) => {
+    setUpdating(true);
+    try {
+      await db.entities.Complaint.update(complaintId, updates);
+      await db.entities.TicketActivity.create({
+        complaint_id: complaintId,
+        action_type: actionType,
+        description: activityDesc,
+        user_email: user?.email,
+        user_name: user?.full_name,
+      });
+
+      if (notifyRecipient) {
+        await notifyStatusChange(notifyRecipient);
+        invalidateNotificationQueries(queryClient);
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+      queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
+      toast.success('Ticket updated');
+    } catch {
+      toast.error('Failed to update ticket');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus) => {
+    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
+    const assignedUser = complaint.assigned_user;
+    const notifyRecipient = assignedUser && assignedUser !== user?.email
+      ? {
+          recipientEmail: assignedUser,
+          changerName: user?.full_name,
+          ticketId: complaint.ticket_id,
+          oldStatus: complaint.status,
+          newStatus,
+          complaintId,
+        }
+      : null;
+
+    await updateComplaint(
+      updates,
+      `Status changed from "${complaint.status}" to "${newStatus}"`,
+      'status_changed',
+      notifyRecipient,
+    );
+  };
+
+  const handleAssignDepartment = async (departmentId) => {
+    const dept = departments.find((d) => d.id === departmentId);
+    const deptName = dept?.name || 'Unknown';
+    await updateComplaint(
+      { assigned_department_id: departmentId },
+      `Assigned to ${deptName} department`,
+      'assigned',
+    );
+  };
+
+  // Department history: derive previous dept from activities
+  const prevDept = React.useMemo(() => {
+    const deptChanges = activities
+      .filter(a => a.action_type === 'assigned' && a.description?.includes('department'))
+      .sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+    // The most recent one is current, the one before is "previous"
+    if (deptChanges.length >= 2) {
+      const prev = deptChanges[1].description.match(/Assigned to (.+) department/);
+      return prev ? prev[1] : null;
+    }
+    return null;
+  }, [activities]);
+
+  if (isLoading || permLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!complaint) {
+    return <div className="text-center py-16 text-muted-foreground">Ticket not found</div>;
+  }
+
+  const ageHours = differenceInHours(new Date(), new Date(complaint.created_date));
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <Link to="/complaints" className="shrink-0">
+          <Button variant="ghost" size="icon"><ArrowLeft className="w-4 h-4" /></Button>
+        </Link>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-lg sm:text-xl font-bold font-mono">{complaint.ticket_id}</h1>
+            <StatusBadge status={complaint.status} />
+            <PriorityBadge priority={complaint.priority} />
+            <Badge variant="outline" className="text-xs gap-1">
+              <Clock className="w-3 h-3" /> {ageHours}h old
+            </Badge>
+          </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
+            Created {format(new Date(complaint.created_date), 'MMM dd, yyyy HH:mm')} by {complaint.created_by}
+          </p>
+        </div>
+      </div>
+
+      {/* Status Progress */}
+      <Card>
+        <CardContent className="pt-4 pb-2 overflow-x-auto">
+          <StatusProgressBar currentStatus={complaint.status} />
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Status & Assignment — shown here on mobile/tablet, hidden on lg+ (shown in sidebar there) */}
+          <div className="lg:hidden space-y-4">
+            {canChangeStatus && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Update Status</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Select value={complaint.status} onValueChange={handleStatusChange} disabled={updating}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {statusOrder.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </CardContent>
+              </Card>
+            )}
+            {canAssign && (
+              <AssignmentCard
+                complaint={complaint}
+                departments={departments}
+                prevDept={prevDept}
+                updating={updating}
+                onAssignDepartment={handleAssignDepartment}
+                onReassignAgent={() => setAssignOpen(true)}
+              />
+            )}
+          </div>
+
+          {/* Complaint Info */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2"><User className="w-4 h-4" />Customer & Order Info</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoRow label="Customer" value={complaint.customer_name} />
+                <InfoRow label="Phone" value={complaint.customer_phone} />
+                <InfoRow label="Order Number" value={complaint.order_number} />
+                <InfoRow label="Complaint Type" value={complaint.complaint_type} />
+                <InfoRow label="Product" value={complaint.product_name} />
+                <InfoRow label="SKU" value={complaint.sku} />
+                <InfoRow label="Qty Affected" value={complaint.quantity_affected} />
+              </div>
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Description</p>
+                <p className="text-sm whitespace-pre-wrap">{complaint.description}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Shipping Info */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2"><Truck className="w-4 h-4" />Shipping Info</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <InfoRow label="Courier" value={complaint.courier_name} />
+                <InfoRow label="Original Tracking" value={complaint.tracking_number} />
+                <InfoRow label="Replacement Tracking" value={complaint.replacement_tracking_number} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Proof Files */}
+          {complaint.proof_files?.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2"><Package className="w-4 h-4" />Proof & Attachments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {complaint.proof_files.map((url, i) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                      className="block aspect-video rounded-lg bg-muted overflow-hidden border hover:border-primary transition-colors relative group">
+                      <img src={url} alt={`Proof ${i + 1}`} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                        <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Replacement Tracking — mobile/tablet only */}
+          {canEdit && (
+            <div className="lg:hidden">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-semibold">Replacement Tracking</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <TrackingForm complaint={complaint} updateComplaint={updateComplaint} updating={updating} />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Tabs: Notes & Timeline */}
+          <Tabs defaultValue="notes">
+            <TabsList>
+              <TabsTrigger value="notes">Internal Notes ({notes.length})</TabsTrigger>
+              <TabsTrigger value="timeline">Timeline ({activities.length})</TabsTrigger>
+            </TabsList>
+            <TabsContent value="notes" className="mt-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <InternalNotes notes={notes} complaintId={complaintId} canAddNotes={canAddNotes} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            <TabsContent value="timeline" className="mt-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <TicketTimeline activities={activities} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        {/* Sidebar Actions */}
+        <div className="space-y-4">
+          {/* Update Status — hidden on mobile/tablet (shown above tabs there) */}
+          {canChangeStatus && (
+            <Card className="hidden lg:block">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Update Status</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Select value={complaint.status} onValueChange={handleStatusChange} disabled={updating}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {statusOrder.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          )}
+
+          {canAssign && (
+            <div className="hidden lg:block">
+              <AssignmentCard
+                complaint={complaint}
+                departments={departments}
+                prevDept={prevDept}
+                updating={updating}
+                onAssignDepartment={handleAssignDepartment}
+                onReassignAgent={() => setAssignOpen(true)}
+              />
+            </div>
+          )}
+
+          {assignOpen && canAssign && (
+            <AssignAgentDialog
+              complaint={complaint}
+              open={assignOpen}
+              onClose={() => setAssignOpen(false)}
+              onSaved={() => {
+                queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+                queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
+              }}
+            />
+          )}
+
+          {canEdit && (
+            <Card className="hidden lg:block">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-semibold">Replacement Tracking</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TrackingForm complaint={complaint} updateComplaint={updateComplaint} updating={updating} />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AssignmentCard({ complaint, departments, prevDept, updating, onAssignDepartment, onReassignAgent }) {
+  const prevDeptRecord = departments.find((d) => d.name === prevDept);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-sm font-semibold">Assignment</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div>
+          <Label className="text-xs">Department</Label>
+          <Select value={complaint.assigned_department_id || ''} onValueChange={onAssignDepartment} disabled={updating}>
+            <SelectTrigger className="mt-1"><SelectValue placeholder="Select department" /></SelectTrigger>
+            <SelectContent>
+              {departments.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          {prevDeptRecord && prevDeptRecord.id !== complaint.assigned_department_id && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-2 h-7 text-xs w-full border-dashed text-muted-foreground hover:text-foreground"
+              disabled={updating}
+              onClick={() => onAssignDepartment(prevDeptRecord.id)}
+            >
+              <CornerUpLeft className="w-3 h-3 mr-1" />
+              Return to {prevDeptRecord.name}
+            </Button>
+          )}
+        </div>
+        <div>
+          <Label className="text-xs">Assigned Agent</Label>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-sm">{complaint.assigned_user_name || <span className="text-muted-foreground italic">Unassigned</span>}</p>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onReassignAgent}>
+              <UserCheck className="w-3 h-3 mr-1" />Reassign
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function InfoRow({ label, value }) {
+  return (
+    <div>
+      <p className="text-xs font-medium text-muted-foreground uppercase">{label}</p>
+      <p className="text-sm mt-0.5">{value || '—'}</p>
+    </div>
+  );
+}
+
+function TrackingForm({ complaint, updateComplaint, updating }) {
+  const [tracking, setTracking] = useState(complaint.replacement_tracking_number || '');
+
+  const handleSave = () => {
+    if (!tracking.trim()) return;
+    updateComplaint({ replacement_tracking_number: tracking.trim() }, `Replacement tracking number set to ${tracking.trim()}`, 'tracking_added');
+  };
+
+  return (
+    <div className="space-y-2">
+      <Input value={tracking} onChange={e => setTracking(e.target.value)} placeholder="Enter tracking number" />
+      <Button size="sm" onClick={handleSave} disabled={updating || !tracking.trim()} className="w-full">
+        {updating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : null}
+        Save Tracking
+      </Button>
+    </div>
+  );
+}
