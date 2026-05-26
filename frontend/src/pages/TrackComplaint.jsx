@@ -190,9 +190,7 @@ export default function TrackComplaint() {
       {/* Header */}
       <header className="bg-card border-b px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-[#1d679d]">
-            <Package className="w-5 h-5 text-white" />
-          </div>
+          <img src="/icons/logo.png" alt="EMZI Nexus Care" className="w-9 h-9 rounded-xl shrink-0 object-cover" />
           <div>
             <h1 className="font-bold text-lg leading-tight">EMZI Nexus Care</h1>
             <p className="text-xs text-muted-foreground">Complaint Status Tracker</p>
