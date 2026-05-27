@@ -160,6 +160,8 @@ In development, Vite proxies `/api` to `http://localhost:8000`.
 
 ```bash
 cd frontend
+cp .env.example .env
+# For split frontend/API hosts, set VITE_API_URL to your API base URL, then:
 npm run build
 ```
 
@@ -344,9 +346,41 @@ Features:
 
 ### CORS errors in production
 
+Cross-origin errors (e.g. frontend on `care.example.com` calling API on `careapi.example.com`) mean the browser’s **OPTIONS preflight** never got CORS headers from Laravel.
+
+**Backend `.env` (on the API server):**
+
+```env
+APP_URL=https://careapi.example.com
+FRONTEND_URL=https://care.example.com
+# Optional if you need multiple origins:
+# CORS_ALLOWED_ORIGINS=https://care.example.com,https://www.care.example.com
+```
+
+Then refresh config cache:
+
+```bash
+php artisan config:clear && php artisan config:cache
+```
+
+**Frontend (build-time):** set `VITE_API_URL` before `npm run build` (see `frontend/.env.example`):
+
+```env
+VITE_API_URL=https://careapi.example.com/api/v1
+```
+
+**Server checks for the API host:**
+
+- Document root must be `backend/public` (not the repo root).
+- Nginx: use `deploy/nginx/care-api.conf` as a template; PHP-FPM must handle all methods including `OPTIONS`.
+- After deploy, verify preflight:  
+  `curl -i -X OPTIONS 'https://careapi.example.com/api/v1/auth/login' -H 'Origin: https://care.example.com' -H 'Access-Control-Request-Method: POST'`  
+  Response should include `Access-Control-Allow-Origin`.
+
+**Same-domain alternative (no CORS):** proxy `/api` on the frontend host to Laravel (see `deploy/nginx/care.conf`) and build with `VITE_API_URL=/api/v1`.
+
 - Set `FRONTEND_URL` in backend `.env`
-- Add your domain to `SANCTUM_STATEFUL_DOMAINS`
-- Use Nginx to proxy `/api` to the backend (see `deploy/nginx/care.conf`)
+- Add your domain to `SANCTUM_STATEFUL_DOMAINS` if using cookie-based Sanctum auth
 
 ### File uploads fail
 
