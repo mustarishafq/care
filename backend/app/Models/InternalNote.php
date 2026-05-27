@@ -10,8 +10,7 @@ class InternalNote extends Model
     protected $fillable = [
         'complaint_id',
         'content',
-        'author_email',
-        'author_name',
+        'author_user_id',
         'department_id',
         'attachments',
     ];
@@ -21,6 +20,16 @@ class InternalNote extends Model
         return [
             'attachments' => 'array',
         ];
+    }
+
+    public function complaint(): BelongsTo
+    {
+        return $this->belongsTo(Complaint::class);
+    }
+
+    public function author(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'author_user_id');
     }
 
     public function department(): BelongsTo

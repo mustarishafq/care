@@ -36,7 +36,7 @@ trait AuthorizesPermissions
             ], 403));
         }
 
-        $assignFields = ['assigned_department_id', 'assigned_user', 'assigned_user_name'];
+        $assignFields = ['assigned_department_id', 'assigned_user_id'];
         $hasAssignChange = ! empty(array_intersect(array_keys($data), $assignFields));
         if ($hasAssignChange && ! $user->hasPermission('complaints.assign')) {
             throw new HttpResponseException(response()->json([

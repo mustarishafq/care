@@ -130,7 +130,7 @@ export default function Dashboard() {
 
 function UnassignedTickets({ complaints, onAssign }) {
   const unassigned = complaints
-    .filter(c => !c.assigned_user && !['Closed', 'Delivered', 'Rejected'].includes(c.status))
+    .filter(c => !c.assigned_user_id && !['Closed', 'Delivered', 'Rejected'].includes(c.status))
     .slice(0, 10);
 
   if (!unassigned.length) return null;

@@ -1,9 +1,9 @@
 import { db } from '@/api/db';
 
 /** Find users @mentioned in note content (longest-name-first to avoid partial matches). */
-export function findMentionedUsers(content, users, excludeEmail = null) {
+export function findMentionedUsers(content, users, excludeUserId = null) {
   const candidates = users
-    .filter(u => u.full_name && u.email !== excludeEmail)
+    .filter(u => u.full_name && String(u.id) !== String(excludeUserId))
     .sort((a, b) => b.full_name.length - a.full_name.length);
 
   const mentioned = new Map();
@@ -31,7 +31,7 @@ export function findMentionedUsers(content, users, excludeEmail = null) {
     }
 
     if (matched) {
-      mentioned.set(matched.email, matched);
+      mentioned.set(matched.id, matched);
       i += 1 + matched.full_name.length;
     } else {
       i++;
@@ -41,11 +41,11 @@ export function findMentionedUsers(content, users, excludeEmail = null) {
   return [...mentioned.values()];
 }
 
-export async function sendNotification({ recipient_email, title, message, type, complaint_id }) {
-  if (!recipient_email) return null;
+export async function sendNotification({ recipient_user_id, title, message, type, complaint_id }) {
+  if (!recipient_user_id) return null;
 
   return db.entities.Notification.create({
-    recipient_email,
+    recipient_user_id,
     title,
     message,
     type,
@@ -54,11 +54,11 @@ export async function sendNotification({ recipient_email, title, message, type, 
   });
 }
 
-export async function notifyAssignedUser({ assigneeEmail, assignerName, ticketId, complaintId }) {
-  if (!assigneeEmail) return;
+export async function notifyAssignedUser({ assigneeUserId, assignerName, ticketId, complaintId }) {
+  if (!assigneeUserId) return;
 
   await sendNotification({
-    recipient_email: assigneeEmail,
+    recipient_user_id: assigneeUserId,
     title: 'Ticket assigned to you',
     message: `${assignerName || 'Someone'} assigned ticket ${ticketId} to you.`,
     type: 'ticket_assigned',
@@ -66,11 +66,11 @@ export async function notifyAssignedUser({ assigneeEmail, assignerName, ticketId
   });
 }
 
-export async function notifyStatusChange({ recipientEmail, changerName, ticketId, oldStatus, newStatus, complaintId }) {
-  if (!recipientEmail) return;
+export async function notifyStatusChange({ recipientUserId, changerName, ticketId, oldStatus, newStatus, complaintId }) {
+  if (!recipientUserId) return;
 
   await sendNotification({
-    recipient_email: recipientEmail,
+    recipient_user_id: recipientUserId,
     title: 'Ticket status updated',
     message: `${changerName || 'Someone'} changed ticket ${ticketId} from "${oldStatus}" to "${newStatus}".`,
     type: 'status_changed',

@@ -131,8 +131,6 @@ export default function OmsIntegration() {
         description: `[Fulfillment System] Status updated to "${manualForm.status}"${manualForm.notes ? ` — ${manualForm.notes}` : ''}`,
         old_value: complaint.status,
         new_value: manualForm.status,
-        user_email: 'system@fulfillment',
-        user_name: 'Fulfillment System',
       });
     }
 

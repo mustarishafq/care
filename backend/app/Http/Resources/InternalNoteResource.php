@@ -15,10 +15,11 @@ class InternalNoteResource extends JsonResource
     {
         return $this->withLegacyDates([
             'id' => (string) $this->id,
-            'complaint_id' => $this->complaint_id,
+            'complaint_id' => $this->complaint_id ? (string) $this->complaint_id : null,
             'content' => $this->content,
-            'author_email' => $this->author_email,
-            'author_name' => $this->author_name,
+            'author_user_id' => $this->author_user_id ? (string) $this->author_user_id : null,
+            'author_email' => $this->author?->email,
+            'author_name' => $this->author?->full_name ?? $this->author?->name,
             'department_id' => $this->department_id ? (string) $this->department_id : null,
             'department' => $this->department?->name,
             'attachments' => StoragePath::urlMany($this->attachments),

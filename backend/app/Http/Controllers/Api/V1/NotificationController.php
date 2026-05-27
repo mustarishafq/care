@@ -17,7 +17,7 @@ class NotificationController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = Notification::query();
+        $query = Notification::query()->with('recipient');
         $this->applyFilters($query, $request->except(['sort', 'limit']));
         $this->applySort($query, $request->query('sort', '-created_date'));
 
@@ -31,17 +31,17 @@ class NotificationController extends Controller
     public function store(Request $request): NotificationResource
     {
         $data = $request->validate([
-            'recipient_email' => ['required', 'email'],
+            'recipient_user_id' => ['required', 'integer', 'exists:users,id'],
             'title' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string'],
             'type' => ['required', 'string', 'max:255'],
-            'complaint_id' => ['nullable', 'string'],
+            'complaint_id' => ['nullable', 'integer', 'exists:complaints,id'],
             'is_read' => ['nullable', 'boolean'],
         ]);
 
         $notification = Notification::create($data);
 
-        return new NotificationResource($notification);
+        return new NotificationResource($notification->load('recipient'));
     }
 
     public function update(Request $request, string $id): NotificationResource
@@ -51,7 +51,7 @@ class NotificationController extends Controller
             'is_read' => ['sometimes', 'boolean'],
         ]));
 
-        return new NotificationResource($notification->fresh());
+        return new NotificationResource($notification->fresh()->load('recipient'));
     }
 
     public function sendEmail(Request $request): JsonResponse

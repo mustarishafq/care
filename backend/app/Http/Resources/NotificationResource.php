@@ -14,11 +14,12 @@ class NotificationResource extends JsonResource
     {
         return $this->withLegacyDates([
             'id' => (string) $this->id,
-            'recipient_email' => $this->recipient_email,
+            'recipient_user_id' => $this->recipient_user_id ? (string) $this->recipient_user_id : null,
+            'recipient_email' => $this->recipient?->email,
             'title' => $this->title,
             'message' => $this->message,
             'type' => $this->type,
-            'complaint_id' => $this->complaint_id,
+            'complaint_id' => $this->complaint_id ? (string) $this->complaint_id : null,
             'is_read' => $this->is_read,
         ], $this->resource);
     }

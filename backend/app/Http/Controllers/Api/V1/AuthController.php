@@ -24,7 +24,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Registration successful. Your account is pending admin approval.',
-            'user' => new UserResource($user),
+            'user' => new UserResource($user->load(['departments', 'role'])),
         ], 201);
     }
 
@@ -37,13 +37,13 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $result['token'],
-            'user' => new UserResource($result['user']->load('departments')),
+            'user' => new UserResource($result['user']->load(['departments', 'role'])),
         ]);
     }
 
     public function me(Request $request): UserResource
     {
-        return new UserResource($request->user()->load('departments'));
+        return new UserResource($request->user()->load(['departments', 'role']));
     }
 
     public function updateMe(Request $request): UserResource

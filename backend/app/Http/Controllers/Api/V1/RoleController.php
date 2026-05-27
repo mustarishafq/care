@@ -7,6 +7,7 @@ use App\Http\Controllers\Concerns\AuthorizesPermissions;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RoleResource;
 use App\Models\Role;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -17,11 +18,14 @@ class RoleController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $this->ensurePermission($request->user(), 'users.manage');
+        $user = $request->user();
+        if (! $user->hasPermission('users.manage') && ! $user->hasPermission('users.invite')) {
+            $this->ensurePermission($user, 'users.manage');
+        }
 
         $query = Role::query();
         $this->applyFilters($query, $request->except(['sort', 'limit']));
-        $this->applySort($query, $request->query('sort', '-created_date'));
+        $this->applySort($query, $request->query('sort', 'sort_order'));
 
         if ($limit = $request->integer('limit')) {
             $query->limit($limit);
@@ -41,6 +45,9 @@ class RoleController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
+        $data['is_system'] = false;
+        $data['is_admin'] = false;
+
         return new RoleResource(Role::create($data));
     }
 
@@ -49,12 +56,18 @@ class RoleController extends Controller
         $this->ensurePermission($request->user(), 'users.manage');
 
         $role = Role::findOrFail($id);
-        $role->update($request->validate([
+        $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'permissions' => ['nullable', 'array'],
             'is_active' => ['nullable', 'boolean'],
-        ]));
+        ]);
+
+        if ($role->is_system) {
+            unset($data['is_active']);
+        }
+
+        $role->update($data);
 
         return new RoleResource($role->fresh());
     }
@@ -63,8 +76,22 @@ class RoleController extends Controller
     {
         $this->ensurePermission($request->user(), 'users.manage');
 
-        Role::findOrFail($id)->delete();
+        $role = Role::findOrFail($id);
 
-        return response()->json(['message' => 'Deleted successfully.']);
+        if ($role->is_system) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'System roles cannot be deleted.',
+            ], 422));
+        }
+
+        if ($role->users()->exists()) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'Cannot delete a role that is assigned to users.',
+            ], 422));
+        }
+
+        $role->delete();
+
+        return response()->json(['message' => 'Role deleted successfully.']);
     }
 }

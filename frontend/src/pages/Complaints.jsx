@@ -15,17 +15,15 @@ import { getUserDepartmentIds } from '@/lib/useDepartments';
 export default function Complaints() {
   const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState({ search: '', status: '', type: '', priority: '', department: '', courier: '' });
-  const { user: currentUser, loading: userLoading } = useCurrentUser();
+  const { user: currentUser, isAdmin: isAdminOrMgmt, loading: userLoading } = useCurrentUser();
   const { hasPermission, loading: permLoading } = usePermissions();
   const canCreate = hasPermission('complaints.create');
+  const userDeptIds = getUserDepartmentIds(currentUser);
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
     queryFn: () => db.entities.Complaint.list('-created_date', 500),
   });
-
-  const isAdminOrMgmt = currentUser?.role === 'super_admin' || currentUser?.role === 'management';
-  const userDeptIds = getUserDepartmentIds(currentUser);
 
   const filtered = useMemo(() => {
     return complaints.filter(c => {

@@ -6,9 +6,9 @@ export function useNotifications() {
   const { user } = useCurrentUser();
 
   const query = useQuery({
-    queryKey: ['notifications', user?.email],
-    queryFn: () => db.entities.Notification.filter({ recipient_email: user?.email }, '-created_date'),
-    enabled: !!user?.email,
+    queryKey: ['notifications', user?.id],
+    queryFn: () => db.entities.Notification.filter({ recipient_user_id: user?.id }, '-created_date'),
+    enabled: !!user?.id,
     refetchInterval: 15_000,
   });
 

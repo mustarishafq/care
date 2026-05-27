@@ -30,9 +30,9 @@ export default function Users() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [editUserOpen, setEditUserOpen] = useState(false);
   const [editUserTarget, setEditUserTarget] = useState(null);
-  const [editUserForm, setEditUserForm] = useState({ full_name: '', phone: '', status: 'active', department_ids: [] });
+  const [editUserForm, setEditUserForm] = useState({ full_name: '', phone: '', status: 'active', department_ids: [], role_id: '' });
   const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('viewer');
+  const [inviteRoleId, setInviteRoleId] = useState('');
   const [inviting, setInviting] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
 
@@ -43,17 +43,19 @@ export default function Users() {
 
   const { data: departments = [] } = useDepartments();
 
-  const { data: customRoles = [] } = useQuery({
+  const { data: roles = [] } = useQuery({
     queryKey: ['roles'],
-    queryFn: () => db.entities.Role.list(),
+    queryFn: () => db.entities.Role.list('sort_order'),
   });
+
+  const defaultRoleId = roles.find(r => r.slug === 'viewer')?.id || roles[0]?.id || '';
 
   const openEditUser = (u) => {
     setEditUserTarget(u);
     setEditUserForm({
       full_name: u.full_name || '',
       phone: u.phone || '',
-      role: u.role || 'viewer',
+      role_id: u.role_id || defaultRoleId,
       status: u.status || 'active',
       department_ids: u.department_ids || u.departments?.map((d) => d.id) || [],
     });
@@ -74,7 +76,7 @@ export default function Users() {
     await db.entities.User.update(editUserTarget.id, {
       full_name: editUserForm.full_name,
       phone: editUserForm.phone,
-      role: editUserForm.role,
+      role_id: editUserForm.role_id,
       status: editUserForm.status,
       department_ids: editUserForm.department_ids,
     });
@@ -93,7 +95,7 @@ export default function Users() {
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
     setInviting(true);
-    await db.users.inviteUser(inviteEmail.trim(), inviteRole);
+    await db.users.inviteUser(inviteEmail.trim(), inviteRoleId || defaultRoleId);
     toast.success(`Invitation sent to ${inviteEmail}`);
     setInviteEmail(''); setInviteOpen(false); setInviting(false);
   };
@@ -150,7 +152,7 @@ export default function Users() {
                     <TableCell className="text-sm text-muted-foreground">{u.email}</TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="text-xs">
-                        {getRoleLabel(u.role, customRoles, u.role_label)}
+                        {getRoleLabel(u.role_id, roles, u.role_label)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -219,10 +221,10 @@ export default function Users() {
             {canManage && editUserTarget?.id !== currentUser?.id && (
               <div className="space-y-1.5">
                 <Label className="text-xs">Role</Label>
-                <Select value={editUserForm.role} onValueChange={v => setEditUserForm(p => ({ ...p, role: v }))}>
+                <Select value={String(editUserForm.role_id || defaultRoleId)} onValueChange={v => setEditUserForm(p => ({ ...p, role_id: v }))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <RoleSelectOptions customRoles={customRoles} />
+                    <RoleSelectOptions roles={roles} />
                   </SelectContent>
                 </Select>
               </div>
@@ -278,10 +280,10 @@ export default function Users() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Role</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
+              <Select value={String(inviteRoleId || defaultRoleId)} onValueChange={setInviteRoleId}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <RoleSelectOptions customRoles={customRoles} />
+                  <RoleSelectOptions roles={roles} />
                 </SelectContent>
               </Select>
             </div>

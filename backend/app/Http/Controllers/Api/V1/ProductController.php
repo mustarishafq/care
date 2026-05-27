@@ -19,7 +19,7 @@ class ProductController extends Controller
     {
         $this->ensurePermission($request->user(), 'products.view');
 
-        $query = Product::query();
+        $query = Product::query()->with('category');
         $this->applyFilters($query, $request->except(['sort', 'limit']));
         $this->applySort($query, $request->query('sort', 'name'));
 
@@ -37,12 +37,12 @@ class ProductController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:255'],
-            'category' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        return new ProductResource(Product::create($data));
+        return new ProductResource(Product::create($data)->load('category'));
     }
 
     public function update(Request $request, string $id): ProductResource
@@ -53,12 +53,12 @@ class ProductController extends Controller
         $product->update($request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
             'sku' => ['nullable', 'string', 'max:255'],
-            'category' => ['nullable', 'string', 'max:255'],
+            'category_id' => ['nullable', 'integer', 'exists:product_categories,id'],
             'description' => ['nullable', 'string'],
             'is_active' => ['nullable', 'boolean'],
         ]));
 
-        return new ProductResource($product->fresh());
+        return new ProductResource($product->fresh()->load('category'));
     }
 
     public function destroy(Request $request, string $id): JsonResponse

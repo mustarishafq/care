@@ -102,7 +102,7 @@ export default function RolesPermissions() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Roles & Permissions</h1>
-          <p className="text-muted-foreground text-sm mt-1">Define custom roles and control access</p>
+          <p className="text-muted-foreground text-sm mt-1">Manage roles and control access</p>
         </div>
         <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />New Role</Button>
       </div>
@@ -115,11 +115,14 @@ export default function RolesPermissions() {
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-primary" />
                   <CardTitle className="text-sm">{role.name}</CardTitle>
+                  {role.is_system && <Badge variant="outline" className="text-[10px]">System</Badge>}
                   {role.is_active === false && <Badge variant="secondary" className="text-[10px]">Inactive</Badge>}
                 </div>
                 <div className="flex gap-1">
                   <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(role)}><Pencil className="w-3.5 h-3.5" /></Button>
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(role.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                  {!role.is_system && (
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(role.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                  )}
                 </div>
               </div>
               {role.description && <p className="text-xs text-muted-foreground mt-1">{role.description}</p>}

@@ -71,8 +71,7 @@ export default function ComplaintDetail() {
         complaint_id: complaintId,
         action_type: actionType,
         description: activityDesc,
-        user_email: user?.email,
-        user_name: user?.full_name,
+        user_id: user?.id,
       });
 
       if (notifyRecipient) {
@@ -92,10 +91,10 @@ export default function ComplaintDetail() {
 
   const handleStatusChange = async (newStatus) => {
     const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
-    const assignedUser = complaint.assigned_user;
-    const notifyRecipient = assignedUser && assignedUser !== user?.email
+    const assignedUserId = complaint.assigned_user_id;
+    const notifyRecipient = assignedUserId && String(assignedUserId) !== String(user?.id)
       ? {
-          recipientEmail: assignedUser,
+          recipientUserId: assignedUserId,
           changerName: user?.full_name,
           ticketId: complaint.ticket_id,
           oldStatus: complaint.status,
@@ -399,7 +398,7 @@ function AssignmentCard({ complaint, departments, prevDept, updating, onAssignDe
         <div>
           <Label className="text-xs">Assigned Agent</Label>
           <div className="flex items-center justify-between mt-1">
-            <p className="text-sm">{complaint.assigned_user_name || <span className="text-muted-foreground italic">Unassigned</span>}</p>
+            <p className="text-sm">{complaint.assigned_user_name || complaint.assigned_user || <span className="text-muted-foreground italic">Unassigned</span>}</p>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onReassignAgent}>
               <UserCheck className="w-3 h-3 mr-1" />Reassign
             </Button>

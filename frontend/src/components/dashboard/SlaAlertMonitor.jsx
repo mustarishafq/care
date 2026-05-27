@@ -21,7 +21,7 @@ function markAlerted(id) {
 
 export default function SlaAlertMonitor({ user }) {
   const queryClient = useQueryClient();
-  const isManager = ['super_admin', 'admin', 'management'].includes(user?.role);
+  const isManager = !!user?.is_admin;
   const lastRunRef = useRef(0);
 
   const { data: complaints = [] } = useQuery({
@@ -64,7 +64,7 @@ export default function SlaAlertMonitor({ user }) {
 
       // In-app notification for the current manager
       await sendNotification({
-        recipient_email: user.email,
+        recipient_user_id: user.id,
         title,
         message,
         type: 'sla_warning',

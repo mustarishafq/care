@@ -54,8 +54,7 @@ class ComplaintController extends Controller
             'status_id' => ['nullable', 'integer', 'exists:complaint_statuses,id'],
             'status' => ['nullable', 'string', 'max:255'],
             'assigned_department_id' => ['nullable', 'integer', 'exists:departments,id'],
-            'assigned_user' => ['nullable', 'string', 'max:255'],
-            'assigned_user_name' => ['nullable', 'string', 'max:255'],
+            'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'resolution_notes' => ['nullable', 'string'],
             'sla_deadline' => ['nullable', 'date'],
         ]);
@@ -98,8 +97,7 @@ class ComplaintController extends Controller
             'status_id' => ['nullable', 'integer', 'exists:complaint_statuses,id'],
             'status' => ['nullable', 'string', 'max:255'],
             'assigned_department_id' => ['nullable', 'integer', 'exists:departments,id'],
-            'assigned_user' => ['nullable', 'string', 'max:255'],
-            'assigned_user_name' => ['nullable', 'string', 'max:255'],
+            'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'resolution_notes' => ['nullable', 'string'],
             'sla_deadline' => ['nullable', 'date'],
             'sla_paused_at' => ['nullable', 'date'],
@@ -134,6 +132,6 @@ class ComplaintController extends Controller
     /** @return list<string> */
     private function complaintRelations(): array
     {
-        return ['assignedDepartment', 'complaintStatus', 'complaintType', 'courier', 'priority', 'product'];
+        return ['assignedDepartment', 'assignedUser', 'complaintStatus', 'complaintType', 'courier', 'priority', 'product'];
     }
 }

@@ -11,12 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Pencil, Trash2, Package, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/lib/usePermissions';
 
-const emptyProduct = { name: '', sku: '', category: '', description: '', is_active: true };
+const emptyProduct = { name: '', sku: '', category_id: '', description: '', is_active: true };
 
 export default function Products() {
   const queryClient = useQueryClient();
@@ -33,6 +34,11 @@ export default function Products() {
     queryFn: () => db.entities.Product.list('name', 500),
   });
 
+  const { data: categories = [] } = useQuery({
+    queryKey: ['product_categories'],
+    queryFn: () => db.entities.ProductCategory.list('sort_order'),
+  });
+
   const filtered = products.filter(p =>
     !search || `${p.name} ${p.sku} ${p.category}`.toLowerCase().includes(search.toLowerCase())
   );
@@ -40,18 +46,28 @@ export default function Products() {
   const openCreate = () => { setEditingProduct(null); setForm(emptyProduct); setDialogOpen(true); };
   const openEdit = (p) => {
     setEditingProduct(p);
-    setForm({ name: p.name, sku: p.sku || '', category: p.category || '', description: p.description || '', is_active: p.is_active !== false });
+    setForm({
+      name: p.name,
+      sku: p.sku || '',
+      category_id: p.category_id || '',
+      description: p.description || '',
+      is_active: p.is_active !== false,
+    });
     setDialogOpen(true);
   };
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast.error('Product name is required'); return; }
     setSaving(true);
+    const payload = {
+      ...form,
+      category_id: form.category_id || null,
+    };
     if (editingProduct) {
-      await db.entities.Product.update(editingProduct.id, form);
+      await db.entities.Product.update(editingProduct.id, payload);
       toast.success('Product updated');
     } else {
-      await db.entities.Product.create(form);
+      await db.entities.Product.create(payload);
       toast.success('Product created');
     }
     queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -162,7 +178,14 @@ export default function Products() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Category</Label>
-                <Input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Electronics" />
+                <Select value={String(form.category_id || '')} onValueChange={v => setForm(p => ({ ...p, category_id: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-1.5">

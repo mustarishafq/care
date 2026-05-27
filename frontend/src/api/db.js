@@ -6,6 +6,7 @@ const ENTITY_MAP = {
   InternalNote: 'internal-notes',
   Notification: 'notifications',
   Product: 'products',
+  ProductCategory: 'product-categories',
   Role: 'roles',
   SystemConfig: 'system-configs',
   Department: 'departments',
@@ -113,8 +114,8 @@ export const db = {
   },
 
   users: {
-    async inviteUser(email, role) {
-      const data = await http.post('/users/invite', { email, role });
+    async inviteUser(email, roleId) {
+      const data = await http.post('/users/invite', { email, role_id: roleId });
       return data;
     },
 

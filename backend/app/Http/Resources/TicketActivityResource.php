@@ -14,13 +14,14 @@ class TicketActivityResource extends JsonResource
     {
         return $this->withLegacyDates([
             'id' => (string) $this->id,
-            'complaint_id' => $this->complaint_id,
+            'complaint_id' => $this->complaint_id ? (string) $this->complaint_id : null,
             'action_type' => $this->action_type,
             'description' => $this->description,
             'old_value' => $this->old_value,
             'new_value' => $this->new_value,
-            'user_email' => $this->user_email,
-            'user_name' => $this->user_name,
+            'user_id' => $this->user_id ? (string) $this->user_id : null,
+            'user_email' => $this->user?->email,
+            'user_name' => $this->user?->full_name ?? $this->user?->name,
         ], $this->resource);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Facades\Hash;
@@ -19,7 +20,7 @@ class AuthService
             'email' => $data['email'],
             'phone' => $data['phone'] ?? null,
             'password' => $data['password'],
-            'role' => 'viewer',
+            'role_id' => Role::defaultId(),
             'status' => User::STATUS_ACTIVE,
             'approval_status' => User::APPROVAL_PENDING,
         ]);

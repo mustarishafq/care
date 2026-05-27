@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AuthorizesPermissions;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
 use App\Mail\UserInvitationMail;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -27,7 +28,7 @@ class UserController extends Controller
             $this->ensurePermission($user, 'users.view');
         }
 
-        return UserResource::collection(User::with('departments')->orderBy('full_name')->get());
+        return UserResource::collection(User::with(['departments', 'role'])->orderBy('full_name')->get());
     }
 
     public function update(Request $request, string $id): UserResource
@@ -40,15 +41,15 @@ class UserController extends Controller
         $data = $request->validate([
             'full_name' => ['sometimes', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'role' => ['sometimes', 'string', 'max:255'],
+            'role_id' => ['sometimes', 'integer', 'exists:roles,id'],
             'status' => ['sometimes', 'in:active,inactive'],
             'department_ids' => ['nullable', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
             'must_change_password' => ['sometimes', 'boolean'],
         ]);
 
-        if (isset($data['role']) && ! $currentUser->isAdmin()) {
-            unset($data['role']);
+        if (isset($data['role_id']) && ! $currentUser->isAdmin()) {
+            unset($data['role_id']);
         }
 
         if (isset($data['full_name'])) {
@@ -64,7 +65,7 @@ class UserController extends Controller
             $user->departments()->sync($departmentIds);
         }
 
-        return new UserResource($user->fresh()->load('departments'));
+        return new UserResource($user->fresh()->load(['departments', 'role']));
     }
 
     public function invite(Request $request): JsonResponse
@@ -73,9 +74,10 @@ class UserController extends Controller
 
         $request->validate([
             'email' => ['required', 'email', 'unique:users,email'],
-            'role' => ['nullable', 'string', 'max:255'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,id'],
         ]);
 
+        $roleId = $request->input('role_id') ?: Role::defaultId();
         $temporaryPassword = Str::random(12);
 
         $user = User::create([
@@ -83,7 +85,7 @@ class UserController extends Controller
             'full_name' => $request->email,
             'email' => $request->email,
             'password' => Hash::make($temporaryPassword),
-            'role' => $request->input('role', 'viewer'),
+            'role_id' => $roleId,
             'status' => User::STATUS_ACTIVE,
             'approval_status' => User::APPROVAL_APPROVED,
             'must_change_password' => true,
@@ -99,7 +101,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Invitation sent successfully.',
-            'user' => new UserResource($user->load('departments')),
+            'user' => new UserResource($user->load(['departments', 'role'])),
         ], 201);
     }
 
@@ -113,7 +115,7 @@ class UserController extends Controller
             'status' => User::STATUS_ACTIVE,
         ]);
 
-        return new UserResource($user->fresh()->load('departments'));
+        return new UserResource($user->fresh()->load(['departments', 'role']));
     }
 
     public function reject(Request $request, string $id): UserResource
@@ -126,7 +128,7 @@ class UserController extends Controller
             'status' => User::STATUS_INACTIVE,
         ]);
 
-        return new UserResource($user->fresh()->load('departments'));
+        return new UserResource($user->fresh()->load(['departments', 'role']));
     }
 
     public function disable(Request $request, string $id): UserResource
@@ -136,6 +138,6 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $user->update(['status' => User::STATUS_INACTIVE]);
 
-        return new UserResource($user->fresh()->load('departments'));
+        return new UserResource($user->fresh()->load(['departments', 'role']));
     }
 }

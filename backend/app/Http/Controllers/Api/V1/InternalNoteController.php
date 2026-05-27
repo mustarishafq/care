@@ -20,7 +20,7 @@ class InternalNoteController extends Controller
     {
         $this->ensurePermission($request->user(), 'complaints.view');
 
-        $query = InternalNote::query()->with('department');
+        $query = InternalNote::query()->with(['department', 'author']);
         $this->applyFilters($query, $request->except(['sort', 'limit']));
         $this->applySort($query, $request->query('sort', '-created_date'));
 
@@ -36,13 +36,16 @@ class InternalNoteController extends Controller
         $this->ensurePermission($request->user(), 'complaints.add_notes');
 
         $data = $request->validate([
-            'complaint_id' => ['required', 'string'],
+            'complaint_id' => ['required', 'integer', 'exists:complaints,id'],
             'content' => ['required', 'string'],
-            'author_email' => ['nullable', 'string', 'max:255'],
-            'author_name' => ['nullable', 'string', 'max:255'],
+            'author_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'department_id' => ['nullable', 'integer', 'exists:departments,id'],
             'attachments' => ['nullable', 'array'],
         ]);
+
+        if (empty($data['author_user_id']) && $request->user()) {
+            $data['author_user_id'] = $request->user()->id;
+        }
 
         if (isset($data['attachments'])) {
             $data['attachments'] = StoragePath::normalizeMany($data['attachments']);
@@ -50,7 +53,7 @@ class InternalNoteController extends Controller
 
         $note = InternalNote::create($data);
 
-        return new InternalNoteResource($note);
+        return new InternalNoteResource($note->load(['department', 'author']));
     }
 
     public function update(Request $request, string $id): InternalNoteResource
@@ -70,7 +73,7 @@ class InternalNoteController extends Controller
 
         $note->update($data);
 
-        return new InternalNoteResource($note->fresh()->load('department'));
+        return new InternalNoteResource($note->fresh()->load(['department', 'author']));
     }
 
     public function destroy(Request $request, string $id): JsonResponse

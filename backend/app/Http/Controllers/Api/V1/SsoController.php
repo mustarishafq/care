@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\UserResource;
+use App\Models\Role;
 use App\Models\SystemConfig;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -54,13 +55,21 @@ class SsoController extends Controller
             return response()->json(['message' => 'Token missing email claim.'], 422);
         }
 
+        $defaultRoleId = $ssoSettings['default_role_id'] ?? null;
+        if (! $defaultRoleId && ! empty($ssoSettings['default_role'])) {
+            $defaultRoleId = Role::idForSlug($ssoSettings['default_role']);
+        }
+        if (! $defaultRoleId) {
+            $defaultRoleId = Role::defaultId();
+        }
+
         $user = User::firstOrCreate(
             ['email' => $email],
             [
                 'name' => $claims['name'] ?? $email,
                 'full_name' => $claims['name'] ?? $email,
                 'password' => Hash::make(bin2hex(random_bytes(32))),
-                'role' => $ssoSettings['default_role'] ?? 'viewer',
+                'role_id' => $defaultRoleId,
                 'status' => User::STATUS_ACTIVE,
                 'approval_status' => User::APPROVAL_APPROVED,
             ]
@@ -74,7 +83,7 @@ class SsoController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => new UserResource($user->load('departments')),
+            'user' => new UserResource($user->load(['departments', 'role'])),
         ]);
     }
 }

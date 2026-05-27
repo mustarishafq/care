@@ -2,7 +2,6 @@ import { db } from '@/api/db';
 
 import { useState, useEffect } from 'react';
 
-// Module-level cache so user is only fetched once per session
 let cachedUser = null;
 let cachedPromise = null;
 
@@ -26,17 +25,13 @@ export function useCurrentUser() {
     }).catch(() => setLoading(false));
   }, []);
 
-  const hasRole = (roles) => {
-    if (!user) return false;
-    if (typeof roles === 'string') return user.role === roles;
-    return roles.includes(user.role);
+  const hasRole = (roleIds) => {
+    if (!user?.role_id) return false;
+    if (typeof roleIds === 'string') return String(user.role_id) === String(roleIds);
+    return roleIds.some((id) => String(user.role_id) === String(id));
   };
 
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin' || user?.role === 'management';
-  const isCS = user?.role === 'customer_service';
-  const isFulfillment = user?.role === 'fulfillment';
-  const isLogistics = user?.role === 'logistics';
-  const isManagement = user?.role === 'management';
+  const isAdmin = !!user?.is_admin;
 
-  return { user, loading, hasRole, isAdmin, isCS, isFulfillment, isLogistics, isManagement };
+  return { user, loading, hasRole, isAdmin };
 }

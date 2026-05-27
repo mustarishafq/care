@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call(RoleSeeder::class);
+
         $defaultDepartments = [
             'Customer Service',
             'Fulfillment',
@@ -86,6 +88,8 @@ class DatabaseSeeder extends Seeder
         }
 
         $administration = Department::where('name', 'Administration')->first();
+        $superAdminRole = Role::where('slug', 'super_admin')->first();
+        $viewerRole = Role::where('slug', 'viewer')->first();
 
         $admin = User::firstOrCreate(
             ['email' => 'admin@admin.com'],
@@ -93,11 +97,15 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Admin',
                 'full_name' => 'System Administrator',
                 'password' => 'password',
-                'role' => 'super_admin',
+                'role_id' => $superAdminRole?->id ?? $viewerRole?->id,
                 'status' => User::STATUS_ACTIVE,
                 'approval_status' => User::APPROVAL_APPROVED,
             ]
         );
+
+        if ($superAdminRole && $admin->role_id !== $superAdminRole->id) {
+            $admin->update(['role_id' => $superAdminRole->id]);
+        }
 
         if ($administration) {
             $admin->departments()->syncWithoutDetaching([$administration->id]);
@@ -120,7 +128,7 @@ class DatabaseSeeder extends Seeder
                     'enabled' => false,
                     'secret' => '',
                     'issuer' => '',
-                    'default_role' => 'viewer',
+                    'default_role_id' => $viewerRole?->id,
                 ],
             ],
             [
@@ -136,14 +144,5 @@ class DatabaseSeeder extends Seeder
                 $config
             );
         }
-
-        Role::firstOrCreate(
-            ['name' => 'Default Viewer'],
-            [
-                'description' => 'Read-only access to complaints and reports',
-                'permissions' => ['complaints.view', 'reports.view', 'products.view'],
-                'is_active' => true,
-            ]
-        );
     }
 }

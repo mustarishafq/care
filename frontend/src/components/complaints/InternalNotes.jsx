@@ -93,14 +93,13 @@ export default function InternalNotes({ notes, complaintId, canAddNotes = false 
     setSending(true);
 
     const trimmed = content.trim();
-    const mentionedUsers = findMentionedUsers(trimmed, users, user?.email);
+    const mentionedUsers = findMentionedUsers(trimmed, users, user?.id);
 
     try {
       await db.entities.InternalNote.create({
         complaint_id: complaintId,
         content: trimmed,
-        author_email: user?.email,
-        author_name: user?.full_name,
+        author_user_id: user?.id,
         department_id: getUserDepartmentIds(user)[0] || null,
       });
 
@@ -108,13 +107,12 @@ export default function InternalNotes({ notes, complaintId, canAddNotes = false 
         complaint_id: complaintId,
         action_type: 'note_added',
         description: `Note added by ${user?.full_name}${mentionedUsers.length ? ` (mentioned: ${mentionedUsers.map(u => u.full_name).join(', ')})` : ''}`,
-        user_email: user?.email,
-        user_name: user?.full_name,
+        user_id: user?.id,
       });
 
       await Promise.all(mentionedUsers.map(mu =>
         sendNotification({
-          recipient_email: mu.email,
+          recipient_user_id: mu.id,
           title: 'You were mentioned in a note',
           message: `${user?.full_name} mentioned you on ticket. Note: "${trimmed.slice(0, 100)}${trimmed.length > 100 ? '…' : ''}"`,
           type: 'mention',

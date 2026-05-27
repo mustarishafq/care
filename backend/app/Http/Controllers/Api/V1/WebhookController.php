@@ -48,12 +48,10 @@ class WebhookController extends Controller
             $complaint->update(ComplaintInput::normalizeForUpdate($updates));
 
             TicketActivity::create([
-                'complaint_id' => (string) $complaint->id,
+                'complaint_id' => $complaint->id,
                 'action_type' => 'tracking_added',
                 'description' => 'Tracking updated via webhook',
                 'new_value' => json_encode($updates),
-                'user_email' => 'system@webhook',
-                'user_name' => 'OMS Webhook',
             ]);
         }
 

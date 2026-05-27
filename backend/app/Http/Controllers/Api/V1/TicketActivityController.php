@@ -19,7 +19,7 @@ class TicketActivityController extends Controller
     {
         $this->ensurePermission($request->user(), 'complaints.view');
 
-        $query = TicketActivity::query();
+        $query = TicketActivity::query()->with('user');
         $this->applyFilters($query, $request->except(['sort', 'limit']));
         $this->applySort($query, $request->query('sort', '-created_date'));
 
@@ -33,20 +33,23 @@ class TicketActivityController extends Controller
     public function store(Request $request): TicketActivityResource
     {
         $data = $request->validate([
-            'complaint_id' => ['required', 'string'],
+            'complaint_id' => ['required', 'integer', 'exists:complaints,id'],
             'action_type' => ['required', 'string', 'max:255'],
             'description' => ['required', 'string'],
             'old_value' => ['nullable', 'string'],
             'new_value' => ['nullable', 'string'],
-            'user_email' => ['nullable', 'string', 'max:255'],
-            'user_name' => ['nullable', 'string', 'max:255'],
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
+
+        if (empty($data['user_id']) && $request->user()) {
+            $data['user_id'] = $request->user()->id;
+        }
 
         $this->ensureTicketActivityPermission($request->user(), $data['action_type']);
 
         $activity = TicketActivity::create($data);
 
-        return new TicketActivityResource($activity);
+        return new TicketActivityResource($activity->load('user'));
     }
 
     public function update(Request $request, string $id): TicketActivityResource
@@ -60,7 +63,7 @@ class TicketActivityController extends Controller
             'new_value' => ['nullable', 'string'],
         ]));
 
-        return new TicketActivityResource($activity->fresh());
+        return new TicketActivityResource($activity->fresh()->load('user'));
     }
 
     public function destroy(Request $request, string $id): JsonResponse

@@ -71,7 +71,7 @@ export default function ResolutionTimeChart({ complaints }) {
 
   const byType = useMemo(() => groupBy(complaints, c => c.complaint_type, c => c.complaint_type), [complaints]);
   const byDept = useMemo(() => groupBy(complaints, c => c.assigned_department, c => c.assigned_department), [complaints]);
-  const byAgent = useMemo(() => groupBy(complaints, c => c.assigned_user, c => c.assigned_user_name || c.assigned_user), [complaints]);
+  const byAgent = useMemo(() => groupBy(complaints, c => c.assigned_user_id, c => c.assigned_user_name || c.assigned_user || 'Unassigned'), [complaints]);
 
   const fastest = (data) => data.length ? data[data.length - 1] : null;
   const slowest = (data) => data.length ? data[0] : null;

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Complaint extends Model
 {
@@ -23,8 +24,7 @@ class Complaint extends Model
         'priority_id',
         'status_id',
         'assigned_department_id',
-        'assigned_user',
-        'assigned_user_name',
+        'assigned_user_id',
         'resolution_notes',
         'sla_deadline',
         'sla_paused_at',
@@ -62,6 +62,26 @@ class Complaint extends Model
     public function assignedDepartment(): BelongsTo
     {
         return $this->belongsTo(Department::class, 'assigned_department_id');
+    }
+
+    public function assignedUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    public function ticketActivities(): HasMany
+    {
+        return $this->hasMany(TicketActivity::class);
+    }
+
+    public function internalNotes(): HasMany
+    {
+        return $this->hasMany(InternalNote::class);
+    }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
     }
 
     protected function casts(): array

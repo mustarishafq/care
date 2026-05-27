@@ -93,8 +93,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       complaint_id: created.id,
       action_type: 'created',
       description: `Ticket ${ticketId} created by ${user?.full_name || 'Unknown'}`,
-      user_email: user?.email,
-      user_name: user?.full_name,
+      user_id: user?.id,
     });
     queryClient.invalidateQueries({ queryKey: ['complaints'] });
     toast.success(`Ticket ${ticketId} created successfully`);

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\Permissions;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -18,7 +19,7 @@ use Laravel\Sanctum\HasApiTokens;
     'email',
     'phone',
     'password',
-    'role',
+    'role_id',
     'status',
     'approval_status',
     'must_change_password',
@@ -48,6 +49,11 @@ class User extends Authenticatable
         ];
     }
 
+    public function role(): BelongsTo
+    {
+        return $this->belongsTo(Role::class);
+    }
+
     public function departments(): BelongsToMany
     {
         return $this->belongsToMany(Department::class);
@@ -55,31 +61,12 @@ class User extends Authenticatable
 
     public function isAdmin(): bool
     {
-        return in_array($this->role, Permissions::ADMIN_ROLES, true);
+        return (bool) $this->role?->is_admin;
     }
 
     public function getRoleLabel(): string
     {
-        $role = $this->role;
-        if (! $role) {
-            return Permissions::BUILTIN_ROLE_LABELS['viewer'];
-        }
-
-        if (isset(Permissions::BUILTIN_ROLE_LABELS[$role])) {
-            return Permissions::BUILTIN_ROLE_LABELS[$role];
-        }
-
-        $customRole = Role::query()->find($role);
-        if ($customRole) {
-            return $customRole->name;
-        }
-
-        $customRoleByName = Role::query()->where('name', $role)->first();
-        if ($customRoleByName) {
-            return $customRoleByName->name;
-        }
-
-        return $role;
+        return $this->role?->name ?? 'Viewer';
     }
 
     /**
@@ -91,21 +78,11 @@ class User extends Authenticatable
             return '*';
         }
 
-        $role = $this->role;
-        if (! $role) {
+        if (! $this->role || $this->role->is_active === false) {
             return [];
         }
 
-        if (isset(Permissions::BUILTIN_ROLE_PERMISSIONS[$role])) {
-            return Permissions::BUILTIN_ROLE_PERMISSIONS[$role];
-        }
-
-        $customRole = Role::query()->find($role);
-        if ($customRole && $customRole->is_active !== false) {
-            return $customRole->permissions ?? [];
-        }
-
-        return [];
+        return $this->role->permissions ?? [];
     }
 
     public function hasPermission(string $permission): bool
@@ -120,7 +97,6 @@ class User extends Authenticatable
             return true;
         }
 
-        // e.g. products.manage implies products.view
         if (str_ends_with($permission, '.view')) {
             $section = explode('.', $permission)[0];
 

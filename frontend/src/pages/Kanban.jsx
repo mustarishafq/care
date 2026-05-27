@@ -79,7 +79,7 @@ export default function Kanban() {
   });
 
   const userDeptIds = getUserDepartmentIds(user);
-  const isAdmin = !user || user?.role === 'super_admin' || user?.role === 'management';
+  const isAdmin = !user || user?.is_admin;
 
   const visibleComplaints = isAdmin
     ? complaints
@@ -107,13 +107,12 @@ export default function Kanban() {
       complaint_id: draggableId,
       action_type: 'status_changed',
       description: `Status changed from "${complaint.status}" to "${newStatus}" via Kanban`,
-      user_email: user?.email,
-      user_name: user?.full_name,
+      user_id: user?.id,
     });
 
-    if (complaint.assigned_user && complaint.assigned_user !== user?.email) {
+    if (complaint.assigned_user_id && String(complaint.assigned_user_id) !== String(user?.id)) {
       await notifyStatusChange({
-        recipientEmail: complaint.assigned_user,
+        recipientUserId: complaint.assigned_user_id,
         changerName: user?.full_name,
         ticketId: complaint.ticket_id,
         oldStatus: complaint.status,

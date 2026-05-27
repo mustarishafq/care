@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\FileUploadController;
 use App\Http\Controllers\Api\V1\InternalNoteController;
 use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\PriorityController;
+use App\Http\Controllers\Api\V1\ProductCategoryController;
 use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SsoController;
@@ -48,6 +49,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('notifications', NotificationController::class);
         Route::post('notifications/send-email', [NotificationController::class, 'sendEmail']);
         Route::apiResource('products', ProductController::class);
+        Route::apiResource('product-categories', ProductCategoryController::class);
         Route::apiResource('roles', RoleController::class);
         Route::apiResource('system-configs', SystemConfigController::class);
 
