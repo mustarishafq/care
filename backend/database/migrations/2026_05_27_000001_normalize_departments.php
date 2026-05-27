@@ -159,10 +159,12 @@ return new class extends Migration
             }
         }
 
-        foreach (DB::table('users')->whereNotNull('departments')->get() as $user) {
-            $depts = json_decode($user->departments, true);
-            if (is_array($depts)) {
-                $names = array_values(array_unique(array_merge($names, $depts)));
+        if (Schema::hasColumn('users', 'departments')) {
+            foreach (DB::table('users')->whereNotNull('departments')->get() as $user) {
+                $depts = json_decode($user->departments, true);
+                if (is_array($depts)) {
+                    $names = array_values(array_unique(array_merge($names, $depts)));
+                }
             }
         }
 
