@@ -7,7 +7,9 @@ use App\Http\Controllers\Controller;
 use App\Support\StoragePath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class FileUploadController extends Controller
 {
@@ -32,5 +34,20 @@ class FileUploadController extends Controller
             'path' => $path,
             'url' => StoragePath::url($path),
         ]);
+    }
+
+    public function show(string $path): BinaryFileResponse
+    {
+        $relative = StoragePath::normalize($path);
+
+        if (! Str::startsWith($relative, 'uploads/') || Str::contains($relative, '..')) {
+            abort(404);
+        }
+
+        if (! Storage::disk('public')->exists($relative)) {
+            abort(404);
+        }
+
+        return response()->file(Storage::disk('public')->path($relative));
     }
 }
