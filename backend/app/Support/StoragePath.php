@@ -16,8 +16,8 @@ class StoragePath
 
         if (Str::startsWith($value, ['http://', 'https://'])) {
             $path = parse_url($value, PHP_URL_PATH) ?? $value;
-            if (Str::contains($path, '/api/v1/files/')) {
-                return ltrim(Str::after($path, '/api/v1/files/'), '/');
+            if (Str::contains($path, '/files/')) {
+                return ltrim(Str::after($path, '/files/'), '/');
             }
             if (Str::contains($path, '/storage/')) {
                 return ltrim(Str::after($path, '/storage/'), '/');
@@ -26,8 +26,8 @@ class StoragePath
             return ltrim($path, '/');
         }
 
-        if (Str::startsWith($value, ['/api/v1/files/', 'api/v1/files/'])) {
-            return ltrim(Str::after($value, 'files/'), '/');
+        if (Str::contains($value, '/files/')) {
+            return ltrim(Str::after($value, '/files/'), '/');
         }
 
         if (Str::startsWith($value, ['/storage/', 'storage/'])) {
@@ -47,10 +47,10 @@ class StoragePath
         return array_values(array_map([self::class, 'normalize'], $values));
     }
 
-    /** Resolve a disk-relative path to a public URL served via the API (proxied in production). */
+    /** Disk-relative path for API file serving (frontend builds URL via VITE_API_URL). */
     public static function url(string $path): string
     {
-        return '/api/v1/files/'.self::normalize($path);
+        return self::normalize($path);
     }
 
     /** @param  array<int, string>|null  $paths */
