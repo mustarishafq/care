@@ -22,7 +22,6 @@ import { useComplaintStatuses } from '@/lib/useLookups';
 import { notifyStatusChange, invalidateNotificationQueries } from '@/lib/notifications';
 import { useDepartments } from '@/lib/useDepartments';
 import { canViewComplaint } from '@/lib/complaintVisibility';
-import { resolveFileUrl } from '@/lib/fileUrl';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
@@ -267,18 +266,15 @@ export default function ComplaintDetail() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {complaint.proof_files.map((url, i) => {
-                    const fileUrl = resolveFileUrl(url);
-                    return (
-                    <a key={i} href={fileUrl} target="_blank" rel="noopener noreferrer"
+                  {complaint.proof_files.map((url, i) => (
+                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                       className="block aspect-video rounded-lg bg-muted overflow-hidden border hover:border-primary transition-colors relative group">
-                      <img src={fileUrl} alt={`Proof ${i + 1}`} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
+                      <img src={url} alt={`Proof ${i + 1}`} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                         <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
                     </a>
-                    );
-                  })}
+                  ))}
                 </div>
               </CardContent>
             </Card>

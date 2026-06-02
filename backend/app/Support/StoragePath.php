@@ -16,18 +16,11 @@ class StoragePath
 
         if (Str::startsWith($value, ['http://', 'https://'])) {
             $path = parse_url($value, PHP_URL_PATH) ?? $value;
-            if (Str::contains($path, '/files/')) {
-                return ltrim(Str::after($path, '/files/'), '/');
-            }
             if (Str::contains($path, '/storage/')) {
                 return ltrim(Str::after($path, '/storage/'), '/');
             }
 
             return ltrim($path, '/');
-        }
-
-        if (Str::contains($value, '/files/')) {
-            return ltrim(Str::after($value, '/files/'), '/');
         }
 
         if (Str::startsWith($value, ['/storage/', 'storage/'])) {
@@ -47,10 +40,10 @@ class StoragePath
         return array_values(array_map([self::class, 'normalize'], $values));
     }
 
-    /** Disk-relative path for API file serving (frontend builds URL via VITE_API_URL). */
+    /** Public URL for a file on the public disk (uses APP_URL, e.g. https://careapi.emzinexus.com/storage/...). */
     public static function url(string $path): string
     {
-        return self::normalize($path);
+        return rtrim(config('app.url'), '/').'/storage/'.self::normalize($path);
     }
 
     /** @param  array<int, string>|null  $paths */
