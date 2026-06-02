@@ -31,8 +31,9 @@ Route::prefix('v1')->group(function () {
     Route::get('complaints', [ComplaintController::class, 'index'])->middleware('throttle:30,1');
     Route::get('complaints/{id}', [ComplaintController::class, 'show'])->middleware('throttle:30,1');
 
-    Route::get('files/{path}', [FileUploadController::class, 'show'])
-        ->where('path', 'uploads/.+')
+    Route::get('files/uploads/{name}.{ext}', [FileUploadController::class, 'show'])
+        ->where('name', '[^/]+')
+        ->where('ext', '[^.]+')
         ->middleware('throttle:120,1');
 
     Route::post('webhook/tracking-update', [WebhookController::class, 'trackingUpdate'])->middleware('throttle:60,1');
