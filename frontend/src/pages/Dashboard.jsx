@@ -1,6 +1,6 @@
 import { db } from '@/api/db';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { filterVisibleComplaints, filterVisibleActivities } from '@/lib/complaintVisibility';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -30,36 +31,46 @@ export default function Dashboard() {
     queryFn: () => db.entities.Complaint.list('-created_date', 500),
   });
 
+  const visibleComplaints = useMemo(
+    () => filterVisibleComplaints(user, complaints),
+    [user, complaints],
+  );
+
   const { data: activities = [] } = useQuery({
     queryKey: ['activities-recent'],
-    queryFn: () => db.entities.TicketActivity.list('-created_date', 20),
+    queryFn: () => db.entities.TicketActivity.list('-created_date', 50),
   });
 
-  const todayCount = complaints.filter(c => isToday(new Date(c.created_date))).length;
-  const monthCount = complaints.filter(c => isThisMonth(new Date(c.created_date))).length;
-  const openCount = complaints.filter(c => !['Closed', 'Delivered', 'Rejected'].includes(c.status)).length;
-  const closedCount = complaints.filter(c => c.status === 'Closed').length;
-  const pendingFulfillment = complaints.filter(c => ['Approved Replacement', 'Reprocessing by Fulfillment'].includes(c.status)).length;
-  const pendingLogistics = complaints.filter(c => c.status === 'Ready to Ship').length;
+  const visibleActivities = useMemo(
+    () => filterVisibleActivities(user, activities, complaints).slice(0, 20),
+    [user, activities, complaints],
+  );
 
-  const resolved = complaints.filter(c => c.resolved_at);
+  const todayCount = visibleComplaints.filter(c => isToday(new Date(c.created_date))).length;
+  const monthCount = visibleComplaints.filter(c => isThisMonth(new Date(c.created_date))).length;
+  const openCount = visibleComplaints.filter(c => !['Closed', 'Delivered', 'Rejected'].includes(c.status)).length;
+  const closedCount = visibleComplaints.filter(c => c.status === 'Closed').length;
+  const pendingFulfillment = visibleComplaints.filter(c => ['Approved Replacement', 'Reprocessing by Fulfillment'].includes(c.status)).length;
+  const pendingLogistics = visibleComplaints.filter(c => c.status === 'Ready to Ship').length;
+
+  const resolved = visibleComplaints.filter(c => c.resolved_at);
   const avgResolution = resolved.length
     ? Math.round(resolved.reduce((sum, c) => sum + differenceInHours(new Date(c.resolved_at), new Date(c.created_date)), 0) / resolved.length)
     : 0;
 
   // Top complaint types
   const typeMap = {};
-  complaints.forEach(c => { typeMap[c.complaint_type] = (typeMap[c.complaint_type] || 0) + 1; });
+  visibleComplaints.forEach(c => { typeMap[c.complaint_type] = (typeMap[c.complaint_type] || 0) + 1; });
   const topTypes = Object.entries(typeMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 
   // Top products
   const prodMap = {};
-  complaints.forEach(c => { if (c.product_name) prodMap[c.product_name] = (prodMap[c.product_name] || 0) + 1; });
+  visibleComplaints.forEach(c => { if (c.product_name) prodMap[c.product_name] = (prodMap[c.product_name] || 0) + 1; });
   const topProducts = Object.entries(prodMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 
   // Top couriers
   const courMap = {};
-  complaints.forEach(c => { if (c.courier_name) courMap[c.courier_name] = (courMap[c.courier_name] || 0) + 1; });
+  visibleComplaints.forEach(c => { if (c.courier_name) courMap[c.courier_name] = (courMap[c.courier_name] || 0) + 1; });
   const topCouriers = Object.entries(courMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
 
   if (isLoading) {
@@ -87,14 +98,14 @@ export default function Dashboard() {
         <StatCard label="Pending Fulfillment" value={pendingFulfillment} icon={Package} color="purple" />
         <StatCard label="Pending Courier" value={pendingLogistics} icon={Truck} color="blue" />
         <StatCard label="Avg Resolution (hrs)" value={avgResolution} icon={Timer} color="primary" />
-        <StatCard label="Total Complaints" value={complaints.length} icon={Clock} color="danger" />
+        <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" />
       </div>
 
       {/* Charts Row — on lg+: trend chart (2 cols) + recent activity (1 col); on mobile recent activity moves to bottom */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <ComplaintTrendChart complaints={complaints} />
+        <ComplaintTrendChart complaints={visibleComplaints} />
         <div className="hidden lg:block">
-          <RecentActivity activities={activities} />
+          <RecentActivity activities={visibleActivities} />
         </div>
       </div>
 
@@ -107,12 +118,12 @@ export default function Dashboard() {
 
       {/* Recent Activity — visible only on mobile/tablet, hidden on lg+ */}
       <div className="lg:hidden">
-        <RecentActivity activities={activities} />
+        <RecentActivity activities={visibleActivities} />
       </div>
 
       {/* Unassigned Tickets — Quick Reassign */}
       <UnassignedTickets
-        complaints={complaints}
+        complaints={visibleComplaints}
         onAssign={c => setAssignTarget(c)}
       />
 

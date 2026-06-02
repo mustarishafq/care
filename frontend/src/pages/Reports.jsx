@@ -21,6 +21,8 @@ import ResolvedUnresolvedChart from '@/components/reports/ResolvedUnresolvedChar
 import TopInsightsCards from '@/components/reports/TopInsightsCards';
 import ResolutionTimeChart from '@/components/reports/ResolutionTimeChart';
 import { useDepartments } from '@/lib/useDepartments';
+import { useCurrentUser } from '@/lib/useCurrentUser';
+import { filterVisibleComplaints } from '@/lib/complaintVisibility';
 import { CalendarDays } from 'lucide-react';
 
 const CHART_COLORS = ['#0ea5e9', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#14b8a6'];
@@ -41,11 +43,17 @@ export default function Reports() {
   const [range, setRange] = useState('30');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const { user } = useCurrentUser();
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
     queryFn: () => db.entities.Complaint.list('-created_date', 1000),
   });
+
+  const visibleComplaints = useMemo(
+    () => filterVisibleComplaints(user, complaints),
+    [user, complaints],
+  );
 
   const { data: departments = [] } = useDepartments();
   const { data: complaintTypes = [] } = useComplaintTypes();
@@ -57,11 +65,11 @@ export default function Reports() {
   const { from, to } = useMemo(() => getRangeDates(range, customFrom, customTo), [range, customFrom, customTo]);
 
   const filtered = useMemo(() =>
-    complaints.filter(c => {
+    visibleComplaints.filter(c => {
       const d = new Date(c.created_date);
       return !isBefore(d, from) && !isAfter(d, to);
     }),
-    [complaints, from, to]
+    [visibleComplaints, from, to]
   );
 
   // By Status

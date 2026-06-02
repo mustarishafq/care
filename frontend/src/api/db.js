@@ -114,6 +114,11 @@ export const db = {
   },
 
   users: {
+    async createUser(payload) {
+      const data = await http.post('/users', payload);
+      return data;
+    },
+
     async inviteUser(email, roleId) {
       const data = await http.post('/users/invite', { email, role_id: roleId });
       return data;

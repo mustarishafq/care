@@ -68,6 +68,46 @@ class UserController extends Controller
         return new UserResource($user->fresh()->load(['departments', 'role']));
     }
 
+    public function store(Request $request): JsonResponse
+    {
+        $currentUser = $request->user();
+        $this->ensurePermission($currentUser, 'users.manage');
+
+        $data = $request->validate([
+            'email' => ['required', 'email', 'unique:users,email'],
+            'full_name' => ['nullable', 'string', 'max:255'],
+            'password' => ['required', 'string', 'min:8'],
+            'role_id' => ['nullable', 'integer', 'exists:roles,id'],
+            'status' => ['sometimes', 'in:active,inactive'],
+            'department_ids' => ['nullable', 'array'],
+            'department_ids.*' => ['integer', 'exists:departments,id'],
+        ]);
+
+        $fullName = $data['full_name'] ?: $data['email'];
+        $roleId = $data['role_id'] ?? Role::defaultId();
+        $departmentIds = $data['department_ids'] ?? [];
+
+        $user = User::create([
+            'name' => $fullName,
+            'full_name' => $fullName,
+            'email' => $data['email'],
+            'password' => $data['password'],
+            'role_id' => $roleId,
+            'status' => $data['status'] ?? User::STATUS_ACTIVE,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'must_change_password' => true,
+        ]);
+
+        if ($departmentIds !== []) {
+            $user->departments()->sync($departmentIds);
+        }
+
+        return response()->json([
+            'message' => 'User created successfully.',
+            'user' => new UserResource($user->load(['departments', 'role'])),
+        ], 201);
+    }
+
     public function invite(Request $request): JsonResponse
     {
         $this->ensurePermission($request->user(), 'users.invite');

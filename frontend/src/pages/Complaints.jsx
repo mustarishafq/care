@@ -10,15 +10,14 @@ import ComplaintTable from '@/components/complaints/ComplaintTable';
 import CreateComplaintDialog from '@/components/complaints/CreateComplaintDialog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
-import { getUserDepartmentIds } from '@/lib/useDepartments';
+import { canViewComplaint } from '@/lib/complaintVisibility';
 
 export default function Complaints() {
   const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState({ search: '', status: '', type: '', priority: '', department: '', courier: '' });
-  const { user: currentUser, isAdmin: isAdminOrMgmt, loading: userLoading } = useCurrentUser();
+  const { user: currentUser, loading: userLoading } = useCurrentUser();
   const { hasPermission, loading: permLoading } = usePermissions();
   const canCreate = hasPermission('complaints.create');
-  const userDeptIds = getUserDepartmentIds(currentUser);
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
@@ -27,9 +26,7 @@ export default function Complaints() {
 
   const filtered = useMemo(() => {
     return complaints.filter(c => {
-      if (!isAdminOrMgmt && userDeptIds.length > 0) {
-        if (c.assigned_department_id && !userDeptIds.includes(c.assigned_department_id)) return false;
-      }
+      if (!canViewComplaint(currentUser, c)) return false;
       if (filters.status && c.status !== filters.status) return false;
       if (filters.type && c.complaint_type_id !== filters.type) return false;
       if (filters.priority && c.priority_id !== filters.priority) return false;
@@ -42,7 +39,7 @@ export default function Complaints() {
       }
       return true;
     });
-  }, [complaints, filters, isAdminOrMgmt, userDeptIds]);
+  }, [complaints, filters, currentUser]);
 
   if (isLoading || userLoading || permLoading) {
     return (

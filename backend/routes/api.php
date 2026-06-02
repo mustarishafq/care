@@ -54,6 +54,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('system-configs', SystemConfigController::class);
 
         Route::get('users', [UserController::class, 'index']);
+        Route::post('users', [UserController::class, 'store']);
         Route::patch('users/{id}', [UserController::class, 'update']);
         Route::post('users/invite', [UserController::class, 'invite']);
         Route::post('users/{id}/approve', [UserController::class, 'approve']);

@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Concerns\AppliesEntityQueries;
 use App\Http\Controllers\Concerns\AuthorizesPermissions;
+use App\Http\Controllers\Concerns\ScopesComplaintVisibility;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\TicketActivityResource;
+use App\Models\Complaint;
 use App\Models\TicketActivity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,13 +15,20 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class TicketActivityController extends Controller
 {
-    use AppliesEntityQueries, AuthorizesPermissions;
+    use AppliesEntityQueries, AuthorizesPermissions, ScopesComplaintVisibility;
 
     public function index(Request $request): AnonymousResourceCollection
     {
         $this->ensurePermission($request->user(), 'complaints.view');
 
         $query = TicketActivity::query()->with('user');
+
+        if (! $request->user()->isAdmin()) {
+            $query->whereHas('complaint', function ($q) use ($request) {
+                $this->applyComplaintVisibilityScope($q, $request->user());
+            });
+        }
+
         $this->applyFilters($query, $request->except(['sort', 'limit']));
         $this->applySort($query, $request->query('sort', '-created_date'));
 
@@ -45,6 +54,8 @@ class TicketActivityController extends Controller
             $data['user_id'] = $request->user()->id;
         }
 
+        $complaint = Complaint::findOrFail($data['complaint_id']);
+        $this->ensureCanViewComplaint($request->user(), $complaint);
         $this->ensureTicketActivityPermission($request->user(), $data['action_type']);
 
         $activity = TicketActivity::create($data);
@@ -56,7 +67,8 @@ class TicketActivityController extends Controller
     {
         $this->ensurePermission($request->user(), 'complaints.edit');
 
-        $activity = TicketActivity::findOrFail($id);
+        $activity = TicketActivity::with('complaint')->findOrFail($id);
+        $this->ensureCanViewComplaint($request->user(), $activity->complaint);
         $activity->update($request->validate([
             'description' => ['sometimes', 'string'],
             'old_value' => ['nullable', 'string'],
@@ -70,7 +82,10 @@ class TicketActivityController extends Controller
     {
         $this->ensurePermission($request->user(), 'complaints.edit');
 
-        TicketActivity::findOrFail($id)->delete();
+        $activity = TicketActivity::with('complaint')->findOrFail($id);
+        $this->ensureCanViewComplaint($request->user(), $activity->complaint);
+
+        $activity->delete();
 
         return response()->json(['message' => 'Deleted successfully.']);
     }

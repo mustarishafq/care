@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { STATUS_COLORS, buildStatusChangeUpdates, buildStatusOrder } from '@/lib/ticketUtils';
-import { getUserDepartmentIds } from '@/lib/useDepartments';
+import { filterVisibleComplaints } from '@/lib/complaintVisibility';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
 import { Link } from 'react-router-dom';
@@ -47,7 +47,7 @@ function sortCards(cards, sortBy, priorityOrderMap = {}) {
 }
 
 export default function Kanban() {
-  const { user } = useCurrentUser();
+  const { user, isAdmin } = useCurrentUser();
   const { hasPermission, loading: permLoading } = usePermissions();
   const canChangeStatus = hasPermission('complaints.change_status');
   const queryClient = useQueryClient();
@@ -78,12 +78,7 @@ export default function Kanban() {
     queryFn: () => db.entities.Complaint.list('-created_date', 500),
   });
 
-  const userDeptIds = getUserDepartmentIds(user);
-  const isAdmin = !user || user?.is_admin;
-
-  const visibleComplaints = isAdmin
-    ? complaints
-    : complaints.filter(c => !c.assigned_department_id || userDeptIds.includes(c.assigned_department_id));
+  const visibleComplaints = filterVisibleComplaints(user, complaints);
 
   const onDragEnd = async (result) => {
     if (!canChangeStatus) return;

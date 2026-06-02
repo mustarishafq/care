@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { UserPlus, Loader2, Pencil, KeyRound } from 'lucide-react';
+import { UserPlus, Loader2, Pencil, KeyRound, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import RoleSelectOptions from '@/components/users/RoleSelectOptions';
 import { getRoleLabel } from '@/lib/roles';
@@ -28,12 +28,15 @@ export default function Users() {
   const canManage = hasPermission('users.manage');
   const queryClient = useQueryClient();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [editUserOpen, setEditUserOpen] = useState(false);
   const [editUserTarget, setEditUserTarget] = useState(null);
   const [editUserForm, setEditUserForm] = useState({ full_name: '', phone: '', status: 'active', department_ids: [], role_id: '' });
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRoleId, setInviteRoleId] = useState('');
+  const [addForm, setAddForm] = useState({ email: '', full_name: '', password: '', role_id: '', department_ids: [] });
   const [inviting, setInviting] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
 
   const { data: users = [], isLoading } = useQuery({
@@ -71,6 +74,20 @@ export default function Users() {
     }));
   };
 
+  const toggleAddDept = (deptId) => {
+    setAddForm(p => ({
+      ...p,
+      department_ids: p.department_ids.includes(deptId)
+        ? p.department_ids.filter(id => id !== deptId)
+        : [...p.department_ids, deptId],
+    }));
+  };
+
+  const openAddUser = () => {
+    setAddForm({ email: '', full_name: '', password: '', role_id: defaultRoleId, department_ids: [] });
+    setAddOpen(true);
+  };
+
   const saveEditUser = async () => {
     setSavingUser(true);
     await db.entities.User.update(editUserTarget.id, {
@@ -95,9 +112,45 @@ export default function Users() {
   const handleInvite = async () => {
     if (!inviteEmail.trim()) return;
     setInviting(true);
-    await db.users.inviteUser(inviteEmail.trim(), inviteRoleId || defaultRoleId);
-    toast.success(`Invitation sent to ${inviteEmail}`);
-    setInviteEmail(''); setInviteOpen(false); setInviting(false);
+    try {
+      await db.users.inviteUser(inviteEmail.trim(), inviteRoleId || defaultRoleId);
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success(`Invitation sent to ${inviteEmail}`);
+      setInviteEmail('');
+      setInviteOpen(false);
+    } catch (err) {
+      toast.error(err.message || 'Failed to send invitation');
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleAddUser = async () => {
+    if (!addForm.email.trim() || !addForm.password.trim()) {
+      toast.error('Email and password are required');
+      return;
+    }
+    if (addForm.password.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    setAdding(true);
+    try {
+      await db.users.createUser({
+        email: addForm.email.trim(),
+        full_name: addForm.full_name.trim() || undefined,
+        password: addForm.password,
+        role_id: addForm.role_id || defaultRoleId,
+        department_ids: addForm.department_ids,
+      });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success(`User ${addForm.email} created`);
+      setAddOpen(false);
+    } catch (err) {
+      toast.error(err.message || 'Failed to create user');
+    } finally {
+      setAdding(false);
+    }
   };
 
   if (isLoading || permLoading) {
@@ -115,10 +168,19 @@ export default function Users() {
           <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
           <p className="text-muted-foreground text-sm mt-1">{users.length} users</p>
         </div>
-        {canInvite && (
-          <Button onClick={() => setInviteOpen(true)}>
-            <UserPlus className="w-4 h-4 mr-2" />Invite User
-          </Button>
+        {(canManage || canInvite) && (
+          <div className="flex items-center gap-2">
+            {canManage && (
+              <Button variant="outline" onClick={openAddUser}>
+                <UserPlus className="w-4 h-4 mr-2" />Add User
+              </Button>
+            )}
+            {canInvite && (
+              <Button onClick={() => setInviteOpen(true)}>
+                <Mail className="w-4 h-4 mr-2" />Invite User
+              </Button>
+            )}
+          </div>
         )}
       </div>
 
@@ -265,6 +327,58 @@ export default function Users() {
             <Button variant="outline" onClick={() => setEditUserOpen(false)}>Cancel</Button>
             <Button onClick={saveEditUser} disabled={savingUser}>
               {savingUser && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Add User</DialogTitle>
+            <p className="text-sm text-muted-foreground">Create an account immediately without sending an invitation email.</p>
+          </DialogHeader>
+          <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Email</Label>
+              <Input value={addForm.email} onChange={e => setAddForm(p => ({ ...p, email: e.target.value }))} placeholder="test@example.com" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Full Name</Label>
+              <Input value={addForm.full_name} onChange={e => setAddForm(p => ({ ...p, full_name: e.target.value }))} placeholder="Optional — defaults to email" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Password</Label>
+              <Input type="password" value={addForm.password} onChange={e => setAddForm(p => ({ ...p, password: e.target.value }))} placeholder="Min. 8 characters" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Role</Label>
+              <Select value={String(addForm.role_id || defaultRoleId)} onValueChange={v => setAddForm(p => ({ ...p, role_id: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <RoleSelectOptions roles={roles} />
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Departments</Label>
+              <div className="space-y-1">
+                {departments.map(dept => (
+                  <label key={dept.id} className="flex items-center gap-3 cursor-pointer p-1.5 rounded hover:bg-muted/50">
+                    <Checkbox
+                      checked={addForm.department_ids.includes(dept.id)}
+                      onCheckedChange={() => toggleAddDept(dept.id)}
+                    />
+                    <span className="text-sm">{dept.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddUser} disabled={adding}>
+              {adding && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Create User
             </Button>
           </DialogFooter>
         </DialogContent>

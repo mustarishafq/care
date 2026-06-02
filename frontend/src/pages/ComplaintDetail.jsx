@@ -21,6 +21,7 @@ import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { notifyStatusChange, invalidateNotificationQueries } from '@/lib/notifications';
 import { useDepartments } from '@/lib/useDepartments';
+import { canViewComplaint } from '@/lib/complaintVisibility';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
@@ -144,6 +145,17 @@ export default function ComplaintDetail() {
 
   if (!complaint) {
     return <div className="text-center py-16 text-muted-foreground">Ticket not found</div>;
+  }
+
+  if (!canViewComplaint(user, complaint)) {
+    return (
+      <div className="text-center py-16 space-y-2">
+        <p className="text-muted-foreground">You do not have permission to view this ticket.</p>
+        <Link to="/complaints" className="text-primary text-sm hover:underline inline-flex items-center gap-1">
+          <ArrowLeft className="w-4 h-4" /> Back to complaints
+        </Link>
+      </div>
+    );
   }
 
   const ageHours = differenceInHours(new Date(), new Date(complaint.created_date));

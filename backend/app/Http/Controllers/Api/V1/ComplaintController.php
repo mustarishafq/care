@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Concerns\AppliesEntityQueries;
 use App\Http\Controllers\Concerns\AuthorizesPermissions;
+use App\Http\Controllers\Concerns\ScopesComplaintVisibility;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
@@ -16,13 +17,18 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ComplaintController extends Controller
 {
-    use AppliesEntityQueries, AuthorizesPermissions;
+    use AppliesEntityQueries, AuthorizesPermissions, ScopesComplaintVisibility;
 
     public function __construct(private TicketIdGenerator $ticketIdGenerator) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = Complaint::query()->with($this->complaintRelations());
+
+        if ($user = $request->user()) {
+            $this->applyComplaintVisibilityScope($query, $user);
+        }
+
         $this->applyFilters($query, $request->except(['sort', 'limit']));
         $this->applySort($query, $request->query('sort', '-created_date'));
 
@@ -71,14 +77,21 @@ class ComplaintController extends Controller
         return new ComplaintResource($complaint->load($this->complaintRelations()));
     }
 
-    public function show(string $id): ComplaintResource
+    public function show(Request $request, string $id): ComplaintResource
     {
-        return new ComplaintResource(Complaint::with($this->complaintRelations())->findOrFail($id));
+        $complaint = Complaint::with($this->complaintRelations())->findOrFail($id);
+
+        if ($user = $request->user()) {
+            $this->ensureCanViewComplaint($user, $complaint);
+        }
+
+        return new ComplaintResource($complaint);
     }
 
     public function update(Request $request, string $id): ComplaintResource
     {
         $complaint = Complaint::findOrFail($id);
+        $this->ensureCanViewComplaint($request->user(), $complaint);
 
         $data = $request->validate([
             'customer_name' => ['sometimes', 'string', 'max:255'],
@@ -124,7 +137,10 @@ class ComplaintController extends Controller
     {
         $this->ensurePermission($request->user(), 'complaints.delete');
 
-        Complaint::findOrFail($id)->delete();
+        $complaint = Complaint::findOrFail($id);
+        $this->ensureCanViewComplaint($request->user(), $complaint);
+
+        $complaint->delete();
 
         return response()->json(['message' => 'Deleted successfully.']);
     }
