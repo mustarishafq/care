@@ -28,6 +28,8 @@ import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
 import TicketTimeline from '@/components/complaints/TicketTimeline';
 import InternalNotes from '@/components/complaints/InternalNotes';
+import WhatsappNotifyCard from '@/components/complaints/WhatsappNotifyCard';
+import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 
 export default function ComplaintDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -65,7 +67,13 @@ export default function ComplaintDetail() {
   const { data: complaintStatuses = [] } = useComplaintStatuses();
   const statusOrder = buildStatusOrder(complaintStatuses);
 
-  const updateComplaint = async (updates, activityDesc, actionType = 'status_changed', notifyRecipient = null) => {
+  const updateComplaint = async (
+    updates,
+    activityDesc,
+    actionType = 'status_changed',
+    notifyRecipient = null,
+    { whatsappEvent, whatsappOptions } = {},
+  ) => {
     setUpdating(true);
     try {
       await db.entities.Complaint.update(complaintId, updates);
@@ -83,7 +91,13 @@ export default function ComplaintDetail() {
 
       queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
       queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
-      toast.success('Ticket updated');
+
+      if (whatsappEvent) {
+        const merged = { ...complaint, ...updates };
+        offerWhatsappShareToast(merged, { event: whatsappEvent, ...whatsappOptions });
+      } else {
+        toast.success('Ticket updated');
+      }
     } catch {
       toast.error('Failed to update ticket');
     } finally {
@@ -99,6 +113,11 @@ export default function ComplaintDetail() {
       updates,
       `Status changed from "${complaint.status}" to "${newStatus}"`,
       'status_changed',
+      null,
+      {
+        whatsappEvent: 'status_changed',
+        whatsappOptions: { oldStatus: complaint.status, newStatus },
+      },
     );
 
     for (const recipientUserId of assignedIds) {
@@ -121,9 +140,11 @@ export default function ComplaintDetail() {
     const dept = departments.find((d) => d.id === departmentId);
     const deptName = dept?.name || 'Unknown';
     await updateComplaint(
-      { assigned_department_id: departmentId },
+      { assigned_department_id: departmentId, assigned_department: deptName },
       `Assigned to ${deptName} department`,
       'assigned',
+      null,
+      { whatsappEvent: 'assigned', whatsappOptions: { note: `Assigned to ${deptName}` } },
     );
   };
 
@@ -182,7 +203,8 @@ export default function ComplaintDetail() {
             </Badge>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mt-1 truncate">
-            Created {format(new Date(complaint.created_date), 'MMM dd, yyyy HH:mm')} by {complaint.created_by}
+            Created {format(new Date(complaint.created_date), 'MMM dd, yyyy HH:mm')}
+            {complaint.created_by ? ` by ${complaint.created_by}` : ''}
           </p>
         </div>
       </div>
@@ -228,6 +250,10 @@ export default function ComplaintDetail() {
                 onAssignAgent={() => setAssignOpen(true)}
               />
             )}
+          </div>
+
+          <div className="lg:hidden">
+            <WhatsappNotifyCard complaint={complaint} event="updated" />
           </div>
 
           {/* Complaint Info */}
@@ -360,14 +386,18 @@ export default function ComplaintDetail() {
             </div>
           )}
 
+          <WhatsappNotifyCard complaint={complaint} event="updated" className="hidden lg:block" />
+
           {assignOpen && canAssign && (
             <AssignAgentDialog
               complaint={complaint}
               open={assignOpen}
               onClose={() => setAssignOpen(false)}
-              onSaved={() => {
+              onSaved={(updatedComplaint) => {
                 queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
                 queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
+                const target = updatedComplaint ?? complaint;
+                offerWhatsappShareToast(target, { event: 'assigned' });
               }}
             />
           )}

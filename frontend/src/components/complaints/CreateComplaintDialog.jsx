@@ -15,6 +15,7 @@ import { findIdByName, useComplaintStatuses, useComplaintTypes, useCouriers, use
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { FileText, FileVideo, Loader2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 
 const storageUrl = (path) => {
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -109,11 +110,22 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     await db.entities.TicketActivity.create({
       complaint_id: created.id,
       action_type: 'created',
-      description: `Ticket ${ticketId} created by ${user?.full_name || 'Unknown'}`,
+      description: `Ticket ${created.ticket_id || ticketId} created by ${user?.full_name || 'Unknown'}`,
       user_id: user?.id,
     });
     queryClient.invalidateQueries({ queryKey: ['complaints'] });
-    toast.success(`Ticket ${ticketId} created successfully`);
+    const product = products.find((p) => String(p.id) === String(form.product_id));
+    const sharePayload = {
+      ...created,
+      complaint_type: created.complaint_type ?? complaintTypes.find((t) => String(t.id) === String(form.complaint_type_id))?.name,
+      priority: created.priority ?? priorities.find((p) => String(p.id) === String(form.priority_id))?.name,
+      assigned_department: created.assigned_department ?? departments.find((d) => String(d.id) === String(form.assigned_department_id))?.name,
+      product_name: created.product_name ?? product?.name,
+      customer_name: created.customer_name ?? form.customer_name,
+      order_number: created.order_number ?? form.order_number,
+      status: created.status ?? complaintStatuses.find((s) => String(s.id) === String(complaintData.status_id))?.name,
+    };
+    offerWhatsappShareToast(sharePayload, { event: 'created' });
     setSaving(false);
     onOpenChange(false);
   };

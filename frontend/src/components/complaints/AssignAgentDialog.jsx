@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils';
 import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { notifyAssignedUser, invalidateNotificationQueries } from '@/lib/notifications';
-import { getAssignedAgentIds } from '@/lib/assignedAgents';
+import { getAssignedAgentIds, getAssignedAgents } from '@/lib/assignedAgents';
 
 export default function AssignAgentDialog({ complaint, open, onClose, onSaved }) {
   const { user } = useCurrentUser();
@@ -99,8 +99,20 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
       }
 
       invalidateNotificationQueries(queryClient);
-      toast.success(selectedIds.length === 1 ? 'Agent assigned successfully' : `${selectedIds.length} agents assigned successfully`);
-      onSaved?.();
+
+      const existingAgents = getAssignedAgents(complaint);
+      const addedAgents = selectedUsers.map((u) => ({
+        id: String(u.id),
+        email: u.email,
+        full_name: u.full_name || u.email,
+      }));
+      const updatedComplaint = {
+        ...complaint,
+        status: newStatus && newStatus !== complaint.status ? newStatus : complaint.status,
+        assigned_agents: [...existingAgents, ...addedAgents],
+      };
+
+      onSaved?.(updatedComplaint);
       onClose();
     } catch {
       toast.error('Failed to assign agents');
