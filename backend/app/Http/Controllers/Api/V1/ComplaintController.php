@@ -74,6 +74,10 @@ class ComplaintController extends Controller
 
         $complaint = Complaint::create($data);
 
+        if ($complaint->assigned_user_id) {
+            $complaint->assignedUsers()->syncWithoutDetaching([$complaint->assigned_user_id]);
+        }
+
         return new ComplaintResource($complaint->load($this->complaintRelations()));
     }
 
@@ -128,7 +132,47 @@ class ComplaintController extends Controller
 
         $this->ensureComplaintUpdatePermissions($request->user(), $data);
 
+        if (array_key_exists('assigned_user_id', $data)) {
+            $assigneeId = $data['assigned_user_id'];
+            unset($data['assigned_user_id']);
+
+            if ($assigneeId) {
+                $complaint->assignedUsers()->syncWithoutDetaching([$assigneeId]);
+            }
+            $complaint->syncPrimaryAssignee();
+        }
+
         $complaint->update($data);
+
+        return new ComplaintResource($complaint->fresh()->load($this->complaintRelations()));
+    }
+
+    public function assignAgent(Request $request, string $id): ComplaintResource
+    {
+        $this->ensurePermission($request->user(), 'complaints.assign');
+
+        $complaint = Complaint::findOrFail($id);
+        $this->ensureCanViewComplaint($request->user(), $complaint);
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $complaint->assignedUsers()->syncWithoutDetaching([$data['user_id']]);
+        $complaint->syncPrimaryAssignee();
+
+        return new ComplaintResource($complaint->fresh()->load($this->complaintRelations()));
+    }
+
+    public function removeAgent(Request $request, string $id, string $userId): ComplaintResource
+    {
+        $this->ensurePermission($request->user(), 'complaints.assign');
+
+        $complaint = Complaint::findOrFail($id);
+        $this->ensureCanViewComplaint($request->user(), $complaint);
+
+        $complaint->assignedUsers()->detach($userId);
+        $complaint->syncPrimaryAssignee();
 
         return new ComplaintResource($complaint->fresh()->load($this->complaintRelations()));
     }
@@ -148,6 +192,6 @@ class ComplaintController extends Controller
     /** @return list<string> */
     private function complaintRelations(): array
     {
-        return ['assignedDepartment', 'assignedUser', 'complaintStatus', 'complaintType', 'courier', 'priority', 'product'];
+        return ['assignedDepartment', 'assignedUser', 'assignedUsers', 'complaintStatus', 'complaintType', 'courier', 'priority', 'product'];
     }
 }

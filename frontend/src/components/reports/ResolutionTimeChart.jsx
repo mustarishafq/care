@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { getAssignedAgents } from '@/lib/assignedAgents';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { differenceInHours } from 'date-fns';
@@ -71,7 +72,28 @@ export default function ResolutionTimeChart({ complaints }) {
 
   const byType = useMemo(() => groupBy(complaints, c => c.complaint_type, c => c.complaint_type), [complaints]);
   const byDept = useMemo(() => groupBy(complaints, c => c.assigned_department, c => c.assigned_department), [complaints]);
-  const byAgent = useMemo(() => groupBy(complaints, c => c.assigned_user_id, c => c.assigned_user_name || c.assigned_user || 'Unassigned'), [complaints]);
+  const byAgent = useMemo(() => {
+    const map = {};
+    complaints.forEach((c) => {
+      const agents = getAssignedAgents(c);
+      if (!agents.length) return;
+      agents.forEach((agent) => {
+        const key = agent.id;
+        if (!map[key]) {
+          map[key] = { label: agent.full_name || agent.email || 'Unassigned', items: [] };
+        }
+        map[key].items.push(c);
+      });
+    });
+    return Object.values(map)
+      .map(({ label, items }) => ({
+        name: label.length > 22 ? label.slice(0, 22) + '…' : label,
+        avgHours: avgHours(items) ?? 0,
+        count: items.filter((item) => getResolvedAt(item)).length,
+      }))
+      .filter((d) => d.avgHours > 0)
+      .sort((a, b) => b.avgHours - a.avgHours);
+  }, [complaints]);
 
   const fastest = (data) => data.length ? data[data.length - 1] : null;
   const slowest = (data) => data.length ? data[0] : null;

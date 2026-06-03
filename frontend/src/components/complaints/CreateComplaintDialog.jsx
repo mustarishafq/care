@@ -13,8 +13,13 @@ import { generateTicketId } from '@/lib/ticketUtils';
 import { findDepartmentIdByName, useDepartments } from '@/lib/useDepartments';
 import { findIdByName, useComplaintStatuses, useComplaintTypes, useCouriers, usePriorities } from '@/lib/useLookups';
 import { useCurrentUser } from '@/lib/useCurrentUser';
-import { Loader2, Upload } from 'lucide-react';
+import { FileText, FileVideo, Loader2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
+
+const storageUrl = (path) => {
+  if (path.startsWith('http://') || path.startsWith('https://')) return path;
+  return `/storage/${path.replace(/^\//, '')}`;
+};
 
 const EMPTY_FORM = {
   customer_name: '',
@@ -63,13 +68,24 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
     setUploading(true);
-    const urls = [];
+    const uploaded = [];
     for (const file of files) {
-      const { path } = await db.integrations.Core.UploadFile({ file });
-      urls.push(path);
+      const { path, url } = await db.integrations.Core.UploadFile({ file });
+      uploaded.push({
+        path,
+        url: url || storageUrl(path),
+        name: file.name,
+        isImage: file.type.startsWith('image/'),
+        isVideo: file.type.startsWith('video/'),
+      });
     }
-    update('proof_files', [...form.proof_files, ...urls]);
+    update('proof_files', [...form.proof_files, ...uploaded]);
     setUploading(false);
+    e.target.value = '';
+  };
+
+  const removeProofFile = (index) => {
+    update('proof_files', form.proof_files.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
@@ -81,6 +97,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     const ticketId = generateTicketId();
     const complaintData = {
       ...form,
+      proof_files: form.proof_files.map((file) => file.path),
       assigned_department_id: form.assigned_department_id || findDepartmentIdByName(departments, 'Customer Service') || null,
       courier_id: form.courier_id || null,
       priority_id: form.priority_id || findIdByName(priorities, 'Medium') || null,
@@ -182,14 +199,37 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
 
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Proof Files</Label>
-          <div className="flex items-center gap-2 flex-wrap">
-            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer text-sm text-muted-foreground hover:text-primary transition-colors">
+          <div className="flex items-start gap-3 flex-wrap">
+            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer text-sm text-muted-foreground hover:text-primary transition-colors shrink-0">
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               <span>{uploading ? 'Uploading...' : 'Upload files'}</span>
               <input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx" className="hidden" onChange={handleFileUpload} />
             </label>
-            {form.proof_files.map((path, i) => (
-              <span key={i} className="text-xs bg-muted px-2 py-1 rounded" title={path}>File {i + 1}</span>
+            {form.proof_files.map((file, i) => (
+              <div key={file.path} className="relative group w-20 h-20 rounded-lg border bg-muted overflow-hidden shrink-0">
+                {file.isImage ? (
+                  <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center justify-center w-full h-full p-1 gap-1">
+                    {file.isVideo ? (
+                      <FileVideo className="w-5 h-5 text-muted-foreground shrink-0" />
+                    ) : (
+                      <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
+                    )}
+                    <span className="text-[10px] text-muted-foreground truncate w-full text-center px-0.5" title={file.name}>
+                      {file.name}
+                    </span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  onClick={() => removeProofFile(i)}
+                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
+                  aria-label={`Remove ${file.name}`}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
             ))}
           </div>
         </div>

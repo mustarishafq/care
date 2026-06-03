@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { STATUS_COLORS, buildStatusChangeUpdates, buildStatusOrder } from '@/lib/ticketUtils';
 import { filterVisibleComplaints } from '@/lib/complaintVisibility';
+import { getAssignedAgentIds } from '@/lib/assignedAgents';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
 import { Link } from 'react-router-dom';
@@ -105,15 +106,18 @@ export default function Kanban() {
       user_id: user?.id,
     });
 
-    if (complaint.assigned_user_id && String(complaint.assigned_user_id) !== String(user?.id)) {
+    for (const recipientUserId of getAssignedAgentIds(complaint).filter((id) => id !== String(user?.id))) {
       await notifyStatusChange({
-        recipientUserId: complaint.assigned_user_id,
+        recipientUserId,
         changerName: user?.full_name,
         ticketId: complaint.ticket_id,
         oldStatus: complaint.status,
         newStatus,
         complaintId: draggableId,
       });
+    }
+
+    if (getAssignedAgentIds(complaint).some((id) => id !== String(user?.id))) {
       invalidateNotificationQueries(queryClient);
     }
 

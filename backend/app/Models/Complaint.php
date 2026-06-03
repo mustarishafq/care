@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Complaint extends Model
@@ -67,6 +68,20 @@ class Complaint extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    public function assignedUsers(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class)->withTimestamps();
+    }
+
+    public function syncPrimaryAssignee(): void
+    {
+        $firstUserId = $this->assignedUsers()->orderBy('complaint_user.created_at')->value('users.id');
+
+        if ($this->assigned_user_id !== $firstUserId) {
+            $this->forceFill(['assigned_user_id' => $firstUserId])->saveQuietly();
+        }
     }
 
     public function ticketActivities(): HasMany

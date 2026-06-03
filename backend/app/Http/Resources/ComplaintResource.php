@@ -41,6 +41,11 @@ class ComplaintResource extends JsonResource
             'assigned_user_id' => $this->assigned_user_id ? (string) $this->assigned_user_id : null,
             'assigned_user' => $this->assignedUser?->email,
             'assigned_user_name' => $this->assignedUser?->full_name ?? $this->assignedUser?->name,
+            'assigned_agents' => $this->whenLoaded('assignedUsers', fn () => $this->assignedUsers->map(fn ($user) => [
+                'id' => (string) $user->id,
+                'email' => $user->email,
+                'full_name' => $user->full_name ?? $user->name,
+            ])->values()->all()),
             'resolution_notes' => $this->resolution_notes,
             'sla_deadline' => $this->sla_deadline?->toIso8601String(),
             'sla_paused_at' => $this->sla_paused_at?->toIso8601String(),

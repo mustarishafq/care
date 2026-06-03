@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, User, Package, Truck, Clock, Loader2, ExternalLink, UserCheck, CornerUpLeft } from 'lucide-react';
+import { ArrowLeft, User, Package, Truck, Clock, Loader2, ExternalLink, UserCheck, CornerUpLeft, X } from 'lucide-react';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
 import { Link } from 'react-router-dom';
 import { format, differenceInHours } from 'date-fns';
@@ -22,6 +22,7 @@ import { useComplaintStatuses } from '@/lib/useLookups';
 import { notifyStatusChange, invalidateNotificationQueries } from '@/lib/notifications';
 import { useDepartments } from '@/lib/useDepartments';
 import { canViewComplaint } from '@/lib/complaintVisibility';
+import { getAssignedAgents, getAssignedAgentIds } from '@/lib/assignedAgents';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
@@ -92,24 +93,28 @@ export default function ComplaintDetail() {
 
   const handleStatusChange = async (newStatus) => {
     const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
-    const assignedUserId = complaint.assigned_user_id;
-    const notifyRecipient = assignedUserId && String(assignedUserId) !== String(user?.id)
-      ? {
-          recipientUserId: assignedUserId,
-          changerName: user?.full_name,
-          ticketId: complaint.ticket_id,
-          oldStatus: complaint.status,
-          newStatus,
-          complaintId,
-        }
-      : null;
+    const assignedIds = getAssignedAgentIds(complaint).filter((id) => id !== String(user?.id));
 
     await updateComplaint(
       updates,
       `Status changed from "${complaint.status}" to "${newStatus}"`,
       'status_changed',
-      notifyRecipient,
     );
+
+    for (const recipientUserId of assignedIds) {
+      await notifyStatusChange({
+        recipientUserId,
+        changerName: user?.full_name,
+        ticketId: complaint.ticket_id,
+        oldStatus: complaint.status,
+        newStatus,
+        complaintId,
+      });
+    }
+
+    if (assignedIds.length) {
+      invalidateNotificationQueries(queryClient);
+    }
   };
 
   const handleAssignDepartment = async (departmentId) => {
@@ -216,8 +221,11 @@ export default function ComplaintDetail() {
                 departments={departments}
                 prevDept={prevDept}
                 updating={updating}
+                complaintId={complaintId}
+                user={user}
+                queryClient={queryClient}
                 onAssignDepartment={handleAssignDepartment}
-                onReassignAgent={() => setAssignOpen(true)}
+                onAssignAgent={() => setAssignOpen(true)}
               />
             )}
           </div>
@@ -343,8 +351,11 @@ export default function ComplaintDetail() {
                 departments={departments}
                 prevDept={prevDept}
                 updating={updating}
+                complaintId={complaintId}
+                user={user}
+                queryClient={queryClient}
                 onAssignDepartment={handleAssignDepartment}
-                onReassignAgent={() => setAssignOpen(true)}
+                onAssignAgent={() => setAssignOpen(true)}
               />
             </div>
           )}
@@ -377,8 +388,40 @@ export default function ComplaintDetail() {
   );
 }
 
-function AssignmentCard({ complaint, departments, prevDept, updating, onAssignDepartment, onReassignAgent }) {
+function AssignmentCard({
+  complaint,
+  departments,
+  prevDept,
+  updating,
+  complaintId,
+  user,
+  queryClient,
+  onAssignDepartment,
+  onAssignAgent,
+}) {
   const prevDeptRecord = departments.find((d) => d.name === prevDept);
+  const assignedAgents = getAssignedAgents(complaint);
+  const [removingId, setRemovingId] = useState(null);
+
+  const handleRemoveAgent = async (agent) => {
+    setRemovingId(agent.id);
+    try {
+      await db.complaints.removeAgent(complaintId, agent.id);
+      await db.entities.TicketActivity.create({
+        complaint_id: complaintId,
+        action_type: 'assigned',
+        description: `${agent.full_name || agent.email} removed from ticket`,
+        user_id: user?.id,
+      });
+      queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+      queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
+      toast.success('Agent removed');
+    } catch {
+      toast.error('Failed to remove agent');
+    } finally {
+      setRemovingId(null);
+    }
+  };
 
   return (
     <Card>
@@ -408,13 +451,36 @@ function AssignmentCard({ complaint, departments, prevDept, updating, onAssignDe
           )}
         </div>
         <div>
-          <Label className="text-xs">Assigned Agent</Label>
-          <div className="flex items-center justify-between mt-1">
-            <p className="text-sm">{complaint.assigned_user_name || complaint.assigned_user || <span className="text-muted-foreground italic">Unassigned</span>}</p>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onReassignAgent}>
-              <UserCheck className="w-3 h-3 mr-1" />Reassign
+          <div className="flex items-center justify-between">
+            <Label className="text-xs">Assigned Agents</Label>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={onAssignAgent}>
+              <UserCheck className="w-3 h-3 mr-1" />Assign
             </Button>
           </div>
+          {assignedAgents.length === 0 ? (
+            <p className="text-sm text-muted-foreground italic mt-1">No agents assigned</p>
+          ) : (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {assignedAgents.map((agent) => (
+                <Badge key={agent.id} variant="secondary" className="text-xs gap-1 pr-1">
+                  {agent.full_name || agent.email}
+                  <button
+                    type="button"
+                    className="ml-0.5 rounded-sm hover:bg-muted-foreground/20 p-0.5 disabled:opacity-50"
+                    disabled={removingId === agent.id}
+                    onClick={() => handleRemoveAgent(agent)}
+                    aria-label={`Remove ${agent.full_name || agent.email}`}
+                  >
+                    {removingId === agent.id ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <X className="w-3 h-3" />
+                    )}
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

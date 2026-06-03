@@ -1,4 +1,5 @@
 import { getUserDepartmentIds } from '@/lib/useDepartments';
+import { isUserAssignedToComplaint } from '@/lib/assignedAgents';
 
 function sameId(a, b) {
   if (a == null || b == null) return false;
@@ -13,7 +14,7 @@ export function canViewComplaint(user, complaint) {
   if (!complaint) return false;
   if (!user || user.is_admin) return true;
 
-  if (sameId(complaint.assigned_user_id, user.id)) return true;
+  if (isUserAssignedToComplaint(complaint, user.id)) return true;
 
   const userDeptIds = getUserDepartmentIds(user);
   if (complaint.assigned_department_id && userDeptIds.some((id) => sameId(id, complaint.assigned_department_id))) {

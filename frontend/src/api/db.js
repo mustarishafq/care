@@ -140,6 +140,18 @@ export const db = {
     },
   },
 
+  complaints: {
+    async assignAgent(complaintId, userId) {
+      const data = await http.post(`/complaints/${complaintId}/agents`, { user_id: userId });
+      return data.data ?? data;
+    },
+
+    async removeAgent(complaintId, userId) {
+      const data = await http.delete(`/complaints/${complaintId}/agents/${userId}`);
+      return data.data ?? data;
+    },
+  },
+
   entities: new Proxy(
     {},
     {

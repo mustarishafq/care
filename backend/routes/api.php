@@ -44,6 +44,8 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('couriers', CourierController::class);
         Route::apiResource('priorities', PriorityController::class);
         Route::apiResource('complaints', ComplaintController::class)->except(['index', 'show']);
+        Route::post('complaints/{id}/agents', [ComplaintController::class, 'assignAgent']);
+        Route::delete('complaints/{id}/agents/{userId}', [ComplaintController::class, 'removeAgent']);
         Route::apiResource('ticket-activities', TicketActivityController::class);
         Route::apiResource('internal-notes', InternalNoteController::class);
         Route::apiResource('notifications', NotificationController::class);

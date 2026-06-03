@@ -22,7 +22,7 @@ trait ScopesComplaintVisibility
         $departmentIds = $user->departments()->pluck('departments.id');
 
         return $query->where(function (Builder $q) use ($user, $departmentIds) {
-            $q->where('assigned_user_id', $user->id);
+            $q->whereHas('assignedUsers', fn (Builder $sub) => $sub->where('users.id', $user->id));
 
             if ($departmentIds->isNotEmpty()) {
                 $q->orWhereIn('assigned_department_id', $departmentIds);
@@ -36,7 +36,7 @@ trait ScopesComplaintVisibility
             return;
         }
 
-        if ($complaint->assigned_user_id === $user->id) {
+        if ($complaint->assignedUsers()->where('users.id', $user->id)->exists()) {
             return;
         }
 

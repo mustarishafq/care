@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { filterVisibleComplaints, filterVisibleActivities } from '@/lib/complaintVisibility';
+import { hasAssignedAgents } from '@/lib/assignedAgents';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
@@ -141,7 +142,7 @@ export default function Dashboard() {
 
 function UnassignedTickets({ complaints, onAssign }) {
   const unassigned = complaints
-    .filter(c => !c.assigned_user_id && !['Closed', 'Delivered', 'Rejected'].includes(c.status))
+    .filter(c => !hasAssignedAgents(c) && !['Closed', 'Delivered', 'Rejected'].includes(c.status))
     .slice(0, 10);
 
   if (!unassigned.length) return null;
