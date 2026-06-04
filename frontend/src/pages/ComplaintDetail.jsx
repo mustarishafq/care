@@ -218,10 +218,9 @@ export default function ComplaintDetail() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-
+        <div className="lg:col-span-2">
           {/* Status & Assignment — shown here on mobile/tablet, hidden on lg+ (shown in sidebar there) */}
-          <div className="lg:hidden space-y-4">
+          <div className="lg:hidden space-y-4 mb-6">
             {canChangeStatus && (
               <Card>
                 <CardHeader className="pb-3">
@@ -250,12 +249,10 @@ export default function ComplaintDetail() {
                 onAssignAgent={() => setAssignOpen(true)}
               />
             )}
-          </div>
-
-          <div className="lg:hidden">
             <WhatsappNotifyCard complaint={complaint} event="updated" />
           </div>
 
+          <div className="space-y-6">
           {/* Complaint Info */}
           <Card>
             <CardHeader className="pb-3">
@@ -349,6 +346,7 @@ export default function ComplaintDetail() {
               </Card>
             </TabsContent>
           </Tabs>
+          </div>
         </div>
 
         {/* Sidebar Actions */}
