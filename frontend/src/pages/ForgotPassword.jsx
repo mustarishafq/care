@@ -4,8 +4,8 @@ import { db } from '@/api/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import AuthLayout from '@/components/layout/AuthLayout';
+import { Loader2, Mail, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ForgotPassword() {
@@ -28,40 +28,65 @@ export default function ForgotPassword() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Forgot Password</CardTitle>
-          <CardDescription>
-            {sent ? 'Check your email for a reset link.' : 'Enter your email to receive a reset link.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!sent ? (
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                Send Reset Link
-              </Button>
-            </form>
-          ) : null}
-          <p className="mt-4 text-center text-sm">
-            <Link to="/login" className="text-primary hover:underline">
-              Back to login
-            </Link>
+    <AuthLayout
+      title={sent ? 'Check your inbox' : 'Forgot password?'}
+      description={
+        sent
+          ? `We've sent a password reset link to ${email}`
+          : "Enter your email and we'll send you a link to reset your password"
+      }
+      footer={
+        <Link
+          to="/login"
+          className="inline-flex items-center gap-1.5 text-primary hover:underline font-medium"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to sign in
+        </Link>
+      }
+    >
+      {sent ? (
+        <div className="text-center space-y-5 py-2">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-green-500/10 rounded-full">
+            <CheckCircle2 className="w-8 h-8 text-green-600" />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            {"Didn't receive the email? Check your spam folder or"}{' '}
+            <button
+              type="button"
+              onClick={() => setSent(false)}
+              className="text-primary hover:underline font-medium"
+            >
+              try again
+            </button>
+            .
           </p>
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="email">Email address</Label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                className="pl-10 h-11"
+                autoComplete="email"
+                required
+              />
+            </div>
+          </div>
+
+          <Button type="submit" className="w-full h-11" disabled={loading}>
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            Send Reset Link
+          </Button>
+        </form>
+      )}
+    </AuthLayout>
   );
 }

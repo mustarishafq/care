@@ -4,19 +4,21 @@ import { db } from '@/api/db';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2 } from 'lucide-react';
+import AuthLayout from '@/components/layout/AuthLayout';
+import { Loader2, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const tokenFromUrl = searchParams.get('token') || '';
   const [form, setForm] = useState({
     email: searchParams.get('email') || '',
-    token: searchParams.get('token') || '',
+    token: tokenFromUrl,
     password: '',
     password_confirmation: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
@@ -33,66 +35,98 @@ export default function ResetPassword() {
     }
   };
 
+  const update = (field) => (e) => setForm((p) => ({ ...p, [field]: e.target.value }));
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Reset Password</CardTitle>
-          <CardDescription>Enter your new password</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="token">Reset Token</Label>
-              <Input
-                id="token"
-                value={form.token}
-                onChange={(e) => setForm((p) => ({ ...p, token: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">New Password</Label>
-              <Input
-                id="password"
-                type="password"
-                value={form.password}
-                onChange={(e) => setForm((p) => ({ ...p, password: e.target.value }))}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password_confirmation">Confirm Password</Label>
-              <Input
-                id="password_confirmation"
-                type="password"
-                value={form.password_confirmation}
-                onChange={(e) => setForm((p) => ({ ...p, password_confirmation: e.target.value }))}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Reset Password
-            </Button>
-          </form>
-          <p className="mt-4 text-center text-sm">
-            <Link to="/login" className="text-primary hover:underline">
-              Back to login
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthLayout
+      title="Set a new password"
+      description="Choose a strong password for your account"
+      footer={
+        <Link
+          to="/login"
+          className="inline-flex items-center gap-1.5 text-primary hover:underline font-medium"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" />
+          Back to sign in
+        </Link>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <div className="relative">
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              id="email"
+              type="email"
+              value={form.email}
+              onChange={update('email')}
+              className="pl-10 h-11"
+              autoComplete="email"
+              required
+            />
+          </div>
+        </div>
+
+        {!tokenFromUrl && (
+          <div className="space-y-2">
+            <Label htmlFor="token">Reset Token</Label>
+            <Input
+              id="token"
+              value={form.token}
+              onChange={update('token')}
+              placeholder="Paste the token from your email"
+              className="h-11 font-mono text-sm"
+              required
+            />
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <Label htmlFor="password">New Password</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={form.password}
+              onChange={update('password')}
+              className="pl-10 pr-10 h-11"
+              autoComplete="new-password"
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password_confirmation">Confirm Password</Label>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              id="password_confirmation"
+              type={showPassword ? 'text' : 'password'}
+              value={form.password_confirmation}
+              onChange={update('password_confirmation')}
+              className="pl-10 h-11"
+              autoComplete="new-password"
+              required
+            />
+          </div>
+        </div>
+
+        <Button type="submit" className="w-full h-11" disabled={loading}>
+          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+          Reset Password
+        </Button>
+      </form>
+    </AuthLayout>
   );
 }
