@@ -2,6 +2,21 @@ import React from 'react';
 import { differenceInHours, addHours } from 'date-fns';
 import { AlertTriangle, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 
+const CLOSED_STATUSES = ['Delivered', 'Closed', 'Rejected'];
+
+export function getResolvedAt(complaint) {
+  if (complaint.resolved_at) return new Date(complaint.resolved_at);
+  if (complaint.closed_at) return new Date(complaint.closed_at);
+  if (CLOSED_STATUSES.includes(complaint.status) && complaint.updated_date) {
+    return new Date(complaint.updated_date);
+  }
+  return null;
+}
+
+export function hasSlaPolicy(complaint) {
+  return !!(complaint.priority || complaint.priority_id || complaint.priority_sla_hours || complaint.sla_deadline);
+}
+
 export function getEffectiveDeadline(complaint) {
   // Base deadline
   let deadline;
@@ -30,13 +45,13 @@ export function getEffectiveDeadline(complaint) {
 export function getSlaStatus(complaint) {
   if (complaint.status === 'Waiting for Customer') return 'paused';
 
-  const closed = ['Delivered', 'Closed', 'Rejected'].includes(complaint.status);
+  const closed = CLOSED_STATUSES.includes(complaint.status);
   const deadline = getEffectiveDeadline(complaint);
   const now = new Date();
   const hoursLeft = differenceInHours(deadline, now);
 
   if (closed) {
-    const resolvedAt = complaint.resolved_at ? new Date(complaint.resolved_at) : now;
+    const resolvedAt = getResolvedAt(complaint) ?? now;
     return resolvedAt <= deadline ? 'met' : 'breached';
   }
   if (now > deadline) return 'breached';

@@ -41,7 +41,7 @@ function groupBy(complaints, keyFn, labelFn) {
   });
   return Object.values(map)
     .map(({ label, items }) => ({ name: label.length > 22 ? label.slice(0, 22) + '…' : label, avgHours: avgHours(items) ?? 0, count: items.filter(c => getResolvedAt(c)).length }))
-    .filter(d => d.avgHours > 0)
+    .filter(d => d.count > 0)
     .sort((a, b) => b.avgHours - a.avgHours);
 }
 
@@ -91,7 +91,7 @@ export default function ResolutionTimeChart({ complaints }) {
         avgHours: avgHours(items) ?? 0,
         count: items.filter((item) => getResolvedAt(item)).length,
       }))
-      .filter((d) => d.avgHours > 0)
+      .filter((d) => d.count > 0)
       .sort((a, b) => b.avgHours - a.avgHours);
   }, [complaints]);
 

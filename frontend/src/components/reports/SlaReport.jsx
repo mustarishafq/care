@@ -1,31 +1,20 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { AlertTriangle, CheckCircle2, Clock, TrendingDown } from 'lucide-react';
 import { differenceInHours, differenceInMinutes } from 'date-fns';
-
-function getSlaStatus(complaint) {
-  if (!complaint.sla_deadline) return null;
-  const now = new Date();
-  const deadline = new Date(complaint.sla_deadline);
-  const isClosed = ['Closed', 'Delivered', 'Rejected'].includes(complaint.status);
-
-  if (isClosed && complaint.resolved_at) {
-    const resolvedAt = new Date(complaint.resolved_at);
-    return resolvedAt <= deadline ? 'met' : 'breached';
-  }
-  if (now > deadline) return 'breached';
-  const remainingMins = differenceInMinutes(deadline, now);
-  const totalMins = (complaint.priority_sla_hours || 48) * 60;
-  if (remainingMins / totalMins < 0.2) return 'warning';
-  return 'on_track';
-}
+import {
+  getEffectiveDeadline,
+  getSlaStatus,
+  hasSlaPolicy,
+} from '@/components/complaints/SlaBadge';
 
 function formatRemaining(complaint) {
-  if (!complaint.sla_deadline) return '—';
+  if (complaint.status === 'Waiting for Customer') return 'Paused';
+
+  const deadline = getEffectiveDeadline(complaint);
   const now = new Date();
-  const deadline = new Date(complaint.sla_deadline);
   const diffH = differenceInHours(deadline, now);
   if (diffH < 0) return `${Math.abs(diffH)}h overdue`;
   if (diffH < 1) {
@@ -36,13 +25,13 @@ function formatRemaining(complaint) {
 }
 
 export default function SlaReport({ complaints }) {
-  const withSla = complaints.filter(c => c.sla_deadline && c.priority);
+  const withSla = complaints.filter(hasSlaPolicy);
 
   const stats = {
     total: withSla.length,
     met: withSla.filter(c => getSlaStatus(c) === 'met').length,
     breached: withSla.filter(c => getSlaStatus(c) === 'breached').length,
-    warning: withSla.filter(c => getSlaStatus(c) === 'warning').length,
+    warning: withSla.filter(c => getSlaStatus(c) === 'at_risk').length,
     on_track: withSla.filter(c => getSlaStatus(c) === 'on_track').length,
   };
 
@@ -52,11 +41,10 @@ export default function SlaReport({ complaints }) {
     return { name: p, total, breached };
   });
 
-  // Open tickets sorted by remaining SLA (most urgent first)
   const openWithSla = withSla
     .filter(c => !['Closed', 'Delivered', 'Rejected'].includes(c.status))
     .map(c => ({ ...c, status_sla: getSlaStatus(c), remaining: formatRemaining(c) }))
-    .sort((a, b) => new Date(a.sla_deadline) - new Date(b.sla_deadline))
+    .sort((a, b) => getEffectiveDeadline(a) - getEffectiveDeadline(b))
     .slice(0, 10);
 
   const breachRate = stats.total > 0 ? ((stats.breached / stats.total) * 100).toFixed(1) : 0;
@@ -149,7 +137,8 @@ export default function SlaReport({ complaints }) {
               )}
               {openWithSla.map(c => {
                 const isBreached = c.status_sla === 'breached';
-                const isWarning = c.status_sla === 'warning';
+                const isWarning = c.status_sla === 'at_risk';
+                const isPaused = c.status_sla === 'paused';
                 return (
                   <div key={c.id} className={`flex items-center justify-between px-4 py-2.5 ${isBreached ? 'bg-red-50 dark:bg-red-900/10' : isWarning ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}>
                     <div className="min-w-0">
@@ -161,8 +150,8 @@ export default function SlaReport({ complaints }) {
                         c.priority === 'Urgent' ? 'bg-red-100 text-red-700' :
                         c.priority === 'High' ? 'bg-amber-100 text-amber-700' :
                         c.priority === 'Medium' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
-                      }`}>{c.priority}</Badge>
-                      <span className={`text-xs font-medium ${isBreached ? 'text-red-600' : isWarning ? 'text-amber-600' : 'text-emerald-600'}`}>
+                      }`}>{c.priority || '—'}</Badge>
+                      <span className={`text-xs font-medium ${isBreached ? 'text-red-600' : isWarning ? 'text-amber-600' : isPaused ? 'text-orange-600' : 'text-emerald-600'}`}>
                         {c.remaining}
                       </span>
                     </div>
