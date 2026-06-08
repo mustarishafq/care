@@ -9,18 +9,29 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Shield, FileText, RefreshCw, Building2, Truck, AlertCircle, Pencil, Plus, X, Loader2, Bell, Link2, Eye, EyeOff, Copy, Check } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Shield, FileText, RefreshCw, Building2, Truck, AlertCircle, Pencil, Plus, X, Loader2, Bell, Link2, Eye, EyeOff, Copy, Check, Ruler, Clock } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { usePermissions } from '@/lib/usePermissions';
 import { useDepartments } from '@/lib/useDepartments';
-import { useComplaintTypes, useCouriers, usePriorities } from '@/lib/useLookups';
+import { useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement } from '@/lib/useLookups';
 
 const SLA_DEFAULT = { first_response: 2, low: 72, medium: 48, high: 24, urgent: 6, stale_alert_hours: 24 };
+const AUTO_CLOSE_DEFAULT = { enabled: false, delay_amount: 1, delay_unit: 'days' };
+
+function formatAutoCloseDelay({ delay_amount, delay_unit }) {
+  const unit = delay_unit === 'hours'
+    ? (delay_amount === 1 ? 'hour' : 'hours')
+    : (delay_amount === 1 ? 'day' : 'days');
+  return `${delay_amount} ${unit}`;
+}
 
 const LOOKUP_SECTIONS = [
   { key: 'departments', label: 'Departments', icon: Building2, entity: 'Department', queryKey: 'departments' },
   { key: 'complaint_types', label: 'Complaint Types', icon: FileText, entity: 'ComplaintType', queryKey: 'complaint_types' },
   { key: 'couriers', label: 'Courier List', icon: Truck, entity: 'Courier', queryKey: 'couriers' },
+  { key: 'units_of_measurement', label: 'Units of Measurement', icon: Ruler, entity: 'UnitOfMeasurement', queryKey: 'units_of_measurement' },
   { key: 'priorities', label: 'Priority Levels', icon: AlertCircle, entity: 'Priority', queryKey: 'priorities' },
 ];
 
@@ -41,9 +52,12 @@ export default function Settings() {
   const [slaForm, setSlaForm] = useState(SLA_DEFAULT);
   const [ssoOpen, setSsoOpen] = useState(false);
   const [ssoForm, setSsoForm] = useState({ api_key: '', issuer_url: '', enabled: false });
+  const [autoCloseOpen, setAutoCloseOpen] = useState(false);
+  const [autoCloseForm, setAutoCloseForm] = useState(AUTO_CLOSE_DEFAULT);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
+  const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupMeta, setLookupMeta] = useState(null);
   const [lookupItems, setLookupItems] = useState([]);
   const [newLookupItem, setNewLookupItem] = useState('');
@@ -51,12 +65,14 @@ export default function Settings() {
   const { data: departments = [], refetch: refetchDepartments } = useDepartments();
   const { data: complaintTypes = [], refetch: refetchComplaintTypes } = useComplaintTypes();
   const { data: couriers = [], refetch: refetchCouriers } = useCouriers();
+  const { data: unitsOfMeasurement = [], refetch: refetchUnitsOfMeasurement } = useUnitsOfMeasurement();
   const { data: priorities = [], refetch: refetchPriorities } = usePriorities();
 
   const lookupData = {
     departments,
     complaint_types: complaintTypes,
     couriers,
+    units_of_measurement: unitsOfMeasurement,
     priorities,
   };
 
@@ -64,6 +80,7 @@ export default function Settings() {
     departments: refetchDepartments,
     complaint_types: refetchComplaintTypes,
     couriers: refetchCouriers,
+    units_of_measurement: refetchUnitsOfMeasurement,
     priorities: refetchPriorities,
   };
 
@@ -97,6 +114,41 @@ export default function Settings() {
   };
 
   const sla = getSla();
+
+  const getAutoClose = () => {
+    const found = configs.find(c => c.key === 'auto_close_delivered');
+    const raw = found?.json_value ?? {};
+    return {
+      enabled: raw.enabled ?? false,
+      delay_amount: Math.max(1, Number(raw.delay_amount ?? AUTO_CLOSE_DEFAULT.delay_amount)),
+      delay_unit: raw.delay_unit === 'hours' ? 'hours' : 'days',
+    };
+  };
+
+  const openAutoClose = () => {
+    setAutoCloseForm(getAutoClose());
+    setAutoCloseOpen(true);
+  };
+
+  const saveAutoClose = async () => {
+    setSaving(true);
+    const existing = configs.find(c => c.key === 'auto_close_delivered');
+    if (existing) {
+      await db.entities.SystemConfig.update(existing.id, { json_value: autoCloseForm });
+    } else {
+      await db.entities.SystemConfig.create({
+        key: 'auto_close_delivered',
+        label: 'Auto-Close Delivered Tickets',
+        json_value: autoCloseForm,
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ['system_configs'] });
+    toast.success('Auto-close settings saved');
+    setSaving(false);
+    setAutoCloseOpen(false);
+  };
+
+  const autoClose = getAutoClose();
 
   const getSso = () => {
     const found = configs.find(c => c.key === 'nexus_sso');
@@ -150,39 +202,72 @@ export default function Settings() {
 
   const sso = getSso();
 
-  const openLookup = (section) => {
-    const items = lookupData[section.key] || [];
+  const openLookup = async (section) => {
     setLookupMeta(section);
-    setLookupItems(items.map((item) => ({ id: item.id, name: item.name })));
     setNewLookupItem('');
+    setLookupItems([]);
     setLookupOpen(true);
+    setLookupLoading(true);
+
+    try {
+      const result = await lookupRefetchers[section.key]?.();
+      const items = result?.data ?? lookupData[section.key] ?? [];
+      setLookupItems(items.map((item) => ({ id: String(item.id), name: item.name })));
+    } catch (err) {
+      toast.error(err.message || `Failed to load ${section.label}`);
+      setLookupOpen(false);
+    } finally {
+      setLookupLoading(false);
+    }
   };
 
   const saveLookup = async () => {
-    if (!lookupMeta) return;
+    if (!lookupMeta || lookupLoading) return;
+
+    const pendingItem = newLookupItem.trim();
+    const itemsToSave = pendingItem
+      ? [...lookupItems, { name: pendingItem }]
+      : lookupItems;
+
+    if (!itemsToSave.length) {
+      toast.error('Add at least one item');
+      return;
+    }
+
     setSaving(true);
-    const current = lookupData[lookupMeta.key] || [];
-    const nextIds = new Set(lookupItems.filter((item) => item.id).map((item) => item.id));
 
-    for (const item of current) {
-      if (!nextIds.has(item.id)) {
-        await db.entities[lookupMeta.entity].delete(item.id);
+    try {
+      const result = await lookupRefetchers[lookupMeta.key]?.();
+      const current = result?.data ?? lookupData[lookupMeta.key] ?? [];
+      const nextIds = new Set(itemsToSave.filter((item) => item.id).map((item) => String(item.id)));
+
+      for (const item of current) {
+        if (!nextIds.has(String(item.id))) {
+          await db.entities[lookupMeta.entity].delete(item.id);
+        }
       }
-    }
 
-    for (const [index, item] of lookupItems.entries()) {
-      if (item.id) {
-        await db.entities[lookupMeta.entity].update(item.id, { name: item.name.trim(), sort_order: index });
-      } else if (item.name.trim()) {
-        await db.entities[lookupMeta.entity].create({ name: item.name.trim(), sort_order: index, is_active: true });
+      for (const [index, item] of itemsToSave.entries()) {
+        const name = item.name.trim();
+        if (!name) continue;
+
+        if (item.id) {
+          await db.entities[lookupMeta.entity].update(item.id, { name, sort_order: index });
+        } else {
+          await db.entities[lookupMeta.entity].create({ name, sort_order: index, is_active: true });
+        }
       }
-    }
 
-    await lookupRefetchers[lookupMeta.key]?.();
-    queryClient.invalidateQueries({ queryKey: [lookupMeta.queryKey] });
-    toast.success(`${lookupMeta.label} saved`);
-    setSaving(false);
-    setLookupOpen(false);
+      await lookupRefetchers[lookupMeta.key]?.();
+      await queryClient.invalidateQueries({ queryKey: [lookupMeta.queryKey] });
+      toast.success(`${lookupMeta.label} saved`);
+      setNewLookupItem('');
+      setLookupOpen(false);
+    } catch (err) {
+      toast.error(err.message || `Failed to save ${lookupMeta.label}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -239,6 +324,37 @@ export default function Settings() {
               <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-border last:border-0">
                 <span className="text-sm">{row.label}</span>
                 <Badge variant="secondary">{row.value} {row.unit}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Auto-Close Delivered Tickets */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Clock className="w-4 h-4" />Auto-Close Delivered Tickets
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant={autoClose.enabled ? 'default' : 'secondary'} className="text-[10px]">
+                  {autoClose.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={openAutoClose} disabled={!canManage}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {[
+              { label: 'Status', value: autoClose.enabled ? 'Active' : 'Inactive' },
+              { label: 'Close after', value: autoClose.enabled ? formatAutoCloseDelay(autoClose) : '—' },
+              { label: 'Action', value: 'Auto-close Delivered tickets' },
+            ].map(row => (
+              <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-border last:border-0">
+                <span className="text-sm">{row.label}</span>
+                <span className="text-xs text-muted-foreground">{row.value}</span>
               </div>
             ))}
           </CardContent>
@@ -302,6 +418,12 @@ export default function Settings() {
             <DialogTitle>Edit {lookupMeta?.label}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            {lookupLoading ? (
+              <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />Loading...
+              </div>
+            ) : (
+            <>
             <div className="space-y-2 max-h-60 overflow-y-auto">
               {lookupItems.map((item, idx) => (
                 <div key={item.id || `new-${idx}`} className="flex items-center gap-2">
@@ -337,10 +459,12 @@ export default function Settings() {
                 <Plus className="w-4 h-4" />
               </Button>
             </div>
+            </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLookupOpen(false)}>Cancel</Button>
-            <Button onClick={saveLookup} disabled={saving}>
+            <Button onClick={saveLookup} disabled={saving || lookupLoading}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save
             </Button>
           </DialogFooter>
@@ -420,6 +544,65 @@ export default function Settings() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSsoOpen(false)}>Cancel</Button>
             <Button onClick={saveSso} disabled={saving || ((ssoForm.api_key?.length ?? 0) > 0 && (ssoForm.api_key?.length ?? 0) < 32)}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-Close Dialog */}
+      <Dialog open={autoCloseOpen} onOpenChange={setAutoCloseOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Clock className="w-4 h-4" />Auto-Close Delivered Tickets</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="rounded-lg bg-muted/50 border p-3 text-xs text-muted-foreground">
+              When enabled, tickets in <strong>Delivered</strong> status are automatically moved to <strong>Closed</strong> after the configured waiting period.
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="auto-close-enabled" className="text-sm">Enable auto-close</Label>
+              <Switch
+                id="auto-close-enabled"
+                checked={!!autoCloseForm.enabled}
+                onCheckedChange={checked => setAutoCloseForm(p => ({ ...p, enabled: checked }))}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Close after delivered for</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={autoCloseForm.delay_amount}
+                  onChange={e => setAutoCloseForm(p => ({ ...p, delay_amount: Math.max(1, Number(e.target.value) || 1) }))}
+                  className="h-8 text-sm w-20"
+                  disabled={!autoCloseForm.enabled}
+                />
+                <Select
+                  value={autoCloseForm.delay_unit}
+                  onValueChange={value => setAutoCloseForm(p => ({ ...p, delay_unit: value }))}
+                  disabled={!autoCloseForm.enabled}
+                >
+                  <SelectTrigger className="h-8 text-sm w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hours">Hours</SelectItem>
+                    <SelectItem value="days">Days</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Example: {formatAutoCloseDelay(autoCloseForm)} after delivery → ticket closes automatically.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAutoCloseOpen(false)}>Cancel</Button>
+            <Button onClick={saveAutoClose} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save
             </Button>
           </DialogFooter>

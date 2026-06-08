@@ -44,15 +44,32 @@ export function findStatusIdByName(statuses, name) {
   return statuses.find((s) => s.name === name)?.id ?? null;
 }
 
-/** Ordered status names from API lookup rows (falls back to STATUS_ORDER). */
-export function buildStatusOrder(statuses = []) {
+function insertAtLegacyPosition(order, name) {
+  if (order.includes(name)) return order;
+  const legacyIndex = STATUS_ORDER.indexOf(name);
+  if (legacyIndex === -1) return [...order, name];
+  for (let i = 0; i < order.length; i++) {
+    const idx = STATUS_ORDER.indexOf(order[i]);
+    if (idx > legacyIndex) {
+      return [...order.slice(0, i), name, ...order.slice(i)];
+    }
+  }
+  return [...order, name];
+}
+
+/** Ordered status names from API lookup rows (falls back to STATUS_ORDER when empty). */
+export function buildStatusOrder(statuses = [], { includeNames = [] } = {}) {
   if (!statuses.length) return [...STATUS_ORDER];
-  const fromApi = [...statuses]
+  let order = [...statuses]
     .filter((s) => s.is_active !== false)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((s) => s.name);
-  const missing = STATUS_ORDER.filter((n) => !fromApi.includes(n));
-  return [...fromApi, ...missing];
+
+  for (const name of includeNames) {
+    if (name) order = insertAtLegacyPosition(order, name);
+  }
+
+  return order;
 }
 
 /** Side-effect fields applied when a complaint status changes (Kanban, detail page, etc.). */
@@ -65,6 +82,9 @@ export function buildStatusChangeUpdates(complaint, newStatus, statuses = [], no
   }
   if (['Delivered', 'Closed'].includes(newStatus)) {
     updates.resolved_at = isoNow;
+  }
+  if (newStatus === 'Delivered') {
+    updates.delivered_at = isoNow;
   }
   if (newStatus === 'Closed') {
     updates.closed_at = isoNow;

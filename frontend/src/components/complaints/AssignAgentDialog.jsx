@@ -30,7 +30,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
   const [saving, setSaving] = useState(false);
 
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const statusOrder = buildStatusOrder(complaintStatuses);
+  const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [complaint?.status] });
 
   const assignedIds = useMemo(() => getAssignedAgentIds(complaint), [complaint]);
 

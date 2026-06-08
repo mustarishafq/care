@@ -53,6 +53,19 @@ trait ManagesLookupEntity
         $this->ensurePermission($request->user(), 'settings.manage');
 
         $resource = $this->lookupResource();
+        $name = trim((string) $request->input('name', ''));
+        $existing = $name !== ''
+            ? $this->lookupModel()::where('name', $name)->first()
+            : null;
+
+        if ($existing && ! $existing->is_active) {
+            $existing->update(array_merge(
+                $request->validate($this->updateRules($existing)),
+                ['is_active' => true]
+            ));
+
+            return new $resource($existing->fresh());
+        }
 
         return new $resource($this->lookupModel()::create($request->validate($this->storeRules())));
     }

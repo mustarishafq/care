@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 
 export default function StatusProgressBar({ currentStatus }) {
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const statusOrder = buildStatusOrder(complaintStatuses);
+  const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [currentStatus] });
 
   if (currentStatus === 'Rejected') {
     return (

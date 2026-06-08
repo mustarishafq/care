@@ -37,6 +37,22 @@ class DepartmentController extends Controller
     {
         $this->ensurePermission($request->user(), 'settings.manage');
 
+        $name = trim((string) $request->input('name', ''));
+        $existing = $name !== '' ? Department::where('name', $name)->first() : null;
+
+        if ($existing && ! $existing->is_active) {
+            $existing->update(array_merge(
+                $request->validate([
+                    'name' => ['sometimes', 'string', 'max:255', 'unique:departments,name,'.$existing->id],
+                    'is_active' => ['nullable', 'boolean'],
+                    'sort_order' => ['nullable', 'integer', 'min:0'],
+                ]),
+                ['is_active' => true]
+            ));
+
+            return new DepartmentResource($existing->fresh());
+        }
+
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255', 'unique:departments,name'],
             'is_active' => ['nullable', 'boolean'],

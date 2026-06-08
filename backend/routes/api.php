@@ -16,6 +16,7 @@ use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SsoController;
 use App\Http\Controllers\Api\V1\SystemConfigController;
 use App\Http\Controllers\Api\V1\TicketActivityController;
+use App\Http\Controllers\Api\V1\UnitOfMeasurementController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Middleware\EnsureUserIsApproved;
@@ -43,6 +44,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('complaint-statuses', ComplaintStatusController::class);
         Route::apiResource('couriers', CourierController::class);
         Route::apiResource('priorities', PriorityController::class);
+        Route::apiResource('units-of-measurement', UnitOfMeasurementController::class);
         Route::apiResource('complaints', ComplaintController::class)->except(['index', 'show']);
         Route::post('complaints/{id}/agents', [ComplaintController::class, 'assignAgent']);
         Route::delete('complaints/{id}/agents/{userId}', [ComplaintController::class, 'removeAgent']);

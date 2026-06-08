@@ -31,6 +31,7 @@ import InternalNotes from '@/components/complaints/InternalNotes';
 import ProofFileThumbnail from '@/components/complaints/ProofFileThumbnail';
 import WhatsappNotifyCard from '@/components/complaints/WhatsappNotifyCard';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
+import { getAffectedProducts, groupAffectedProductsByProduct } from '@/lib/whatsappShare';
 
 export default function ComplaintDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -66,7 +67,7 @@ export default function ComplaintDetail() {
 
   const { data: departments = [] } = useDepartments();
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const statusOrder = buildStatusOrder(complaintStatuses);
+  const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [complaint?.status] });
 
   const updateComplaint = async (
     updates,
@@ -186,6 +187,7 @@ export default function ComplaintDetail() {
   }
 
   const ageHours = differenceInHours(new Date(), new Date(complaint.created_date));
+  const affectedProductGroups = groupAffectedProductsByProduct(getAffectedProducts(complaint));
 
   return (
     <div className="space-y-6">
@@ -264,12 +266,33 @@ export default function ComplaintDetail() {
                 <InfoRow label="Customer" value={complaint.customer_name} />
                 <InfoRow label="Phone" value={complaint.customer_phone} />
                 <InfoRow label="Order Number" value={complaint.order_number} />
+                <InfoRow label="Order Source" value={complaint.order_source} />
                 <InfoRow label="Complaint Type" value={complaint.complaint_type} />
-                <InfoRow label="Product" value={complaint.product_name} />
-                <InfoRow label="SKU" value={complaint.sku} />
-                <InfoRow label="Qty Affected" value={complaint.quantity_affected} />
               </div>
-              <div className="mt-4 pt-4 border-t">
+              {affectedProductGroups.length > 0 && (
+                <div className="mt-4 pt-4 space-y-3">
+                  <p className="text-xs font-medium text-muted-foreground uppercase">Affected Products</p>
+                  {affectedProductGroups.map((group, index) => (
+                    <div key={`${group.product_id ?? group.product_name}-${index}`} className="rounded-lg border bg-muted/30 p-3 space-y-2">
+                      <p className="text-sm font-medium">{group.product_name || 'Unknown product'}</p>
+                      <div className="space-y-1">
+                        {group.lines.map((line, lineIndex) => (
+                          <p key={`${line.batch_number}-${lineIndex}`} className="text-sm text-muted-foreground">
+                            Batch: {line.batch_number || '—'}
+                            {(line.quantity_affected != null || line.unit_of_measurement) && (
+                              <span>
+                                {' '}— {line.quantity_affected != null ? line.quantity_affected : ''}
+                                {line.unit_of_measurement ? ` ${line.unit_of_measurement}` : ''}
+                              </span>
+                            )}
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="mt-4 pt-4">
                 <p className="text-xs font-medium text-muted-foreground uppercase mb-1">Description</p>
                 <p className="text-sm whitespace-pre-wrap">{complaint.description}</p>
               </div>

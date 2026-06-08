@@ -9,8 +9,9 @@ use App\Models\Department;
 use App\Models\Priority;
 use App\Models\Role;
 use App\Models\SystemConfig;
-use App\Models\User;
+use App\Models\UnitOfMeasurement;
 use Illuminate\Database\Seeder;
+use App\Models\User;
 
 class DatabaseSeeder extends Seeder
 {
@@ -64,6 +65,15 @@ class DatabaseSeeder extends Seeder
             Priority::firstOrCreate(
                 ['name' => $priority['name']],
                 ['sla_hours' => $priority['sla_hours'], 'is_active' => true, 'sort_order' => $index]
+            );
+        }
+
+        $defaultUnits = ['Piece', 'Box', 'Carton', 'Kg', 'Gram', 'Liter', 'Pack'];
+
+        foreach ($defaultUnits as $index => $name) {
+            UnitOfMeasurement::firstOrCreate(
+                ['name' => $name],
+                ['is_active' => true, 'sort_order' => $index]
             );
         }
 
@@ -135,6 +145,15 @@ class DatabaseSeeder extends Seeder
                 'key' => 'webhook_api_key',
                 'label' => 'Webhook API Key',
                 'json_value' => ['key' => bin2hex(random_bytes(16))],
+            ],
+            [
+                'key' => 'auto_close_delivered',
+                'label' => 'Auto-Close Delivered Tickets',
+                'json_value' => [
+                    'enabled' => false,
+                    'delay_amount' => 1,
+                    'delay_unit' => 'days',
+                ],
             ],
         ];
 

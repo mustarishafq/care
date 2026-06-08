@@ -25,6 +25,14 @@ export function usePriorities() {
   });
 }
 
+export function useUnitsOfMeasurement() {
+  return useQuery({
+    queryKey: ['units_of_measurement'],
+    queryFn: () => db.entities.UnitOfMeasurement.list('sort_order'),
+    staleTime: 60_000,
+  });
+}
+
 export function useComplaintStatuses() {
   return useQuery({
     queryKey: ['complaint_statuses'],

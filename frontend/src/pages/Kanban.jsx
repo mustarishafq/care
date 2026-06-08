@@ -24,15 +24,21 @@ import { notifyStatusChange, invalidateNotificationQueries } from '@/lib/notific
 
 const STORAGE_KEY = 'kanban_column_order';
 
-function loadColumnOrder(statusOrder) {
+function loadColumnOrder(statusOrder, existing = []) {
+  const activeNames = new Set(statusOrder);
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
-      const parsed = JSON.parse(saved);
-      const missing = statusOrder.filter(s => !parsed.includes(s));
+      const parsed = JSON.parse(saved).filter((s) => activeNames.has(s));
+      const missing = statusOrder.filter((s) => !parsed.includes(s));
       return [...parsed, ...missing];
     }
   } catch {}
+  if (existing.length) {
+    const kept = existing.filter((s) => activeNames.has(s));
+    const missing = statusOrder.filter((s) => !kept.includes(s));
+    return [...kept, ...missing];
+  }
   return [...statusOrder];
 }
 
@@ -55,15 +61,7 @@ export default function Kanban() {
   const [draggingId, setDraggingId] = useState(null);
   const [columnSorts, setColumnSorts] = useState({});
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const statusOrder = buildStatusOrder(complaintStatuses);
-  const [columnOrder, setColumnOrder] = useState(() => loadColumnOrder(statusOrder));
-
-  React.useEffect(() => {
-    setColumnOrder((prev) => {
-      const missing = statusOrder.filter((s) => !prev.includes(s));
-      return missing.length ? [...prev, ...missing] : prev;
-    });
-  }, [statusOrder.join('|')]);
+  const [columnOrder, setColumnOrder] = useState([]);
   const [columnOrderOpen, setColumnOrderOpen] = useState(false);
 
   const saveColumnOrder = (order) => {
@@ -80,6 +78,16 @@ export default function Kanban() {
   });
 
   const visibleComplaints = filterVisibleComplaints(user, complaints);
+
+  const statusOrder = React.useMemo(() => {
+    const inUseStatuses = [...new Set(visibleComplaints.map((c) => c.status).filter(Boolean))];
+    return buildStatusOrder(complaintStatuses, { includeNames: inUseStatuses });
+  }, [complaintStatuses, visibleComplaints]);
+
+  React.useEffect(() => {
+    if (!statusOrder.length) return;
+    setColumnOrder((prev) => (prev.length ? loadColumnOrder(statusOrder, prev) : loadColumnOrder(statusOrder)));
+  }, [statusOrder.join('|')]);
 
   const onDragEnd = async (result) => {
     if (!canChangeStatus) return;

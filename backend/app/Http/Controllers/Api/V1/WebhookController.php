@@ -45,7 +45,8 @@ class WebhookController extends Controller
         ], fn ($v) => $v !== null);
 
         if (! empty($updates)) {
-            $complaint->update(ComplaintInput::normalizeForUpdate($updates));
+            $normalized = ComplaintInput::normalizeForUpdate($updates);
+            $complaint->update(ComplaintInput::applyStatusTimestamps($complaint, $normalized));
 
             TicketActivity::create([
                 'complaint_id' => $complaint->id,
@@ -57,7 +58,11 @@ class WebhookController extends Controller
 
         return response()->json([
             'message' => 'Tracking updated successfully.',
-            'complaint' => new ComplaintResource($complaint->fresh()->load(['complaintStatus', 'product'])),
+            'complaint' => new ComplaintResource($complaint->fresh()->load([
+                'complaintStatus',
+                'affectedProducts.product',
+                'affectedProducts.unitOfMeasurement',
+            ])),
         ]);
     }
 }

@@ -26,7 +26,7 @@ const STATUS_ICONS = {
 
 function StatusProgressBar({ status }) {
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const statusOrder = buildStatusOrder(complaintStatuses);
+  const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [status] });
 
   if (status === 'Rejected') {
     return (

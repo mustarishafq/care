@@ -18,13 +18,48 @@
       "type": "string",
       "description": "Order reference number"
     },
+    "order_source": {
+      "type": "string",
+      "enum": [
+        "SiteGiant",
+        "FounderHQ"
+      ],
+      "description": "Platform where the order was placed"
+    },
+    "batch_number": {
+      "type": "string",
+      "description": "Primary product batch or lot number (legacy)"
+    },
     "product_name": {
       "type": "string",
-      "description": "Product name"
+      "description": "Primary product name (legacy)"
     },
     "quantity_affected": {
       "type": "number",
-      "description": "Number of items affected"
+      "description": "Primary product quantity affected (legacy)"
+    },
+    "unit_of_measurement_id": {
+      "type": "string",
+      "description": "Primary unit of measurement lookup ID (legacy)"
+    },
+    "unit_of_measurement": {
+      "type": "string",
+      "description": "Primary unit for quantity affected (legacy)"
+    },
+    "affected_products": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "product_id": { "type": "string" },
+          "product_name": { "type": "string" },
+          "batch_number": { "type": "string" },
+          "quantity_affected": { "type": "number" },
+          "unit_of_measurement_id": { "type": "string" },
+          "unit_of_measurement": { "type": "string" }
+        }
+      },
+      "description": "Affected product lines, each pairing one batch number with its quantity and unit"
     },
     "complaint_type": {
       "type": "string",
@@ -136,6 +171,11 @@
       "format": "date-time",
       "description": "Timestamp when resolved"
     },
+    "delivered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when marked as delivered"
+    },
     "closed_at": {
       "type": "string",
       "format": "date-time",
@@ -144,8 +184,7 @@
   },
   "required": [
     "customer_name",
-    "order_number",
-    "product_name",
+    "tracking_number",
     "complaint_type",
     "description"
   ]

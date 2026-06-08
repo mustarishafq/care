@@ -28,8 +28,8 @@ class Product extends Model
         return $this->belongsTo(ProductCategory::class, 'category_id');
     }
 
-    public function complaints(): HasMany
+    public function complaintAffectedProducts(): HasMany
     {
-        return $this->hasMany(Complaint::class);
+        return $this->hasMany(ComplaintAffectedProduct::class);
     }
 }

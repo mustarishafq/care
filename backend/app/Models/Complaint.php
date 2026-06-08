@@ -14,8 +14,7 @@ class Complaint extends Model
         'customer_name',
         'customer_phone',
         'order_number',
-        'product_id',
-        'quantity_affected',
+        'order_source',
         'complaint_type_id',
         'description',
         'proof_files',
@@ -32,12 +31,13 @@ class Complaint extends Model
         'sla_paused_duration',
         'first_response_at',
         'resolved_at',
+        'delivered_at',
         'closed_at',
     ];
 
-    public function product(): BelongsTo
+    public function affectedProducts(): HasMany
     {
-        return $this->belongsTo(Product::class);
+        return $this->hasMany(ComplaintAffectedProduct::class)->orderBy('sort_order');
     }
 
     public function complaintType(): BelongsTo
@@ -107,6 +107,7 @@ class Complaint extends Model
             'sla_paused_at' => 'datetime',
             'first_response_at' => 'datetime',
             'resolved_at' => 'datetime',
+            'delivered_at' => 'datetime',
             'closed_at' => 'datetime',
         ];
     }

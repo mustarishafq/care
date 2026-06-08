@@ -11,25 +11,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateTicketId } from '@/lib/ticketUtils';
 import { findDepartmentIdByName, useDepartments } from '@/lib/useDepartments';
-import { findIdByName, useComplaintStatuses, useComplaintTypes, useCouriers, usePriorities } from '@/lib/useLookups';
+import { findIdByName, useComplaintStatuses, useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement } from '@/lib/useLookups';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Loader2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
 import ProofFileThumbnail from '@/components/complaints/ProofFileThumbnail';
+import AffectedProductsEditor, { EMPTY_AFFECTED_PRODUCT } from '@/components/complaints/AffectedProductsEditor';
 
 const storageUrl = (path) => {
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
   return `/storage/${path.replace(/^\//, '')}`;
 };
 
+const ORDER_SOURCES = ['SiteGiant', 'FounderHQ'];
+
 const EMPTY_FORM = {
   customer_name: '',
   customer_phone: '',
   order_number: '',
-  product_id: '',
-  quantity_affected: 1,
+  order_source: '',
+  affected_products: [{ ...EMPTY_AFFECTED_PRODUCT }],
   complaint_type_id: '',
   description: '',
   courier_id: '',
@@ -49,6 +52,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const { data: complaintTypes = [] } = useComplaintTypes();
   const { data: couriers = [] } = useCouriers();
   const { data: priorities = [] } = usePriorities();
+  const { data: unitsOfMeasurement = [] } = useUnitsOfMeasurement();
   const { data: complaintStatuses = [] } = useComplaintStatuses();
   const [form, setForm] = useState(EMPTY_FORM);
 
@@ -120,21 +124,46 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   };
 
   const handleSubmit = async () => {
-    if (!form.customer_name || !form.order_number || !form.product_id || !form.complaint_type_id || !form.description) {
+    const hasValidProduct = form.affected_products.some(
+      (item) => item.product_id && (item.batch_entries ?? []).some((entry) => entry.batch_number?.trim()),
+    );
+    if (!form.customer_name || !form.tracking_number.trim() || !hasValidProduct || !form.complaint_type_id || !form.description) {
       toast.error('Please fill in all required fields');
       return;
     }
+
+    const affectedProducts = form.affected_products
+      .filter((item) => item.product_id)
+      .map((item) => ({
+        product_id: item.product_id,
+        batch_entries: (item.batch_entries ?? [])
+          .filter((entry) => entry.batch_number?.trim())
+          .map((entry) => ({
+            batch_number: entry.batch_number.trim(),
+            quantity_affected: Number(entry.quantity_affected) || null,
+            unit_of_measurement_id: entry.unit_of_measurement_id || null,
+          })),
+      }))
+      .filter((item) => item.batch_entries.length > 0);
+
     setSaving(true);
     const ticketId = generateTicketId();
     const complaintData = {
-      ...form,
+      customer_name: form.customer_name,
+      customer_phone: form.customer_phone,
+      order_number: form.order_number.trim() || null,
+      order_source: form.order_source || null,
+      affected_products: affectedProducts,
+      complaint_type_id: form.complaint_type_id,
+      description: form.description,
       proof_files: form.proof_files.map((file) => file.path),
       assigned_department_id: form.assigned_department_id || findDepartmentIdByName(departments, 'Customer Service') || null,
+      assigned_user_id: user?.id || null,
       courier_id: form.courier_id || null,
+      tracking_number: form.tracking_number,
       priority_id: form.priority_id || findIdByName(priorities, 'Medium') || null,
       ticket_id: ticketId,
       status_id: findIdByName(complaintStatuses, 'New Complaint'),
-      quantity_affected: Number(form.quantity_affected) || 1,
     };
     const created = await db.entities.Complaint.create(complaintData);
     await db.entities.TicketActivity.create({
@@ -144,16 +173,22 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       user_id: user?.id,
     });
     queryClient.invalidateQueries({ queryKey: ['complaints'] });
-    const product = products.find((p) => String(p.id) === String(form.product_id));
     const sharePayload = {
       ...created,
       complaint_type: created.complaint_type ?? complaintTypes.find((t) => String(t.id) === String(form.complaint_type_id))?.name,
       priority: created.priority ?? priorities.find((p) => String(p.id) === String(form.priority_id))?.name,
       assigned_department: created.assigned_department ?? departments.find((d) => String(d.id) === String(form.assigned_department_id))?.name,
-      product_name: created.product_name ?? product?.name,
+      assigned_user_name: created.assigned_user_name ?? user?.full_name,
       customer_name: created.customer_name ?? form.customer_name,
       order_number: created.order_number ?? form.order_number,
+      order_source: created.order_source ?? form.order_source,
+      tracking_number: created.tracking_number ?? form.tracking_number,
       status: created.status ?? complaintStatuses.find((s) => String(s.id) === String(complaintData.status_id))?.name,
+      affected_products: (created.affected_products ?? []).map((item) => ({
+        ...item,
+        product_name: item.product_name ?? products.find((p) => String(p.id) === String(item.product_id))?.name,
+        unit_of_measurement: item.unit_of_measurement ?? unitsOfMeasurement.find((u) => String(u.id) === String(item.unit_of_measurement_id))?.name,
+      })),
     };
     offerWhatsappShareToast(sharePayload, { event: 'created' });
     setSaving(false);
@@ -162,11 +197,12 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+        <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
           <DialogTitle className="text-lg">Create New Complaint</DialogTitle>
         </DialogHeader>
 
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Customer Name *</Label>
@@ -174,32 +210,35 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Phone Number</Label>
-            <Input value={form.customer_phone} onChange={e => update('customer_phone', e.target.value)} placeholder="+62..." />
+            <Input value={form.customer_phone} onChange={e => update('customer_phone', e.target.value)} placeholder="60123456789" />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Order Number *</Label>
+            <Label className="text-xs font-medium">Tracking Number *</Label>
+            <Input value={form.tracking_number} onChange={e => update('tracking_number', e.target.value)} placeholder="Tracking #" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Order Number</Label>
             <Input value={form.order_number} onChange={e => update('order_number', e.target.value)} placeholder="ORD-..." />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Product *</Label>
-            {products.length > 0 ? (
-              <Select value={form.product_id} onValueChange={v => update('product_id', v)}>
-                <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
-                <SelectContent>
-                  {products.map(p => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}{p.sku ? ` (${p.sku})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <p className="text-sm text-muted-foreground py-2">Add products on the Products page before creating complaints.</p>
-            )}
+            <Label className="text-xs font-medium">Order Source</Label>
+            <Select value={form.order_source} onValueChange={v => update('order_source', v)}>
+              <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+              <SelectContent>
+                {ORDER_SOURCES.map(source => (
+                  <SelectItem key={source} value={source}>{source}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Quantity Affected</Label>
-            <Input type="number" min={1} value={form.quantity_affected} onChange={e => update('quantity_affected', e.target.value)} />
+            <Label className="text-xs font-medium">Courier</Label>
+            <Select value={form.courier_id} onValueChange={v => update('courier_id', v)}>
+              <SelectTrigger><SelectValue placeholder="Select courier" /></SelectTrigger>
+              <SelectContent>
+                {couriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Complaint Type *</Label>
@@ -219,20 +258,14 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Courier</Label>
-            <Select value={form.courier_id} onValueChange={v => update('courier_id', v)}>
-              <SelectTrigger><SelectValue placeholder="Select courier" /></SelectTrigger>
-              <SelectContent>
-                {couriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs font-medium">Tracking Number</Label>
-            <Input value={form.tracking_number} onChange={e => update('tracking_number', e.target.value)} placeholder="Tracking #" />
-          </div>
         </div>
+
+        <AffectedProductsEditor
+          products={products}
+          unitsOfMeasurement={unitsOfMeasurement}
+          value={form.affected_products}
+          onChange={(affected_products) => update('affected_products', affected_products)}
+        />
 
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Description *</Label>
@@ -271,8 +304,9 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           )}
           <p className="text-xs text-muted-foreground">Maximum file size: 10 MB per file.</p>
         </div>
+        </div>
 
-        <DialogFooter>
+        <DialogFooter className="shrink-0 border-t px-6 py-4 bg-background">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}

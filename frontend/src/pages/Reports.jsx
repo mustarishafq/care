@@ -60,7 +60,10 @@ export default function Reports() {
   const { data: couriers = [] } = useCouriers();
   const { data: priorities = [] } = usePriorities();
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const statusOrder = buildStatusOrder(complaintStatuses);
+  const statusOrder = useMemo(() => {
+    const inUseStatuses = [...new Set(visibleComplaints.map((c) => c.status).filter(Boolean))];
+    return buildStatusOrder(complaintStatuses, { includeNames: inUseStatuses });
+  }, [complaintStatuses, visibleComplaints]);
 
   const { from, to } = useMemo(() => getRangeDates(range, customFrom, customTo), [range, customFrom, customTo]);
 

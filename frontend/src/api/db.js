@@ -14,6 +14,7 @@ const ENTITY_MAP = {
   ComplaintStatus: 'complaint-statuses',
   Courier: 'couriers',
   Priority: 'priorities',
+  UnitOfMeasurement: 'units-of-measurement',
   User: 'users',
 };
 

@@ -8,6 +8,7 @@ use App\Http\Controllers\Concerns\ScopesComplaintVisibility;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
+use App\Services\ComplaintAffectedProductService;
 use App\Services\TicketIdGenerator;
 use App\Support\ComplaintInput;
 use App\Support\StoragePath;
@@ -19,7 +20,10 @@ class ComplaintController extends Controller
 {
     use AppliesEntityQueries, AuthorizesPermissions, ScopesComplaintVisibility;
 
-    public function __construct(private TicketIdGenerator $ticketIdGenerator) {}
+    public function __construct(
+        private TicketIdGenerator $ticketIdGenerator,
+        private ComplaintAffectedProductService $affectedProductService,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -46,15 +50,30 @@ class ComplaintController extends Controller
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
-            'order_number' => ['required', 'string', 'max:255'],
-            'product_id' => ['required_without:product_name', 'integer', 'exists:products,id'],
-            'product_name' => ['required_without:product_id', 'string', 'max:255'],
+            'order_number' => ['nullable', 'string', 'max:255'],
+            'order_source' => ['nullable', 'string', 'in:SiteGiant,FounderHQ'],
+            'batch_number' => ['nullable', 'string', 'max:255'],
+            'product_id' => ['required_without_all:product_name,affected_products', 'integer', 'exists:products,id'],
+            'product_name' => ['required_without_all:product_id,affected_products', 'string', 'max:255'],
             'quantity_affected' => ['nullable', 'integer', 'min:1'],
+            'unit_of_measurement_id' => ['nullable', 'integer', 'exists:units_of_measurement,id'],
+            'affected_products' => ['nullable', 'array', 'min:1'],
+            'affected_products.*.product_id' => ['required_without:affected_products.*.product_name', 'integer', 'exists:products,id'],
+            'affected_products.*.product_name' => ['required_without:affected_products.*.product_id', 'string', 'max:255'],
+            'affected_products.*.batch_number' => ['nullable', 'string', 'max:255'],
+            'affected_products.*.quantity_affected' => ['nullable', 'integer', 'min:1'],
+            'affected_products.*.unit_of_measurement_id' => ['nullable', 'integer', 'exists:units_of_measurement,id'],
+            'affected_products.*.batch_entries' => ['nullable', 'array'],
+            'affected_products.*.batch_entries.*.batch_number' => ['nullable', 'string', 'max:255'],
+            'affected_products.*.batch_entries.*.quantity_affected' => ['nullable', 'integer', 'min:1'],
+            'affected_products.*.batch_entries.*.unit_of_measurement_id' => ['nullable', 'integer', 'exists:units_of_measurement,id'],
+            'affected_products.*.batch_numbers' => ['nullable', 'array'],
+            'affected_products.*.batch_numbers.*' => ['nullable', 'string', 'max:255'],
             'complaint_type_id' => ['required', 'integer', 'exists:complaint_types,id'],
             'description' => ['required', 'string'],
             'proof_files' => ['nullable', 'array'],
             'courier_id' => ['nullable', 'integer', 'exists:couriers,id'],
-            'tracking_number' => ['nullable', 'string', 'max:255'],
+            'tracking_number' => ['required', 'string', 'max:255'],
             'replacement_tracking_number' => ['nullable', 'string', 'max:255'],
             'priority_id' => ['nullable', 'integer', 'exists:priorities,id'],
             'status_id' => ['nullable', 'integer', 'exists:complaint_statuses,id'],
@@ -65,14 +84,25 @@ class ComplaintController extends Controller
             'sla_deadline' => ['nullable', 'date'],
         ]);
 
+        $affectedProducts = ComplaintInput::pullAffectedProducts($data);
+
+        if ($affectedProducts === []) {
+            abort(422, 'At least one affected product is required.');
+        }
+
         $data = ComplaintInput::normalizeForCreate($data);
         $data['ticket_id'] = $this->ticketIdGenerator->generate();
+
+        if (! isset($data['assigned_user_id']) && $request->user()) {
+            $data['assigned_user_id'] = $request->user()->id;
+        }
 
         if (isset($data['proof_files'])) {
             $data['proof_files'] = StoragePath::normalizeMany($data['proof_files']);
         }
 
         $complaint = Complaint::create($data);
+        $this->affectedProductService->sync($complaint, $affectedProducts);
 
         if ($complaint->assigned_user_id) {
             $complaint->assignedUsers()->syncWithoutDetaching([$complaint->assigned_user_id]);
@@ -100,10 +130,25 @@ class ComplaintController extends Controller
         $data = $request->validate([
             'customer_name' => ['sometimes', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
-            'order_number' => ['sometimes', 'string', 'max:255'],
+            'order_number' => ['nullable', 'string', 'max:255'],
+            'order_source' => ['nullable', 'string', 'in:SiteGiant,FounderHQ'],
+            'batch_number' => ['nullable', 'string', 'max:255'],
             'product_id' => ['sometimes', 'integer', 'exists:products,id'],
             'product_name' => ['sometimes', 'string', 'max:255'],
             'quantity_affected' => ['nullable', 'integer', 'min:1'],
+            'unit_of_measurement_id' => ['nullable', 'integer', 'exists:units_of_measurement,id'],
+            'affected_products' => ['sometimes', 'array', 'min:1'],
+            'affected_products.*.product_id' => ['required_without:affected_products.*.product_name', 'integer', 'exists:products,id'],
+            'affected_products.*.product_name' => ['required_without:affected_products.*.product_id', 'string', 'max:255'],
+            'affected_products.*.batch_number' => ['nullable', 'string', 'max:255'],
+            'affected_products.*.quantity_affected' => ['nullable', 'integer', 'min:1'],
+            'affected_products.*.unit_of_measurement_id' => ['nullable', 'integer', 'exists:units_of_measurement,id'],
+            'affected_products.*.batch_entries' => ['nullable', 'array'],
+            'affected_products.*.batch_entries.*.batch_number' => ['nullable', 'string', 'max:255'],
+            'affected_products.*.batch_entries.*.quantity_affected' => ['nullable', 'integer', 'min:1'],
+            'affected_products.*.batch_entries.*.unit_of_measurement_id' => ['nullable', 'integer', 'exists:units_of_measurement,id'],
+            'affected_products.*.batch_numbers' => ['nullable', 'array'],
+            'affected_products.*.batch_numbers.*' => ['nullable', 'string', 'max:255'],
             'complaint_type_id' => ['sometimes', 'integer', 'exists:complaint_types,id'],
             'description' => ['sometimes', 'string'],
             'proof_files' => ['nullable', 'array'],
@@ -121,6 +166,7 @@ class ComplaintController extends Controller
             'sla_paused_duration' => ['nullable', 'integer', 'min:0'],
             'first_response_at' => ['nullable', 'date'],
             'resolved_at' => ['nullable', 'date'],
+            'delivered_at' => ['nullable', 'date'],
             'closed_at' => ['nullable', 'date'],
         ]);
 
@@ -128,7 +174,24 @@ class ComplaintController extends Controller
             $data['proof_files'] = StoragePath::normalizeMany($data['proof_files']);
         }
 
+        $affectedProducts = null;
+        if ($request->hasAny([
+            'affected_products',
+            'product_id',
+            'product_name',
+            'batch_number',
+            'quantity_affected',
+            'unit_of_measurement_id',
+        ])) {
+            $affectedProducts = ComplaintInput::pullAffectedProducts($data);
+
+            if ($affectedProducts === []) {
+                abort(422, 'At least one affected product is required.');
+            }
+        }
+
         $data = ComplaintInput::normalizeForUpdate($data);
+        $data = ComplaintInput::applyStatusTimestamps($complaint, $data);
 
         $this->ensureComplaintUpdatePermissions($request->user(), $data);
 
@@ -143,6 +206,10 @@ class ComplaintController extends Controller
         }
 
         $complaint->update($data);
+
+        if ($affectedProducts !== null) {
+            $this->affectedProductService->sync($complaint, $affectedProducts);
+        }
 
         return new ComplaintResource($complaint->fresh()->load($this->complaintRelations()));
     }
@@ -192,6 +259,16 @@ class ComplaintController extends Controller
     /** @return list<string> */
     private function complaintRelations(): array
     {
-        return ['assignedDepartment', 'assignedUser', 'assignedUsers', 'complaintStatus', 'complaintType', 'courier', 'priority', 'product'];
+        return [
+            'assignedDepartment',
+            'assignedUser',
+            'assignedUsers',
+            'complaintStatus',
+            'complaintType',
+            'courier',
+            'priority',
+            'affectedProducts.product',
+            'affectedProducts.unitOfMeasurement',
+        ];
     }
 }
