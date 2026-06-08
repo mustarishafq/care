@@ -13,9 +13,11 @@ import { generateTicketId } from '@/lib/ticketUtils';
 import { findDepartmentIdByName, useDepartments } from '@/lib/useDepartments';
 import { findIdByName, useComplaintStatuses, useComplaintTypes, useCouriers, usePriorities } from '@/lib/useLookups';
 import { useCurrentUser } from '@/lib/useCurrentUser';
-import { FileText, FileVideo, Loader2, Upload, X } from 'lucide-react';
+import { Loader2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
+import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
+import ProofFileThumbnail from '@/components/complaints/ProofFileThumbnail';
 
 const storageUrl = (path) => {
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -42,6 +44,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
   const { data: departments = [] } = useDepartments();
   const { data: complaintTypes = [] } = useComplaintTypes();
   const { data: couriers = [] } = useCouriers();
@@ -56,6 +59,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
 
   useEffect(() => {
     if (!open) return;
+    setUploadError('');
     setForm({
       ...EMPTY_FORM,
       priority_id: findIdByName(priorities, 'Medium') || '',
@@ -68,21 +72,47 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (!files.length) return;
+
     setUploading(true);
+    setUploadError('');
     const uploaded = [];
-    for (const file of files) {
-      const { path, url } = await db.integrations.Core.UploadFile({ file });
-      uploaded.push({
-        path,
-        url: url || storageUrl(path),
-        name: file.name,
-        isImage: file.type.startsWith('image/'),
-        isVideo: file.type.startsWith('video/'),
-      });
+    const errors = [];
+
+    try {
+      for (const file of files) {
+        if (file.size > MAX_PROOF_FILE_BYTES) {
+          const message = `"${file.name}" is too large (${formatProofFileSize(file.size)}). Maximum size is 10 MB.`;
+          errors.push(message);
+          toast.error(message);
+          continue;
+        }
+
+        try {
+          const { path, url } = await db.integrations.Core.UploadFile({ file });
+          uploaded.push({
+            path,
+            url: url || storageUrl(path),
+            name: file.name,
+            isImage: file.type.startsWith('image/'),
+            isVideo: file.type.startsWith('video/'),
+          });
+        } catch (err) {
+          const message = err.message || `Failed to upload "${file.name}"`;
+          errors.push(message);
+          toast.error(message);
+        }
+      }
+
+      if (uploaded.length) {
+        setForm((prev) => ({ ...prev, proof_files: [...prev.proof_files, ...uploaded] }));
+      }
+      if (errors.length) {
+        setUploadError(errors.join(' '));
+      }
+    } finally {
+      setUploading(false);
+      e.target.value = '';
     }
-    update('proof_files', [...form.proof_files, ...uploaded]);
-    setUploading(false);
-    e.target.value = '';
   };
 
   const removeProofFile = (index) => {
@@ -219,20 +249,12 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
             </label>
             {form.proof_files.map((file, i) => (
               <div key={file.path} className="relative group w-20 h-20 rounded-lg border bg-muted overflow-hidden shrink-0">
-                {file.isImage ? (
-                  <img src={file.url} alt={file.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="flex flex-col items-center justify-center w-full h-full p-1 gap-1">
-                    {file.isVideo ? (
-                      <FileVideo className="w-5 h-5 text-muted-foreground shrink-0" />
-                    ) : (
-                      <FileText className="w-5 h-5 text-muted-foreground shrink-0" />
-                    )}
-                    <span className="text-[10px] text-muted-foreground truncate w-full text-center px-0.5" title={file.name}>
-                      {file.name}
-                    </span>
-                  </div>
-                )}
+                <ProofFileThumbnail
+                  url={file.url}
+                  name={file.name}
+                  isImage={file.isImage}
+                  isVideo={file.isVideo}
+                />
                 <button
                   type="button"
                   onClick={() => removeProofFile(i)}
@@ -244,6 +266,10 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
               </div>
             ))}
           </div>
+          {uploadError && (
+            <p className="text-xs text-destructive" role="alert">{uploadError}</p>
+          )}
+          <p className="text-xs text-muted-foreground">Maximum file size: 10 MB per file.</p>
         </div>
 
         <DialogFooter>

@@ -8,6 +8,7 @@ use App\Support\StoragePath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class FileUploadController extends Controller
 {
@@ -18,6 +19,15 @@ class FileUploadController extends Controller
         $user = $request->user();
         if (! $user->hasPermission('complaints.create') && ! $user->hasPermission('complaints.edit')) {
             $this->ensurePermission($user, 'complaints.create');
+        }
+
+        if (
+            ! $request->hasFile('file')
+            && str_contains((string) $request->header('Content-Type'), 'multipart/form-data')
+        ) {
+            throw ValidationException::withMessages([
+                'file' => ['The file is too large or could not be uploaded. Maximum size is 10 MB.'],
+            ]);
         }
 
         $request->validate([

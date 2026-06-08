@@ -28,6 +28,7 @@ import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
 import TicketTimeline from '@/components/complaints/TicketTimeline';
 import InternalNotes from '@/components/complaints/InternalNotes';
+import ProofFileThumbnail from '@/components/complaints/ProofFileThumbnail';
 import WhatsappNotifyCard from '@/components/complaints/WhatsappNotifyCard';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 
@@ -300,7 +301,7 @@ export default function ComplaintDetail() {
                   {complaint.proof_files.map((url, i) => (
                     <a key={i} href={url} target="_blank" rel="noopener noreferrer"
                       className="block aspect-video rounded-lg bg-muted overflow-hidden border hover:border-primary transition-colors relative group">
-                      <img src={url} alt={`Proof ${i + 1}`} className="w-full h-full object-cover" onError={e => { e.target.style.display = 'none'; }} />
+                      <ProofFileThumbnail url={url} name={`Proof ${i + 1}`} />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
                         <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                       </div>
