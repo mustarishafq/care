@@ -26,6 +26,11 @@
       ],
       "description": "Platform where the order was placed"
     },
+    "purchase_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Date the customer purchased the order"
+    },
     "batch_number": {
       "type": "string",
       "description": "Primary product batch or lot number (legacy)"
@@ -185,6 +190,7 @@
   "required": [
     "customer_name",
     "tracking_number",
+    "purchase_date",
     "complaint_type",
     "description"
   ]

@@ -15,6 +15,7 @@ class Complaint extends Model
         'customer_phone',
         'order_number',
         'order_source',
+        'purchase_date',
         'complaint_type_id',
         'description',
         'proof_files',
@@ -103,6 +104,7 @@ class Complaint extends Model
     {
         return [
             'proof_files' => 'array',
+            'purchase_date' => 'date',
             'sla_deadline' => 'datetime',
             'sla_paused_at' => 'datetime',
             'first_response_at' => 'datetime',

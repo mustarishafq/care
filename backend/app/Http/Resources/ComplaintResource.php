@@ -23,6 +23,7 @@ class ComplaintResource extends JsonResource
             'customer_phone' => $this->customer_phone,
             'order_number' => $this->order_number,
             'order_source' => $this->order_source,
+            'purchase_date' => $this->purchase_date?->format('Y-m-d'),
             'batch_number' => $primary['batch_number'] ?? null,
             'product_id' => $primary['product_id'] ?? null,
             'product_name' => $primary['product_name'] ?? null,

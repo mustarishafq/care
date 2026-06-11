@@ -267,6 +267,7 @@ export default function ComplaintDetail() {
                 <InfoRow label="Phone" value={complaint.customer_phone} />
                 <InfoRow label="Order Number" value={complaint.order_number} />
                 <InfoRow label="Order Source" value={complaint.order_source} />
+                <InfoRow label="Purchase Date" value={complaint.purchase_date ? format(new Date(`${complaint.purchase_date}T00:00:00`), 'd MMM yyyy') : null} />
                 <InfoRow label="Complaint Type" value={complaint.complaint_type} />
               </div>
               {affectedProductGroups.length > 0 && (

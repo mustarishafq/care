@@ -95,6 +95,14 @@ function ComplaintCard({ complaint }) {
             <p className="font-medium">{complaint.order_number || '—'}</p>
           </div>
           <div>
+            <p className="text-xs text-muted-foreground">Purchase Date</p>
+            <p className="font-medium">
+              {complaint.purchase_date
+                ? format(new Date(`${complaint.purchase_date}T00:00:00`), 'd MMM yyyy')
+                : '—'}
+            </p>
+          </div>
+          <div>
             <p className="text-xs text-muted-foreground">Product</p>
             <p className="font-medium">{complaint.product_name || '—'}</p>
           </div>

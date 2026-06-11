@@ -32,6 +32,7 @@ const EMPTY_FORM = {
   customer_phone: '',
   order_number: '',
   order_source: '',
+  purchase_date: '',
   affected_products: [{ ...EMPTY_AFFECTED_PRODUCT }],
   complaint_type_id: '',
   description: '',
@@ -127,7 +128,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     const hasValidProduct = form.affected_products.some(
       (item) => item.product_id && (item.batch_entries ?? []).some((entry) => entry.batch_number?.trim()),
     );
-    if (!form.customer_name || !form.tracking_number.trim() || !hasValidProduct || !form.complaint_type_id || !form.description) {
+    if (!form.customer_name || !form.tracking_number.trim() || !form.purchase_date || !hasValidProduct || !form.complaint_type_id || !form.description) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -153,6 +154,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       customer_phone: form.customer_phone,
       order_number: form.order_number.trim() || null,
       order_source: form.order_source || null,
+      purchase_date: form.purchase_date,
       affected_products: affectedProducts,
       complaint_type_id: form.complaint_type_id,
       description: form.description,
@@ -182,6 +184,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       customer_name: created.customer_name ?? form.customer_name,
       order_number: created.order_number ?? form.order_number,
       order_source: created.order_source ?? form.order_source,
+      purchase_date: created.purchase_date ?? form.purchase_date,
       tracking_number: created.tracking_number ?? form.tracking_number,
       status: created.status ?? complaintStatuses.find((s) => String(s.id) === String(complaintData.status_id))?.name,
       affected_products: (created.affected_products ?? []).map((item) => ({
@@ -230,6 +233,14 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">Purchase Date *</Label>
+            <Input
+              type="date"
+              value={form.purchase_date}
+              onChange={e => update('purchase_date', e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Courier</Label>

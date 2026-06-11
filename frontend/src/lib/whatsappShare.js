@@ -149,6 +149,13 @@ function formatAffectedProductsSection(complaint) {
   return output;
 }
 
+function formatPurchaseDate(value) {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 /**
  * @param {object} complaint
  * @param {{ event?: string, oldStatus?: string, newStatus?: string, note?: string }} [options]
@@ -172,11 +179,12 @@ export function buildComplaintShareMessage(complaint, options = {}) {
     lines.push('', `${EMOJI.person} Customer`, complaint.customer_name);
   }
 
-  const hasDetails = complaint.order_source || complaint.tracking_number || complaint.complaint_type || complaint.order_number;
+  const hasDetails = complaint.order_source || complaint.tracking_number || complaint.complaint_type || complaint.order_number || complaint.purchase_date;
   if (hasDetails) {
     lines.push('', `${EMOJI.tag} Complaint Details`);
     if (complaint.order_source) lines.push(`${EMOJI.bullet} Source: ${complaint.order_source}`);
     if (complaint.order_number) lines.push(`${EMOJI.bullet} Order No: ${complaint.order_number}`);
+    if (complaint.purchase_date) lines.push(`${EMOJI.bullet} Purchase Date: ${formatPurchaseDate(complaint.purchase_date)}`);
     if (complaint.tracking_number) lines.push(`${EMOJI.bullet} Tracking No: ${complaint.tracking_number}`);
     if (complaint.complaint_type) lines.push(`${EMOJI.bullet} Type: ${complaint.complaint_type}`);
   }
