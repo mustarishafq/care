@@ -10,6 +10,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
+} from '@/components/ui/command';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -26,6 +29,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerKey, setPickerKey] = useState(0);
   const [newStatus, setNewStatus] = useState(complaint?.status || '');
   const [saving, setSaving] = useState(false);
 
@@ -144,7 +148,13 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
               <p className="text-sm text-muted-foreground italic">All agents are already assigned.</p>
             ) : (
               <>
-                <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                <Popover
+                  open={pickerOpen}
+                  onOpenChange={(open) => {
+                    setPickerOpen(open);
+                    if (open) setPickerKey((k) => k + 1);
+                  }}
+                >
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
@@ -160,25 +170,31 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-2" align="start">
-                    <div className="max-h-56 overflow-y-auto space-y-1">
-                      {availableUsers.map((u) => {
-                        const id = String(u.id);
-                        const checked = selectedIds.includes(id);
-                        return (
-                          <label
-                            key={u.id}
-                            className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm cursor-pointer hover:bg-muted"
-                          >
-                            <Checkbox
-                              checked={checked}
-                              onCheckedChange={() => toggleAgent(id)}
-                            />
-                            <span className="truncate">{u.full_name || u.email}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
+                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+                    <Command key={pickerKey}>
+                      <CommandInput placeholder="Search agents..." />
+                      <CommandList>
+                        <CommandEmpty>No agents found.</CommandEmpty>
+                        <CommandGroup>
+                          {availableUsers.map((u) => {
+                            const id = String(u.id);
+                            const checked = selectedIds.includes(id);
+                            const label = u.full_name || u.email;
+                            return (
+                              <CommandItem
+                                key={u.id}
+                                value={`${u.full_name || ''} ${u.email || ''}`}
+                                onSelect={() => toggleAgent(id)}
+                                className="cursor-pointer"
+                              >
+                                <Checkbox checked={checked} className="pointer-events-none" />
+                                <span className="truncate">{label}</span>
+                              </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
                   </PopoverContent>
                 </Popover>
 
