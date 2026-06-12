@@ -10,13 +10,11 @@ import {
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import {
-  Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
-} from '@/components/ui/command';
+import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Loader2, UserCheck, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Search, UserCheck, ChevronsUpDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
@@ -29,7 +27,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
   const queryClient = useQueryClient();
   const [selectedIds, setSelectedIds] = useState([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [pickerKey, setPickerKey] = useState(0);
+  const [agentSearch, setAgentSearch] = useState('');
   const [newStatus, setNewStatus] = useState(complaint?.status || '');
   const [saving, setSaving] = useState(false);
 
@@ -54,11 +52,22 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
     [availableUsers, selectedIds],
   );
 
+  const filteredUsers = useMemo(() => {
+    const query = agentSearch.trim().toLowerCase();
+    if (!query) return availableUsers;
+    return availableUsers.filter((u) => {
+      const name = (u.full_name || '').toLowerCase();
+      const email = (u.email || '').toLowerCase();
+      return name.includes(query) || email.includes(query);
+    });
+  }, [availableUsers, agentSearch]);
+
   useEffect(() => {
     if (open) {
       setSelectedIds([]);
       setNewStatus(complaint?.status || '');
       setPickerOpen(false);
+      setAgentSearch('');
     }
   }, [open, complaint?.status]);
 
@@ -152,7 +161,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
                   open={pickerOpen}
                   onOpenChange={(open) => {
                     setPickerOpen(open);
-                    if (open) setPickerKey((k) => k + 1);
+                    if (!open) setAgentSearch('');
                   }}
                 >
                   <PopoverTrigger asChild>
@@ -170,31 +179,45 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
-                    <Command key={pickerKey}>
-                      <CommandInput placeholder="Search agents..." />
-                      <CommandList>
-                        <CommandEmpty>No agents found.</CommandEmpty>
-                        <CommandGroup>
-                          {availableUsers.map((u) => {
-                            const id = String(u.id);
-                            const checked = selectedIds.includes(id);
-                            const label = u.full_name || u.email;
-                            return (
-                              <CommandItem
-                                key={u.id}
-                                value={`${u.full_name || ''} ${u.email || ''}`}
-                                onSelect={() => toggleAgent(id)}
-                                className="cursor-pointer"
-                              >
-                                <Checkbox checked={checked} className="pointer-events-none" />
-                                <span className="truncate">{label}</span>
-                              </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-2 z-[100]"
+                    align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <div className="relative mb-2">
+                      <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={agentSearch}
+                        onChange={(e) => setAgentSearch(e.target.value)}
+                        placeholder="Search agents..."
+                        className="h-9 pl-8"
+                      />
+                    </div>
+                    <div
+                      className="max-h-56 overflow-y-auto overscroll-contain space-y-1"
+                      onWheel={(e) => e.stopPropagation()}
+                    >
+                      {filteredUsers.length === 0 ? (
+                        <p className="py-4 text-center text-sm text-muted-foreground">No agents found.</p>
+                      ) : (
+                        filteredUsers.map((u) => {
+                          const id = String(u.id);
+                          const checked = selectedIds.includes(id);
+                          return (
+                            <label
+                              key={u.id}
+                              className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm cursor-pointer hover:bg-muted"
+                            >
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={() => toggleAgent(id)}
+                              />
+                              <span className="truncate">{u.full_name || u.email}</span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
                   </PopoverContent>
                 </Popover>
 
