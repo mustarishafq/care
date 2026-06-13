@@ -96,6 +96,20 @@ class AutoCloseDeliveredComplaintsService
                     ]);
                 }
 
+                app(OutgoingWebhookService::class)->dispatchComplaint(
+                    'complaint.status_changed',
+                    $complaint->fresh()->load([
+                        'complaintStatus',
+                        'complaintType',
+                        'courier',
+                        'priority',
+                        'assignedDepartment',
+                        'assignedUser',
+                        'affectedProducts.product',
+                        'affectedProducts.unitOfMeasurement',
+                    ]),
+                );
+
                 $count++;
             });
         }

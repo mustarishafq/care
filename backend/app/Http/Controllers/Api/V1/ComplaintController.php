@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
 use App\Services\ComplaintAffectedProductService;
+use App\Services\OutgoingWebhookService;
 use App\Services\TicketIdGenerator;
 use App\Support\ComplaintInput;
 use App\Support\StoragePath;
@@ -23,6 +24,7 @@ class ComplaintController extends Controller
     public function __construct(
         private TicketIdGenerator $ticketIdGenerator,
         private ComplaintAffectedProductService $affectedProductService,
+        private OutgoingWebhookService $outgoingWebhook,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -109,7 +111,10 @@ class ComplaintController extends Controller
             $complaint->assignedUsers()->syncWithoutDetaching([$complaint->assigned_user_id]);
         }
 
-        return new ComplaintResource($complaint->load($this->complaintRelations()));
+        $complaint = $complaint->load($this->complaintRelations());
+        $this->outgoingWebhook->dispatchComplaint('complaint.created', $complaint);
+
+        return new ComplaintResource($complaint);
     }
 
     public function show(Request $request, string $id): ComplaintResource
@@ -213,7 +218,13 @@ class ComplaintController extends Controller
             $this->affectedProductService->sync($complaint, $affectedProducts);
         }
 
-        return new ComplaintResource($complaint->fresh()->load($this->complaintRelations()));
+        $complaint = $complaint->fresh()->load($this->complaintRelations());
+        $this->outgoingWebhook->dispatchComplaint(
+            isset($data['status']) || isset($data['status_id']) ? 'complaint.status_changed' : 'complaint.updated',
+            $complaint,
+        );
+
+        return new ComplaintResource($complaint);
     }
 
     public function assignAgent(Request $request, string $id): ComplaintResource

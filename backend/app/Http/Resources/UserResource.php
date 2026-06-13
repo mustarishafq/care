@@ -18,6 +18,7 @@ class UserResource extends JsonResource
         return $this->withLegacyDates([
             'id' => (string) $this->id,
             'email' => $this->email,
+            'nexus_sso_id' => $this->nexus_sso_id,
             'full_name' => $this->full_name ?? $this->name,
             'phone' => $this->phone,
             'role_id' => $this->role_id ? (string) $this->role_id : null,

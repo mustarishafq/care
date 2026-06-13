@@ -18,7 +18,7 @@ import Users from '@/pages/Users';
 import Settings from '@/pages/Settings';
 import Products from '@/pages/Products';
 import RolesPermissions from '@/pages/RolesPermissions';
-import OmsIntegration from '@/pages/OmsIntegration';
+import Integrations from '@/pages/Integrations';
 import SsoNexus from '@/pages/SsoNexus';
 import TrackComplaint from '@/pages/TrackComplaint';
 import Login from '@/pages/Login';
@@ -68,7 +68,8 @@ const AppRoutes = () => (
       <Route path="/settings" element={<Settings />} />
       <Route path="/products" element={<Products />} />
       <Route path="/roles" element={<RolesPermissions />} />
-      <Route path="/oms" element={<OmsIntegration />} />
+      <Route path="/integrations" element={<Integrations />} />
+      <Route path="/oms" element={<Navigate to="/integrations" replace />} />
     </Route>
     <Route path="*" element={<PageNotFound />} />
   </Routes>

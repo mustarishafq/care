@@ -31,8 +31,8 @@ export const ALL_PERMISSIONS = [
   { key: 'products.manage', label: 'Manage Products', group: 'Products' },
   { key: 'settings.view', label: 'View Settings', group: 'Settings' },
   { key: 'settings.manage', label: 'Manage Settings', group: 'Settings' },
-  { key: 'oms.view', label: 'View OMS Integration', group: 'Integrations' },
-  { key: 'oms.manage', label: 'Manage OMS Integration', group: 'Integrations' },
+  { key: 'oms.view', label: 'View Integrations', group: 'Integrations' },
+  { key: 'oms.manage', label: 'Manage Integrations', group: 'Integrations' },
 ];
 
 const GROUPS = [...new Set(ALL_PERMISSIONS.map(p => p.group))];

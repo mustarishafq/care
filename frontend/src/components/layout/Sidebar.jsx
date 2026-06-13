@@ -18,7 +18,7 @@ const navItems = [
 { label: 'Products', icon: Package, path: '/products', permission: 'products.view' },
 { label: 'Users', icon: Users, path: '/users', permission: 'users.view' },
 { label: 'Roles & Permissions', icon: ShieldCheck, path: '/roles', permission: 'users.manage' },
-{ label: 'Integration', icon: Plug, path: '/oms', permission: 'oms.view' },
+{ label: 'Integrations', icon: Plug, path: '/integrations', permission: 'oms.view' },
 { label: 'Settings', icon: Settings, path: '/settings', permission: 'settings.view' }];
 
 export default function Sidebar({ collapsed, setCollapsed, unreadCount, sidebarOpen, setSidebarOpen, permissions, isAdmin }) {

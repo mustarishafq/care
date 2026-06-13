@@ -16,6 +16,7 @@ class NotificationResource extends JsonResource
             'id' => (string) $this->id,
             'recipient_user_id' => $this->recipient_user_id ? (string) $this->recipient_user_id : null,
             'recipient_email' => $this->recipient?->email,
+            'sso_id' => $this->recipient?->nexus_sso_id,
             'title' => $this->title,
             'message' => $this->message,
             'type' => $this->type,

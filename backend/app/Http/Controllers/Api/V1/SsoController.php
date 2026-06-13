@@ -50,7 +50,13 @@ class SsoController extends Controller
             return response()->json(['message' => 'Invalid token issuer.'], 401);
         }
 
-        $email = $claims['email'] ?? $claims['sub'] ?? null;
+        $ssoId = $this->extractNexusUserId($claims);
+        $email = $this->extractEmail($claims);
+
+        if (! $ssoId) {
+            return response()->json(['message' => 'Token missing sub claim (Nexus user ID).'], 422);
+        }
+
         if (! $email) {
             return response()->json(['message' => 'Token missing email claim.'], 422);
         }
@@ -63,17 +69,36 @@ class SsoController extends Controller
             $defaultRoleId = Role::defaultId();
         }
 
-        $user = User::firstOrCreate(
-            ['email' => $email],
-            [
-                'name' => $claims['name'] ?? $email,
-                'full_name' => $claims['name'] ?? $email,
+        $displayName = trim((string) ($claims['name'] ?? ''));
+        if ($displayName === '') {
+            $displayName = $email;
+        }
+
+        $user = User::where('nexus_sso_id', $ssoId)->first();
+
+        if (! $user) {
+            $user = User::where('email', $email)->first();
+        }
+
+        if ($user) {
+            $user->update([
+                'nexus_sso_id' => $ssoId,
+                'name' => $displayName,
+                'full_name' => $displayName,
+                'email' => $email,
+            ]);
+        } else {
+            $user = User::create([
+                'email' => $email,
+                'nexus_sso_id' => $ssoId,
+                'name' => $displayName,
+                'full_name' => $displayName,
                 'password' => Hash::make(bin2hex(random_bytes(32))),
                 'role_id' => $defaultRoleId,
                 'status' => User::STATUS_ACTIVE,
                 'approval_status' => User::APPROVAL_APPROVED,
-            ]
-        );
+            ]);
+        }
 
         if (! $user->canLogin()) {
             return response()->json(['message' => 'User account is not active.'], 403);
@@ -85,5 +110,25 @@ class SsoController extends Controller
             'token' => $token,
             'user' => new UserResource($user->load(['departments', 'role'])),
         ]);
+    }
+
+    /** @param  array<string, mixed>  $claims */
+    private function extractNexusUserId(array $claims): ?string
+    {
+        $sub = trim((string) ($claims['sub'] ?? ''));
+
+        return $sub !== '' ? $sub : null;
+    }
+
+    /** @param  array<string, mixed>  $claims */
+    private function extractEmail(array $claims): ?string
+    {
+        $email = trim((string) ($claims['email'] ?? ''));
+
+        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return $email;
+        }
+
+        return null;
     }
 }

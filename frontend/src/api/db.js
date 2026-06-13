@@ -174,6 +174,28 @@ export const db = {
         return http.post('/notifications/send-email', { to, subject, body });
       },
     },
+
+    Webhook: {
+      async getSettings() {
+        return http.get('/webhook/settings');
+      },
+
+      async updateSettings(payload) {
+        return http.patch('/webhook/settings', payload);
+      },
+
+      async regenerateIncomingSecret() {
+        return http.post('/webhook/regenerate-secret');
+      },
+
+      async regenerateOutgoingSecret(id) {
+        return http.post('/webhook/regenerate-outgoing-secret', { id });
+      },
+
+      async testOutgoing(webhook) {
+        return http.post('/webhook/test-outgoing', webhook);
+      },
+    },
   },
 };
 

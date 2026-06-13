@@ -35,6 +35,11 @@ Route::prefix('v1')->group(function () {
     Route::post('webhook/tracking-update', [WebhookController::class, 'trackingUpdate'])->middleware('throttle:60,1');
 
     Route::middleware(['auth:sanctum', EnsureUserIsApproved::class])->group(function () {
+        Route::get('webhook/settings', [WebhookController::class, 'settings']);
+        Route::patch('webhook/settings', [WebhookController::class, 'updateSettings']);
+        Route::post('webhook/regenerate-secret', [WebhookController::class, 'regenerateIncomingSecret']);
+        Route::post('webhook/regenerate-outgoing-secret', [WebhookController::class, 'regenerateOutgoingSecret']);
+        Route::post('webhook/test-outgoing', [WebhookController::class, 'testOutgoing']);
         Route::get('auth/me', [AuthController::class, 'me']);
         Route::patch('auth/me', [AuthController::class, 'updateMe']);
         Route::post('auth/logout', [AuthController::class, 'logout']);

@@ -322,7 +322,7 @@ Features:
 - Active status check on login
 - Secure password reset tokens (Laravel built-in, expiring)
 - Input validation on all endpoints
-- Webhook API key authentication
+- Webhook secret authentication (`X-Webhook-Secret`)
 
 ---
 

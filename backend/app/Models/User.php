@@ -17,6 +17,7 @@ use Laravel\Sanctum\HasApiTokens;
     'name',
     'full_name',
     'email',
+    'nexus_sso_id',
     'phone',
     'password',
     'role_id',

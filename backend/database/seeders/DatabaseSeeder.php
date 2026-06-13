@@ -143,8 +143,15 @@ class DatabaseSeeder extends Seeder
             ],
             [
                 'key' => 'webhook_api_key',
-                'label' => 'Webhook API Key',
-                'json_value' => ['key' => bin2hex(random_bytes(16))],
+                'label' => 'Webhook Secret',
+                'json_value' => ['secret' => bin2hex(random_bytes(32))],
+            ],
+            [
+                'key' => 'outgoing_webhook',
+                'label' => 'Outgoing Webhooks',
+                'json_value' => [
+                    'webhooks' => [],
+                ],
             ],
             [
                 'key' => 'auto_close_delivered',
