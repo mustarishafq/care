@@ -9,3 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('complaints:auto-close-delivered')->hourly();
+Schedule::command('complaints:stale-alerts')->hourly();

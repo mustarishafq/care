@@ -13,7 +13,6 @@ import ComplaintTrendChart from '@/components/dashboard/ComplaintTrendChart';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import TopIssuesCard from '@/components/dashboard/TopIssuesCard';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
-import SlaAlertMonitor from '@/components/dashboard/SlaAlertMonitor';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,7 +83,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <SlaAlertMonitor user={user} />
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
         <p className="text-muted-foreground text-sm mt-1">Overview of complaint management performance</p>

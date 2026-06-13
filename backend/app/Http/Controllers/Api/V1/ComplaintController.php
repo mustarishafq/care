@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
 use App\Services\ComplaintAffectedProductService;
+use App\Services\ComplaintNotificationService;
 use App\Services\OutgoingWebhookService;
 use App\Services\TicketIdGenerator;
 use App\Support\ComplaintInput;
@@ -25,6 +26,7 @@ class ComplaintController extends Controller
         private TicketIdGenerator $ticketIdGenerator,
         private ComplaintAffectedProductService $affectedProductService,
         private OutgoingWebhookService $outgoingWebhook,
+        private ComplaintNotificationService $complaintNotifications,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -130,8 +132,10 @@ class ComplaintController extends Controller
 
     public function update(Request $request, string $id): ComplaintResource
     {
-        $complaint = Complaint::findOrFail($id);
+        $complaint = Complaint::with('complaintStatus')->findOrFail($id);
         $this->ensureCanViewComplaint($request->user(), $complaint);
+
+        $oldStatusName = $complaint->complaintStatus?->name ?? '';
 
         $data = $request->validate([
             'customer_name' => ['sometimes', 'string', 'max:255'],
@@ -219,8 +223,19 @@ class ComplaintController extends Controller
         }
 
         $complaint = $complaint->fresh()->load($this->complaintRelations());
+        $newStatusName = $complaint->complaintStatus?->name ?? '';
+
+        if ($oldStatusName !== $newStatusName) {
+            $this->complaintNotifications->notifyStatusChanged(
+                $complaint,
+                $request->user(),
+                $oldStatusName,
+                $newStatusName,
+            );
+        }
+
         $this->outgoingWebhook->dispatchComplaint(
-            isset($data['status']) || isset($data['status_id']) ? 'complaint.status_changed' : 'complaint.updated',
+            $oldStatusName !== $newStatusName ? 'complaint.status_changed' : 'complaint.updated',
             $complaint,
         );
 
@@ -241,7 +256,14 @@ class ComplaintController extends Controller
         $complaint->assignedUsers()->syncWithoutDetaching([$data['user_id']]);
         $complaint->syncPrimaryAssignee();
 
-        return new ComplaintResource($complaint->fresh()->load($this->complaintRelations()));
+        $complaint = $complaint->fresh()->load($this->complaintRelations());
+        $assignee = $complaint->assignedUsers->firstWhere('id', (int) $data['user_id']);
+
+        if ($assignee) {
+            $this->complaintNotifications->notifyTicketAssigned($complaint, $assignee, $request->user());
+        }
+
+        return new ComplaintResource($complaint);
     }
 
     public function removeAgent(Request $request, string $id, string $userId): ComplaintResource

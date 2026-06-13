@@ -19,7 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
-import { notifyAssignedUser, invalidateNotificationQueries } from '@/lib/notifications';
+import { invalidateNotificationQueries } from '@/lib/notifications';
 import { getAssignedAgentIds, getAssignedAgents } from '@/lib/assignedAgents';
 
 export default function AssignAgentDialog({ complaint, open, onClose, onSaved }) {
@@ -99,17 +99,6 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
         description: `${names} assigned to ticket${newStatus !== complaint.status ? ` and status changed to "${newStatus}"` : ''}`,
         user_id: user?.id,
       });
-
-      for (const agentUserId of selectedIds) {
-        if (String(agentUserId) !== String(user?.id)) {
-          await notifyAssignedUser({
-            assigneeUserId: agentUserId,
-            assignerName: user?.full_name,
-            ticketId: complaint.ticket_id,
-            complaintId: complaint.id,
-          });
-        }
-      }
 
       invalidateNotificationQueries(queryClient);
 

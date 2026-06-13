@@ -621,7 +621,7 @@ export default function Settings() {
               { field: 'medium', label: 'Resolution Target — Medium' },
               { field: 'high', label: 'Resolution Target — High' },
               { field: 'urgent', label: 'Resolution Target — Urgent' },
-              { field: 'stale_alert_hours', label: 'Stale Ticket Alert (New/Pending)' },
+              { field: 'stale_alert_hours', label: 'Stale Ticket Alert (New/Pending, cron hourly)' },
             ].map(row => (
               <div key={row.field} className="flex items-center gap-3">
                 <Label className="text-xs w-52 shrink-0">{row.label}</Label>

@@ -3,15 +3,17 @@
 namespace App\Services;
 
 use App\Models\Complaint;
-use App\Models\Notification;
 use App\Models\SystemConfig;
 use App\Models\TicketActivity;
-use App\Support\NotificationPayload;
 use Illuminate\Support\Facades\DB;
 
 class AutoCloseDeliveredComplaintsService
 {
     public const CONFIG_KEY = 'auto_close_delivered';
+
+    public function __construct(
+        private ComplaintNotificationService $complaintNotifications,
+    ) {}
 
     /** @return array{enabled: bool, delay_amount: int, delay_unit: string} */
     public function getSettings(): array
@@ -86,18 +88,16 @@ class AutoCloseDeliveredComplaintsService
                     'user_id' => null,
                 ]);
 
-                foreach ($complaint->assignedUsers as $user) {
-                    Notification::create(NotificationPayload::normalize([
-                        'recipient_user_id' => $user->id,
+                $this->complaintNotifications->notifyAssignedAgents(
+                    $complaint->fresh(['assignedUsers', 'complaintStatus']),
+                    [
                         'title' => 'Ticket status updated',
                         'message' => "System automatically closed ticket {$complaint->ticket_id} from \"Delivered\" to \"Closed\".",
                         'type' => 'status_changed',
                         'severity' => 'success',
                         'category' => 'system',
-                        'complaint_id' => $complaint->id,
-                        'is_read' => false,
-                    ]));
-                }
+                    ],
+                );
 
                 app(OutgoingWebhookService::class)->dispatchComplaint(
                     'complaint.status_changed',

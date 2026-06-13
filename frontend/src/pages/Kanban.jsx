@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { STATUS_COLORS, buildStatusChangeUpdates, buildStatusOrder } from '@/lib/ticketUtils';
 import { filterVisibleComplaints } from '@/lib/complaintVisibility';
-import { getAssignedAgentIds } from '@/lib/assignedAgents';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
 import { Link } from 'react-router-dom';
@@ -20,7 +19,7 @@ import { Clock, ArrowUpDown, Columns } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { buildPriorityOrder, useComplaintStatuses, usePriorities } from '@/lib/useLookups';
 import { toast } from 'sonner';
-import { notifyStatusChange, invalidateNotificationQueries } from '@/lib/notifications';
+import { invalidateNotificationQueries } from '@/lib/notifications';
 
 const STORAGE_KEY = 'kanban_column_order';
 
@@ -114,21 +113,7 @@ export default function Kanban() {
       user_id: user?.id,
     });
 
-    for (const recipientUserId of getAssignedAgentIds(complaint).filter((id) => id !== String(user?.id))) {
-      await notifyStatusChange({
-        recipientUserId,
-        changerName: user?.full_name,
-        ticketId: complaint.ticket_id,
-        oldStatus: complaint.status,
-        newStatus,
-        complaintId: draggableId,
-      });
-    }
-
-    if (getAssignedAgentIds(complaint).some((id) => id !== String(user?.id))) {
-      invalidateNotificationQueries(queryClient);
-    }
-
+    invalidateNotificationQueries(queryClient);
     toast.success(`Moved to "${newStatus}"`);
     queryClient.invalidateQueries({ queryKey: ['complaints'] });
   };

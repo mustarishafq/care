@@ -6,7 +6,10 @@ use App\Http\Controllers\Concerns\AppliesEntityQueries;
 use App\Http\Controllers\Concerns\AuthorizesPermissions;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\InternalNoteResource;
+use App\Models\Complaint;
 use App\Models\InternalNote;
+use App\Services\ComplaintNotificationService;
+use App\Support\MentionParser;
 use App\Support\StoragePath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +18,10 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class InternalNoteController extends Controller
 {
     use AppliesEntityQueries, AuthorizesPermissions;
+
+    public function __construct(
+        private ComplaintNotificationService $complaintNotifications,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -52,6 +59,14 @@ class InternalNoteController extends Controller
         }
 
         $note = InternalNote::create($data);
+        $complaint = Complaint::findOrFail($data['complaint_id']);
+        $author = $request->user();
+
+        if ($author) {
+            foreach (MentionParser::findMentionedUsers($data['content'], $author->id) as $mentioned) {
+                $this->complaintNotifications->notifyMention($complaint, $mentioned, $author, $data['content']);
+            }
+        }
 
         return new InternalNoteResource($note->load(['department', 'author']));
     }

@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { Send, Loader2, AtSign } from 'lucide-react';
 import { toast } from 'sonner';
-import { findMentionedUsers, sendNotification, invalidateNotificationQueries } from '@/lib/notifications';
+import { findMentionedUsers, invalidateNotificationQueries } from '@/lib/notifications';
 
 function initials(name) {
   if (!name) return '??';
@@ -109,16 +109,6 @@ export default function InternalNotes({ notes, complaintId, canAddNotes = false 
         description: `Note added by ${user?.full_name}${mentionedUsers.length ? ` (mentioned: ${mentionedUsers.map(u => u.full_name).join(', ')})` : ''}`,
         user_id: user?.id,
       });
-
-      await Promise.all(mentionedUsers.map(mu =>
-        sendNotification({
-          recipient_user_id: mu.id,
-          title: 'You were mentioned in a note',
-          message: `${user?.full_name} mentioned you on ticket. Note: "${trimmed.slice(0, 100)}${trimmed.length > 100 ? '…' : ''}"`,
-          type: 'mention',
-          complaint_id: complaintId,
-        })
-      ));
 
       queryClient.invalidateQueries({ queryKey: ['notes', complaintId] });
       queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });

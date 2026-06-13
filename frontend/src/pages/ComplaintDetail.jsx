@@ -19,10 +19,10 @@ import { format, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
-import { notifyStatusChange, invalidateNotificationQueries } from '@/lib/notifications';
+import { invalidateNotificationQueries } from '@/lib/notifications';
 import { useDepartments } from '@/lib/useDepartments';
 import { canViewComplaint } from '@/lib/complaintVisibility';
-import { getAssignedAgents, getAssignedAgentIds } from '@/lib/assignedAgents';
+import { getAssignedAgents } from '@/lib/assignedAgents';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
@@ -73,7 +73,6 @@ export default function ComplaintDetail() {
     updates,
     activityDesc,
     actionType = 'status_changed',
-    notifyRecipient = null,
     { whatsappEvent, whatsappOptions } = {},
   ) => {
     setUpdating(true);
@@ -86,20 +85,16 @@ export default function ComplaintDetail() {
         user_id: user?.id,
       });
 
-      if (notifyRecipient) {
-        await notifyStatusChange(notifyRecipient);
-        invalidateNotificationQueries(queryClient);
-      }
-
-      queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
-      queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
-
       if (whatsappEvent) {
         const merged = { ...complaint, ...updates };
         offerWhatsappShareToast(merged, { event: whatsappEvent, ...whatsappOptions });
       } else {
         toast.success('Ticket updated');
       }
+
+      queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+      queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
+      invalidateNotificationQueries(queryClient);
     } catch {
       toast.error('Failed to update ticket');
     } finally {
@@ -109,33 +104,16 @@ export default function ComplaintDetail() {
 
   const handleStatusChange = async (newStatus) => {
     const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
-    const assignedIds = getAssignedAgentIds(complaint).filter((id) => id !== String(user?.id));
 
     await updateComplaint(
       updates,
       `Status changed from "${complaint.status}" to "${newStatus}"`,
       'status_changed',
-      null,
       {
         whatsappEvent: 'status_changed',
         whatsappOptions: { oldStatus: complaint.status, newStatus },
       },
     );
-
-    for (const recipientUserId of assignedIds) {
-      await notifyStatusChange({
-        recipientUserId,
-        changerName: user?.full_name,
-        ticketId: complaint.ticket_id,
-        oldStatus: complaint.status,
-        newStatus,
-        complaintId,
-      });
-    }
-
-    if (assignedIds.length) {
-      invalidateNotificationQueries(queryClient);
-    }
   };
 
   const handleAssignDepartment = async (departmentId) => {
@@ -145,7 +123,6 @@ export default function ComplaintDetail() {
       { assigned_department_id: departmentId, assigned_department: deptName },
       `Assigned to ${deptName} department`,
       'assigned',
-      null,
       { whatsappEvent: 'assigned', whatsappOptions: { note: `Assigned to ${deptName}` } },
     );
   };
