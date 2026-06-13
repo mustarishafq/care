@@ -381,7 +381,7 @@ export default function Settings() {
             {[
               { label: 'API Key (Secret)', value: sso.api_key ? '••••••••••••••••' : 'Not configured' },
               { label: 'Expected Issuer URL', value: sso.issuer_url || 'Not configured' },
-              { label: 'SSO Endpoint', value: `${window.location.origin}/sso/nexus` },
+              { label: 'SSO Endpoint', value: `${window.location.origin}/sso/nexus?token=JWT&redirect_to=/dashboard` },
             ].map(row => (
               <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-border last:border-0 gap-3">
                 <span className="text-sm">{row.label}</span>
@@ -521,6 +521,7 @@ export default function Settings() {
             </div>
 
             <div className="space-y-1.5">
+              <p className="text-xs text-muted-foreground">Optional query params: <code className="bg-muted px-1 rounded">redirect_to</code> (preferred) or <code className="bg-muted px-1 rounded">return_to</code>. JWT may also include a <code className="bg-muted px-1 rounded">redirect_to</code> claim.</p>
               <Label className="text-xs">SSO Endpoint (share this with Nexus as your Base URL)</Label>
               <div className="flex gap-2">
                 <Input readOnly value={`${window.location.origin}/sso/nexus`} className="h-8 text-sm font-mono bg-muted" />

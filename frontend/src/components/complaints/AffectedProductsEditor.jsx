@@ -140,7 +140,7 @@ export default function AffectedProductsEditor({
 
                 <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem] gap-2 items-end">
                   <div className="space-y-1.5 min-w-0">
-                    <Label className="text-xs font-medium">Batch Number *</Label>
+                    <Label className="text-xs font-medium">Batch Number</Label>
                     <Input
                       value={entry.batch_number}
                       onChange={(e) => updateBatchEntry(productIndex, entryIndex, { batch_number: e.target.value })}

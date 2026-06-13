@@ -10,7 +10,7 @@ use App\Models\Complaint;
 use App\Models\Notification;
 use App\Services\OutgoingWebhookService;
 use App\Services\WebhookSettingsService;
-use App\Support\ComplaintInput;
+use App\Support\NotificationPayload;
 use App\Models\TicketActivity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -271,7 +271,7 @@ class WebhookController extends Controller
 
         if ($wantsNotificationPayload) {
             if ($notification) {
-                $payload['notification'] = (new NotificationResource($notification))->resolve();
+                $payload['notification'] = NotificationPayload::toWebhookPayload($notification);
 
                 if ($notification->complaint) {
                     $payload['complaint'] = (new ComplaintResource($notification->complaint))->resolve();
@@ -329,16 +329,20 @@ class WebhookController extends Controller
     private function sampleNotification(?Complaint $complaint): array
     {
         $ticketId = $complaint?->ticket_id ?? 'RH-TEST-0001';
+        $complaintId = $complaint ? (string) $complaint->id : null;
 
         return [
             'id' => '0',
             'recipient_user_id' => $complaint?->assigned_user_id ? (string) $complaint->assigned_user_id : '1',
             'recipient_email' => $complaint?->assignedUser?->email ?? 'agent@example.com',
-            'sso_id' => $complaint?->assignedUser->nexus_sso_id,
+            'sso_id' => $complaint?->assignedUser?->nexus_sso_id,
             'title' => 'Ticket assigned to you',
             'message' => "Sample notification for webhook test on ticket {$ticketId}.",
-            'type' => 'ticket_assigned',
-            'complaint_id' => $complaint ? (string) $complaint->id : null,
+            'type' => 'info',
+            'category' => 'task',
+            'action_url' => NotificationPayload::actionUrlForComplaint($complaintId) ?? rtrim((string) config('app.frontend_url'), '/').'/dashboard',
+            'event_type' => 'ticket_assigned',
+            'complaint_id' => $complaintId,
             'is_read' => false,
             'created_date' => now()->toIso8601String(),
         ];

@@ -115,7 +115,10 @@ X-Webhook-Secret: YOUR_OUTGOING_SECRET
   "notification": {
     "title": "Ticket assigned to you",
     "message": "Admin assigned ticket RH-250608-1234 to you.",
-    "type": "ticket_assigned",
+    "type": "info",
+    "category": "task",
+    "action_url": "https://care.example.com/complaints/42",
+    "event_type": "ticket_assigned",
     "recipient_email": "agent@example.com"
   },
   "complaint": { ... }

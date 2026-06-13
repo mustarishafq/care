@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 
 import { Loader2, ShieldCheck, ShieldX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { rememberSsoRedirect, resolveSsoRedirect } from '@/lib/ssoRedirect';
 
 export default function SsoNexus() {
   const [status, setStatus] = useState('loading');
@@ -17,7 +18,6 @@ export default function SsoNexus() {
   const handleSso = async () => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
-    const returnTo = params.get('return_to');
 
     if (!token) {
       setError('No SSO token provided in the URL.');
@@ -31,17 +31,19 @@ export default function SsoNexus() {
       const data = await http.post('/sso/nexus/verify', { token });
       setToken(data.token);
       const user = data.user?.data ?? data.user;
-      setUserInfo({ email: user.email, name: user.full_name || user.email, returnTo });
+      const finalRedirect = resolveSsoRedirect(
+        params.get('redirect_to'),
+        params.get('return_to'),
+        data.redirect_to,
+      );
 
-      if (returnTo) {
-        sessionStorage.setItem('nexus_return_to', returnTo);
-      }
-
+      rememberSsoRedirect(finalRedirect);
+      setUserInfo({ email: user.email, name: user.full_name || user.email, redirectTo: finalRedirect });
       setStatus('success');
 
       setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 2000);
+        window.location.href = finalRedirect;
+      }, 1200);
     } catch (e) {
       setError(e.message || 'SSO verification failed.');
       setStatus('error');
@@ -70,7 +72,7 @@ export default function SsoNexus() {
             <h1 className="text-xl font-bold">SSO Authentication Failed</h1>
             <p className="text-muted-foreground text-sm mt-2">{error}</p>
           </div>
-          <Button variant="outline" onClick={() => window.location.href = '/login'}>Go to Login</Button>
+          <Button variant="outline" onClick={() => { window.location.href = '/login'; }}>Go to Login</Button>
         </div>
       </div>
     );
@@ -89,7 +91,9 @@ export default function SsoNexus() {
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">{userInfo?.email}</p>
         </div>
-        <p className="text-sm text-muted-foreground">Redirecting you to the dashboard…</p>
+        <p className="text-sm text-muted-foreground">
+          Redirecting you{userInfo?.redirectTo !== '/dashboard' ? ' to your requested page' : ' to the dashboard'}…
+        </p>
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
       </div>
     </div>

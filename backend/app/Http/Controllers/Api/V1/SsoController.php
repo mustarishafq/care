@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\SystemConfig;
 use App\Models\User;
+use App\Support\SsoRedirect;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -106,9 +107,12 @@ class SsoController extends Controller
 
         $token = $user->createToken('sso-token')->plainTextToken;
 
+        $redirectTo = SsoRedirect::sanitize($claims['redirect_to'] ?? null);
+
         return response()->json([
             'token' => $token,
             'user' => new UserResource($user->load(['departments', 'role'])),
+            'redirect_to' => $redirectTo !== '/dashboard' ? $redirectTo : null,
         ]);
     }
 

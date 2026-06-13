@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\AppliesEntityQueries;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\NotificationResource;
 use App\Models\Notification;
+use App\Support\NotificationPayload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -35,11 +36,14 @@ class NotificationController extends Controller
             'title' => ['required', 'string', 'max:255'],
             'message' => ['required', 'string'],
             'type' => ['required', 'string', 'max:255'],
+            'severity' => ['nullable', 'string', 'in:'.implode(',', NotificationPayload::SEVERITIES)],
+            'category' => ['nullable', 'string', 'in:'.implode(',', NotificationPayload::CATEGORIES)],
+            'action_url' => ['nullable', 'string', 'max:2048'],
             'complaint_id' => ['nullable', 'integer', 'exists:complaints,id'],
             'is_read' => ['nullable', 'boolean'],
         ]);
 
-        $notification = Notification::create($data);
+        $notification = Notification::create(NotificationPayload::normalize($data));
 
         return new NotificationResource($notification->load('recipient'));
     }

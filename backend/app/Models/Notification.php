@@ -12,6 +12,9 @@ class Notification extends Model
         'title',
         'message',
         'type',
+        'severity',
+        'category',
+        'action_url',
         'complaint_id',
         'is_read',
     ];

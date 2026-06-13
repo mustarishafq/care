@@ -78,8 +78,9 @@ export const db = {
       } finally {
         clearToken();
         if (redirect) {
-          const nexusReturn = sessionStorage.getItem('nexus_return_to');
+          const nexusReturn = sessionStorage.getItem('nexus_redirect_to') || sessionStorage.getItem('nexus_return_to');
           if (nexusReturn) {
+            sessionStorage.removeItem('nexus_redirect_to');
             sessionStorage.removeItem('nexus_return_to');
             window.location.href = nexusReturn;
           } else {

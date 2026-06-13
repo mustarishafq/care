@@ -138,9 +138,7 @@ class ComplaintInput
                 }
 
                 $batchNumber = trim((string) ($entry['batch_number'] ?? ''));
-                if ($batchNumber === '') {
-                    continue;
-                }
+                $batchNumber = $batchNumber !== '' ? $batchNumber : null;
 
                 $entryUnitId = $entry['unit_of_measurement_id'] ?? $unitId;
                 if (! empty($entry['unit_of_measurement']) && ! $entryUnitId) {

@@ -125,9 +125,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   };
 
   const handleSubmit = async () => {
-    const hasValidProduct = form.affected_products.some(
-      (item) => item.product_id && (item.batch_entries ?? []).some((entry) => entry.batch_number?.trim()),
-    );
+    const hasValidProduct = form.affected_products.some((item) => item.product_id);
     if (!form.customer_name || !form.tracking_number.trim() || !form.purchase_date || !hasValidProduct || !form.complaint_type_id || !form.description) {
       toast.error('Please fill in all required fields');
       return;
@@ -138,14 +136,12 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       .map((item) => ({
         product_id: item.product_id,
         batch_entries: (item.batch_entries ?? [])
-          .filter((entry) => entry.batch_number?.trim())
           .map((entry) => ({
-            batch_number: entry.batch_number.trim(),
+            batch_number: entry.batch_number?.trim() || null,
             quantity_affected: Number(entry.quantity_affected) || null,
             unit_of_measurement_id: entry.unit_of_measurement_id || null,
           })),
-      }))
-      .filter((item) => item.batch_entries.length > 0);
+      }));
 
     setSaving(true);
     const ticketId = generateTicketId();

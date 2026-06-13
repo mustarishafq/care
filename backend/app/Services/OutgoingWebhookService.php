@@ -47,7 +47,7 @@ class OutgoingWebhookService
         $notification->loadMissing(['recipient', 'complaint.complaintStatus']);
 
         $payload = [
-            'notification' => (new NotificationResource($notification))->resolve(),
+            'notification' => NotificationPayload::toWebhookPayload($notification),
         ];
 
         if ($notification->complaint) {
