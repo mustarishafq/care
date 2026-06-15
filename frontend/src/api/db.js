@@ -1,4 +1,5 @@
 import { clearToken, getToken, http, setToken } from './http';
+import { clearStoredSsoRedirects, sanitizeRedirect } from '@/lib/ssoRedirect';
 
 const ENTITY_MAP = {
   Complaint: 'complaints',
@@ -78,20 +79,19 @@ export const db = {
       } finally {
         clearToken();
         if (redirect) {
-          const nexusReturn = sessionStorage.getItem('nexus_redirect_to') || sessionStorage.getItem('nexus_return_to');
-          if (nexusReturn) {
-            sessionStorage.removeItem('nexus_redirect_to');
-            sessionStorage.removeItem('nexus_return_to');
-            window.location.href = nexusReturn;
-          } else {
-            window.location.href = '/login';
-          }
+          const returnPath = sanitizeRedirect(
+            sessionStorage.getItem('nexus_redirect_to') || sessionStorage.getItem('nexus_return_to'),
+          );
+          clearStoredSsoRedirects();
+          const params = returnPath ? `?return=${encodeURIComponent(returnPath)}` : '';
+          window.location.href = `/login${params}`;
         }
       }
     },
 
     redirectToLogin(returnUrl) {
-      const params = returnUrl ? `?return=${encodeURIComponent(returnUrl)}` : '';
+      const path = sanitizeRedirect(returnUrl);
+      const params = path ? `?return=${encodeURIComponent(path)}` : '';
       window.location.href = `/login${params}`;
     },
 

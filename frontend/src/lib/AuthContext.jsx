@@ -59,7 +59,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
-    db.auth.redirectToLogin(window.location.href);
+    const { pathname, search, hash } = window.location;
+    db.auth.redirectToLogin(`${pathname}${search}${hash}`);
   };
 
   return (

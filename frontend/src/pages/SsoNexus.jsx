@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 
 import { Loader2, ShieldCheck, ShieldX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { rememberSsoRedirect, resolveSsoRedirect } from '@/lib/ssoRedirect';
+import { consumeLoginReturn, rememberSsoRedirect, resolveSsoRedirect } from '@/lib/ssoRedirect';
 
 export default function SsoNexus() {
   const [status, setStatus] = useState('loading');
@@ -35,6 +35,7 @@ export default function SsoNexus() {
         params.get('redirect_to'),
         params.get('return_to'),
         data.redirect_to,
+        consumeLoginReturn(),
       );
 
       rememberSsoRedirect(finalRedirect);

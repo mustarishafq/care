@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '@/api/db';
 import { useAuth } from '@/lib/AuthContext';
+import { readLoginReturnFromSearch, rememberLoginReturn } from '@/lib/ssoRedirect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -19,6 +20,13 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const loginReturn = readLoginReturnFromSearch(searchParams);
+
+  useEffect(() => {
+    if (loginReturn) {
+      rememberLoginReturn(loginReturn);
+    }
+  }, [loginReturn]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,8 +35,7 @@ export default function Login() {
       await db.auth.login(email, password);
       await checkUserAuth();
       toast.success('Logged in successfully');
-      const returnUrl = searchParams.get('return') || '/dashboard';
-      navigate(returnUrl);
+      navigate(loginReturn || '/dashboard');
     } catch (err) {
       toast.error(err.message || 'Login failed');
     } finally {
@@ -50,7 +57,7 @@ export default function Login() {
       }
     >
       <div className="space-y-6">
-        <NexusBrainLoginButton />
+        <NexusBrainLoginButton returnTo={loginReturn} />
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
