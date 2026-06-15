@@ -4,7 +4,13 @@ import React, { useEffect, useState } from 'react';
 
 import { Loader2, ShieldCheck, ShieldX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { consumeLoginReturn, rememberSsoRedirect, resolveSsoRedirect } from '@/lib/ssoRedirect';
+import {
+  consumeLoginReturn,
+  extractJwtClaim,
+  rememberNexusLogoutReturn,
+  rememberSsoRedirect,
+  resolveSsoRedirect,
+} from '@/lib/ssoRedirect';
 
 export default function SsoNexus() {
   const [status, setStatus] = useState('loading');
@@ -28,12 +34,15 @@ export default function SsoNexus() {
     setStatus('validating');
 
     try {
+      rememberNexusLogoutReturn(
+        params.get('return_to') || extractJwtClaim(token, 'return_to'),
+      );
+
       const data = await http.post('/sso/nexus/verify', { token });
       setToken(data.token);
       const user = data.user?.data ?? data.user;
       const finalRedirect = resolveSsoRedirect(
         params.get('redirect_to'),
-        params.get('return_to'),
         data.redirect_to,
         consumeLoginReturn(),
       );

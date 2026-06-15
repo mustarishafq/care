@@ -1,5 +1,9 @@
 import { clearToken, getToken, http, setToken } from './http';
-import { clearStoredSsoRedirects, sanitizeRedirect } from '@/lib/ssoRedirect';
+import {
+  clearStoredSsoRedirects,
+  getNexusLogoutReturn,
+  sanitizeRedirect,
+} from '@/lib/ssoRedirect';
 
 const ENTITY_MAP = {
   Complaint: 'complaints',
@@ -79,12 +83,16 @@ export const db = {
       } finally {
         clearToken();
         if (redirect) {
-          const returnPath = sanitizeRedirect(
-            sessionStorage.getItem('nexus_redirect_to') || sessionStorage.getItem('nexus_return_to'),
-          );
+          const nexusLogoutReturn = getNexusLogoutReturn();
+          const returnPath = sanitizeRedirect(sessionStorage.getItem('nexus_redirect_to'));
           clearStoredSsoRedirects();
-          const params = returnPath ? `?return=${encodeURIComponent(returnPath)}` : '';
-          window.location.href = `/login${params}`;
+
+          if (nexusLogoutReturn) {
+            window.location.href = nexusLogoutReturn;
+          } else {
+            const params = returnPath ? `?return=${encodeURIComponent(returnPath)}` : '';
+            window.location.href = `/login${params}`;
+          }
         }
       }
     },
