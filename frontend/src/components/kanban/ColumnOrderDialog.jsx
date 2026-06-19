@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { STATUS_COLORS } from '@/lib/ticketUtils';
+import { getStatusColors } from '@/lib/ticketUtils';
 import { GripVertical, RotateCcw } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
@@ -35,7 +35,7 @@ export default function ColumnOrderDialog({ open, onOpenChange, columnOrder, def
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1.5 mt-1">
                 {order.map((status, index) => {
-                  const colors = STATUS_COLORS[status];
+                  const colors = getStatusColors(status);
                   return (
                     <Draggable key={status} draggableId={status} index={index}>
                       {(provided, snapshot) => (

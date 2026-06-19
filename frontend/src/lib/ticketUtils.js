@@ -56,6 +56,16 @@ export const STATUS_COLORS = {
   'Drop': { bg: 'bg-slate-100 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-300', dot: 'bg-slate-500' },
 };
 
+export const DEFAULT_STATUS_COLORS = {
+  bg: 'bg-muted',
+  text: 'text-muted-foreground',
+  dot: 'bg-muted-foreground',
+};
+
+export function getStatusColors(status) {
+  return STATUS_COLORS[status] ?? DEFAULT_STATUS_COLORS;
+}
+
 export const PRIORITY_COLORS = {
   'Low': { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300' },
   'Medium': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300' },

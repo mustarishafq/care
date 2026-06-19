@@ -3,7 +3,7 @@ import { db } from '@/api/db';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { STATUS_COLORS, buildStatusChangeUpdates, buildStatusOrder, requiresClosureProof, hasClosureProof } from '@/lib/ticketUtils';
+import { getStatusColors, buildStatusChangeUpdates, buildStatusOrder, requiresClosureProof, hasClosureProof } from '@/lib/ticketUtils';
 import { filterVisibleComplaints } from '@/lib/complaintVisibility';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
@@ -275,7 +275,7 @@ export default function Kanban() {
             const rawCards = visibleComplaints.filter(c => c.status === status);
             const sortBy = columnSorts[status] || 'date_desc';
             const cards = sortCards(rawCards, sortBy, priorityOrder);
-            const colors = STATUS_COLORS[status];
+            const colors = getStatusColors(status);
             return (
               <div key={status} className="shrink-0 w-[270px]" data-kanban-status={status}>
                 <div className={`flex items-center gap-2 px-3 py-2 rounded-t-lg ${colors.bg}`}>
