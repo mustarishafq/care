@@ -30,14 +30,15 @@ function normalizeNotificationPayload({ type, complaint_id, severity, category, 
   };
 }
 
-/** Find users @mentioned in note content (longest-name-first to avoid partial matches). */
-export function findMentionedUsers(content, users, excludeUserId = null) {
+/** Split note content into text and @mention segments (longest-name-first). */
+export function parseMentionSegments(content, users) {
   const candidates = users
-    .filter(u => u.full_name && String(u.id) !== String(excludeUserId))
+    .filter(u => u.full_name)
     .sort((a, b) => b.full_name.length - a.full_name.length);
 
-  const mentioned = new Map();
+  const segments = [];
   let i = 0;
+  let textStart = 0;
 
   while (i < content.length) {
     if (content[i] !== '@') {
@@ -61,11 +62,32 @@ export function findMentionedUsers(content, users, excludeUserId = null) {
     }
 
     if (matched) {
-      mentioned.set(matched.id, matched);
+      if (textStart < i) {
+        segments.push({ type: 'text', value: content.slice(textStart, i) });
+      }
+      segments.push({ type: 'mention', value: matched.full_name, user: matched });
       i += 1 + matched.full_name.length;
+      textStart = i;
     } else {
       i++;
     }
+  }
+
+  if (textStart < content.length) {
+    segments.push({ type: 'text', value: content.slice(textStart) });
+  }
+
+  return segments;
+}
+
+/** Find users @mentioned in note content (longest-name-first to avoid partial matches). */
+export function findMentionedUsers(content, users, excludeUserId = null) {
+  const mentioned = new Map();
+
+  for (const segment of parseMentionSegments(content, users)) {
+    if (segment.type !== 'mention') continue;
+    if (String(segment.user.id) === String(excludeUserId)) continue;
+    mentioned.set(segment.user.id, segment.user);
   }
 
   return [...mentioned.values()];

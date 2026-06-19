@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format } from 'date-fns';
 import { Send, Loader2, AtSign } from 'lucide-react';
 import { toast } from 'sonner';
-import { findMentionedUsers, invalidateNotificationQueries } from '@/lib/notifications';
+import { findMentionedUsers, invalidateNotificationQueries, parseMentionSegments } from '@/lib/notifications';
 
 function initials(name) {
   if (!name) return '??';
@@ -18,16 +18,19 @@ function initials(name) {
 }
 
 /** Render note content with @mentions highlighted */
-function NoteContent({ content }) {
-  const parts = content.split(/(@\w[\w\s]*?\b)(?=\s|$|[,.])/g);
+function NoteContent({ content, users }) {
+  const segments = parseMentionSegments(content, users);
+
   return (
     <p className="text-sm mt-1 whitespace-pre-wrap leading-relaxed">
-      {parts.map((part, i) =>
-        part.startsWith('@') ? (
+      {segments.map((segment, i) =>
+        segment.type === 'mention' ? (
           <span key={i} className="inline-flex items-center gap-0.5 bg-primary/10 text-primary rounded px-1 font-medium text-xs py-0.5">
-            <AtSign className="w-2.5 h-2.5" />{part.slice(1)}
+            <AtSign className="w-2.5 h-2.5" />{segment.value}
           </span>
-        ) : part
+        ) : (
+          <React.Fragment key={i}>{segment.value}</React.Fragment>
+        )
       )}
     </p>
   );
@@ -188,7 +191,7 @@ export default function InternalNotes({ notes, complaintId, canAddNotes = false 
                   {format(new Date(note.created_date), 'MMM dd, HH:mm')}
                 </span>
               </div>
-              <NoteContent content={note.content} />
+              <NoteContent content={note.content} users={users} />
             </div>
           </div>
         ))}
