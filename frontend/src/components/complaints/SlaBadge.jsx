@@ -1,7 +1,9 @@
 import React from 'react';
 import { differenceInHours, addHours } from 'date-fns';
 import { AlertTriangle, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import { SLA_PAUSED_STATUSES, SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+import { DEFAULT_SLA_PAUSED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
+import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 
 export function getResolvedAt(complaint) {
   if (complaint.resolved_at) return new Date(complaint.resolved_at);
@@ -16,8 +18,7 @@ export function hasSlaPolicy(complaint) {
   return !!(complaint.priority || complaint.priority_id || complaint.priority_sla_hours || complaint.sla_deadline);
 }
 
-export function getEffectiveDeadline(complaint) {
-  // Base deadline
+export function getEffectiveDeadline(complaint, pausedStatusNames = DEFAULT_SLA_PAUSED_STATUS_NAMES) {
   let deadline;
   if (complaint.sla_deadline) {
     deadline = new Date(complaint.sla_deadline);
@@ -27,25 +28,22 @@ export function getEffectiveDeadline(complaint) {
     deadline = addHours(base, hours);
   }
 
-  // Add accumulated paused seconds
   let totalPausedSeconds = complaint.sla_paused_duration || 0;
 
-  // If currently paused, also add the current ongoing pause duration
-  if (SLA_PAUSED_STATUSES.includes(complaint.status) && complaint.sla_paused_at) {
+  if (isSlaPausedStatus(complaint.status, pausedStatusNames) && complaint.sla_paused_at) {
     const pausedSince = new Date(complaint.sla_paused_at);
     const currentPause = Math.floor((new Date() - pausedSince) / 1000);
     totalPausedSeconds += currentPause;
   }
 
-  // Extend deadline by total paused time
   return new Date(deadline.getTime() + totalPausedSeconds * 1000);
 }
 
-export function getSlaStatus(complaint) {
-  if (SLA_PAUSED_STATUSES.includes(complaint.status)) return 'paused';
+export function getSlaStatus(complaint, pausedStatusNames = DEFAULT_SLA_PAUSED_STATUS_NAMES) {
+  if (isSlaPausedStatus(complaint.status, pausedStatusNames)) return 'paused';
 
   const closed = SLA_CLOSED_STATUSES.includes(complaint.status);
-  const deadline = getEffectiveDeadline(complaint);
+  const deadline = getEffectiveDeadline(complaint, pausedStatusNames);
   const now = new Date();
   const hoursLeft = differenceInHours(deadline, now);
 
@@ -67,7 +65,8 @@ const CONFIG = {
 };
 
 export default function SlaBadge({ complaint }) {
-  const status = getSlaStatus(complaint);
+  const { pausedStatusNames } = useSlaSettings();
+  const status = getSlaStatus(complaint, pausedStatusNames);
   if (!status) return null;
   const { label, icon: Icon, className } = CONFIG[status];
   return (

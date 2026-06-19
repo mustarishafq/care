@@ -50,7 +50,7 @@ export default function Login() {
       footer={
         <p>
           Need an account?{' '}
-          <Link to="/register" className="text-primary hover:underline font-medium">
+          <Link to="/register" className="text-primary font-medium hover:text-primary/80 transition-colors">
             Create one
           </Link>
         </p>
@@ -68,9 +68,9 @@ export default function Login() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div className="space-y-2 lg:space-y-1.5">
+            <Label htmlFor="email" className="text-sm font-medium text-foreground">Email</Label>
             <div className="relative">
               <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
@@ -79,19 +79,19 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="pl-10 h-11"
+                className="pl-10 h-12 lg:h-11 bg-background border-border/80 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 autoComplete="email"
                 required
               />
             </div>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2 lg:space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
               <Link
                 to="/forgot-password"
-                className="text-xs text-primary hover:underline"
+                className="text-xs text-primary hover:text-primary/80 transition-colors font-medium"
               >
                 Forgot password?
               </Link>
@@ -103,7 +103,7 @@ export default function Login() {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-10 pr-10 h-11"
+                className="pl-10 pr-10 h-12 lg:h-11 bg-background border-border/80 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 autoComplete="current-password"
                 required
               />
@@ -118,9 +118,13 @@ export default function Login() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full h-11" disabled={loading}>
+          <Button
+            type="submit"
+            className="w-full h-12 lg:h-11 font-semibold text-base lg:text-sm shadow-md shadow-primary/20 hover:shadow-primary/30"
+            disabled={loading}
+          >
             {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-            Sign In
+            {loading ? 'Signing in…' : 'Sign In'}
           </Button>
         </form>
       </div>

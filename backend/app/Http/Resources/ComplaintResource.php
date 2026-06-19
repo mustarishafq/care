@@ -36,6 +36,8 @@ class ComplaintResource extends JsonResource
             'complaint_type' => $this->complaintType?->name,
             'description' => $this->description,
             'proof_files' => StoragePath::urlMany($this->proof_files),
+            'closure_proof_files' => StoragePath::closureProofUrls($this->closure_proof_files),
+            'closure_proof_notes' => $this->closure_proof_notes,
             'courier_id' => $this->courier_id ? (string) $this->courier_id : null,
             'courier_name' => $this->courier?->name,
             'tracking_number' => $this->tracking_number,

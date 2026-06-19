@@ -12,11 +12,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateTicketId } from '@/lib/ticketUtils';
 import { findIdByName, useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement } from '@/lib/useLookups';
 import { useCurrentUser } from '@/lib/useCurrentUser';
-import { Loader2, Upload, X } from 'lucide-react';
+import { Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
-import ProofFileThumbnail from '@/components/complaints/ProofFileThumbnail';
+import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import AffectedProductsEditor, { EMPTY_AFFECTED_PRODUCT } from '@/components/complaints/AffectedProductsEditor';
 
 const storageUrl = (path) => {
@@ -274,30 +274,16 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
 
         <div className="space-y-1.5">
           <Label className="text-xs font-medium">Proof Files</Label>
-          <div className="flex items-start gap-3 flex-wrap">
-            <label className="flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer text-sm text-muted-foreground hover:text-primary transition-colors shrink-0">
+          <div className="space-y-3">
+            <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer text-sm text-muted-foreground hover:text-primary transition-colors">
               {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               <span>{uploading ? 'Uploading...' : 'Upload files'}</span>
               <input type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx" className="hidden" onChange={handleFileUpload} />
             </label>
-            {form.proof_files.map((file, i) => (
-              <div key={file.path} className="relative group w-20 h-20 rounded-lg border bg-muted overflow-hidden shrink-0">
-                <ProofFileThumbnail
-                  url={file.url}
-                  name={file.name}
-                  isImage={file.isImage}
-                  isVideo={file.isVideo}
-                />
-                <button
-                  type="button"
-                  onClick={() => removeProofFile(i)}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center hover:bg-black/80 transition-colors"
-                  aria-label={`Remove ${file.name}`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            ))}
+            <ProofImageGallery
+              items={form.proof_files}
+              onRemove={removeProofFile}
+            />
           </div>
           {uploadError && (
             <p className="text-xs text-destructive" role="alert">{uploadError}</p>
@@ -306,9 +292,11 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
         </div>
         </div>
 
-        <DialogFooter className="shrink-0 border-t px-6 py-4 bg-background">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={saving}>
+        <DialogFooter className="shrink-0 border-t px-6 py-4 bg-background flex-row gap-2 sm:justify-end">
+          <Button variant="outline" className="flex-1 sm:flex-initial" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button className="flex-1 sm:flex-initial" onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
             Create Ticket
           </Button>

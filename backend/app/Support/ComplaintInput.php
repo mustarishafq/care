@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Complaint;
+use App\Services\SlaSettingsService;
 use Illuminate\Support\Facades\DB;
 
 class ComplaintInput
@@ -95,22 +96,47 @@ class ComplaintInput
         return self::applySlaPauseChanges($complaint, $data, $now);
     }
 
-    /** @var list<string> */
-    private const SLA_PAUSED_STATUSES = ['Waiting for Customer', 'Waiting for Vendor'];
+    public static function ensureClosureProofForClose(Complaint $complaint, array $data): void
+    {
+        if (! array_key_exists('status_id', $data)) {
+            return;
+        }
+
+        $closedId = self::lookupId('complaint_statuses', 'Closed');
+        $dropId = self::lookupId('complaint_statuses', 'Drop');
+        $newStatusId = (int) $data['status_id'];
+
+        if (! in_array($newStatusId, array_filter([(int) $closedId, (int) $dropId]), true)) {
+            return;
+        }
+
+        if ((int) ($complaint->status_id ?? 0) === $newStatusId) {
+            return;
+        }
+
+        $proofFiles = array_key_exists('closure_proof_files', $data)
+            ? StoragePath::normalizeClosureProofMany($data['closure_proof_files'])
+            : StoragePath::normalizeClosureProofMany($complaint->closure_proof_files);
+
+        if ($proofFiles === []) {
+            abort(422, 'At least one closure proof image is required before closing this ticket.');
+        }
+    }
 
     private static function applySlaPauseChanges(Complaint $complaint, array $data, $now): array
     {
-        $newStatusName = DB::table('complaint_statuses')->where('id', $data['status_id'])->value('name');
-        $oldStatusName = $complaint->complaintStatus?->name ?? '';
-
-        if (! is_string($newStatusName)) {
+        if (! isset($data['status_id'])) {
             return $data;
         }
 
-        $enteringPause = in_array($newStatusName, self::SLA_PAUSED_STATUSES, true)
-            && ! in_array($oldStatusName, self::SLA_PAUSED_STATUSES, true);
-        $leavingPause = in_array($oldStatusName, self::SLA_PAUSED_STATUSES, true)
-            && ! in_array($newStatusName, self::SLA_PAUSED_STATUSES, true);
+        $slaSettings = app(SlaSettingsService::class);
+        $newStatusId = (int) $data['status_id'];
+        $oldStatusId = (int) ($complaint->status_id ?? 0);
+
+        $enteringPause = $slaSettings->isPausedStatusId($newStatusId)
+            && ! $slaSettings->isPausedStatusId($oldStatusId);
+        $leavingPause = $slaSettings->isPausedStatusId($oldStatusId)
+            && ! $slaSettings->isPausedStatusId($newStatusId);
 
         if ($enteringPause) {
             $data['sla_paused_at'] = $now;

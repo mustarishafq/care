@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
-  FileText, AlertCircle, CheckCircle2, Clock,
+  LayoutDashboard, FileText, AlertCircle, CheckCircle2, Clock,
   Package, Truck, Timer, TrendingUp, UserCheck
 } from 'lucide-react';
 import { isToday, isThisMonth, differenceInHours } from 'date-fns';
@@ -14,6 +14,7 @@ import ComplaintTrendChart from '@/components/dashboard/ComplaintTrendChart';
 import RecentActivity from '@/components/dashboard/RecentActivity';
 import TopIssuesCard from '@/components/dashboard/TopIssuesCard';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
+import PageHeader from '@/components/layout/PageHeader';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -84,21 +85,22 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground text-sm mt-1">Overview of complaint management performance</p>
-      </div>
+      <PageHeader
+        icon={LayoutDashboard}
+        title="Dashboard"
+        description="Overview of complaint management performance"
+      />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Today's Complaints" value={todayCount} icon={FileText} color="blue" />
-        <StatCard label="This Month" value={monthCount} icon={TrendingUp} color="purple" />
-        <StatCard label="Open Tickets" value={openCount} icon={AlertCircle} color="warning" />
-        <StatCard label="Closed" value={closedCount} icon={CheckCircle2} color="success" />
-        <StatCard label="Pending Fulfillment" value={pendingFulfillment} icon={Package} color="purple" />
-        <StatCard label="Pending Courier" value={pendingLogistics} icon={Truck} color="blue" />
-        <StatCard label="Avg Resolution (hrs)" value={avgResolution} icon={Timer} color="primary" />
-        <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <StatCard label="Today's Complaints" value={todayCount} icon={FileText} color="blue" index={0} />
+        <StatCard label="This Month" value={monthCount} icon={TrendingUp} color="purple" index={1} />
+        <StatCard label="Open Tickets" value={openCount} icon={AlertCircle} color="warning" index={2} />
+        <StatCard label="Closed" value={closedCount} icon={CheckCircle2} color="success" index={3} />
+        <StatCard label="Pending Fulfillment" value={pendingFulfillment} icon={Package} color="purple" index={4} />
+        <StatCard label="Pending Courier" value={pendingLogistics} icon={Truck} color="blue" index={5} />
+        <StatCard label="Avg Resolution (hrs)" value={avgResolution} icon={Timer} color="primary" index={6} />
+        <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" index={7} />
       </div>
 
       {/* Charts Row — on lg+: trend chart (2 cols) + recent activity (1 col); on mobile recent activity moves to bottom */}
@@ -147,7 +149,7 @@ function UnassignedTickets({ complaints, onAssign }) {
   if (!unassigned.length) return null;
 
   return (
-    <Card>
+    <Card className="rounded-2xl">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <UserCheck className="w-4 h-4 text-amber-500" />

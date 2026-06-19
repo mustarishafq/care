@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Pencil, Trash2, Package, Search, Loader2 } from 'lucide-react';
+import PageHeader from '@/components/layout/PageHeader';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/lib/usePermissions';
@@ -89,23 +90,24 @@ export default function Products() {
   if (isLoading || permLoading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Products</h1>
-          <p className="text-muted-foreground text-sm mt-1">{products.length} products in catalog</p>
-        </div>
-        {canManage && (
-          <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />Add Product</Button>
-        )}
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={Package}
+        title="Products"
+        description={`${products.length} products in catalog`}
+        actions={canManage ? (
+          <Button onClick={openCreate} className="gap-2 h-10 w-full sm:w-auto sm:h-9 shadow-md shadow-primary/20 hover:shadow-primary/30">
+            <Plus className="w-4 h-4" />Add Product
+          </Button>
+        ) : null}
+      />
 
       <div className="relative max-w-sm">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input className="pl-9" placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
-      <Card>
+      <Card className="rounded-2xl">
         <CardContent className="p-0">
           <Table>
             <TableHeader>

@@ -1,32 +1,42 @@
 import React from 'react';
-import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
-export default function StatCard({ label, value, icon: Icon, trend, color = 'primary' }) {
-  const colorMap = {
-    primary: 'bg-primary/10 text-primary',
-    success: 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400',
-    warning: 'bg-amber-100 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400',
-    danger: 'bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400',
-    purple: 'bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
-    blue: 'bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
-  };
+const colorMap = {
+  primary: 'bg-primary/10 text-primary',
+  success: 'bg-success/10 text-success',
+  warning: 'bg-warning/10 text-warning',
+  danger: 'bg-destructive/10 text-destructive',
+  info: 'bg-info/10 text-info',
+  purple: 'bg-chart-3/10 text-chart-3',
+  blue: 'bg-primary/10 text-primary',
+};
 
+export default function StatCard({ label, value, icon: Icon, trend, color = 'primary', index = 0 }) {
   return (
-    <Card className="p-5 hover:shadow-md transition-shadow">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm text-muted-foreground font-medium">{label}</p>
-          <p className="text-2xl font-bold mt-1 tracking-tight">{value}</p>
-          {trend && (
-            <p className={`text-xs mt-1.5 font-medium ${trend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+    <div
+      className="bg-card rounded-2xl border border-border p-4 sm:p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group"
+      style={{ animationDelay: `${index * 50}ms` }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider leading-snug">{label}</p>
+          <p className="text-2xl sm:text-3xl font-bold mt-1 tracking-tight">{value}</p>
+          {trend != null && (
+            <p className={cn(
+              'text-xs mt-1.5 font-medium',
+              trend >= 0 ? 'text-success' : 'text-destructive',
+            )}>
               {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}% from last month
             </p>
           )}
         </div>
-        <div className={`p-2.5 rounded-xl ${colorMap[color]}`}>
-          <Icon className="w-5 h-5" />
+        <div className={cn(
+          'p-2 sm:p-2.5 rounded-lg shrink-0 transition-transform duration-300 group-hover:scale-110',
+          colorMap[color] || colorMap.primary,
+        )}>
+          <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
       </div>
-    </Card>
+    </div>
   );
 }

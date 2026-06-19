@@ -10,6 +10,7 @@ use App\Models\Priority;
 use App\Models\Role;
 use App\Models\SystemConfig;
 use App\Models\UnitOfMeasurement;
+use App\Services\SlaSettingsService;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 
@@ -128,9 +129,16 @@ class DatabaseSeeder extends Seeder
                 'key' => 'sla_settings',
                 'label' => 'SLA Settings',
                 'json_value' => [
-                    'warning_hours' => 4,
-                    'critical_hours' => 8,
-                    'escalation_email' => 'admin@admin.com',
+                    'first_response' => 2,
+                    'low' => 72,
+                    'medium' => 48,
+                    'high' => 24,
+                    'urgent' => 6,
+                    'stale_alert_hours' => 24,
+                    'paused_status_ids' => ComplaintStatus::query()
+                        ->whereIn('name', SlaSettingsService::DEFAULT_PAUSED_STATUS_NAMES)
+                        ->pluck('id')
+                        ->all(),
                 ],
             ],
             [

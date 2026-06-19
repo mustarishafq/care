@@ -1,49 +1,43 @@
-import React, { useEffect, useState } from 'react';
-import { useTheme } from 'next-themes';
+import React from 'react';
+import { cn } from '@/lib/utils';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { useIsMobile } from '@/hooks/use-mobile';
 import ProfileMenu from './ProfileMenu';
 import NavNotificationBell from './NavNotificationBell';
-import { Menu, Moon, Sun } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import MobileMoreMenu from './MobileMoreMenu';
+import { GlobalSearchTrigger } from './GlobalSearch';
+import ThemeToggle from '@/components/theme/ThemeToggle';
+import { glassPanelStyles } from './glassStyles';
 
-export default function TopBar({ onMenuClick }) {
+export default function TopBar({ permissions, isAdmin, unreadCount }) {
   const { user } = useCurrentUser();
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  const isDark = resolvedTheme === 'dark';
-
-  const toggleDark = () => {
-    setTheme(isDark ? 'light' : 'dark');
-  };
+  const isMobile = useIsMobile();
 
   return (
-    <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 sticky top-0 z-30">
-      {/* Burger button — mobile only */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="lg:hidden"
-        onClick={onMenuClick}
-      >
-        <Menu className="w-5 h-5" />
-      </Button>
-      <div className="hidden lg:block" />
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div className="flex items-center">
-          <NavNotificationBell />
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleDark}
-            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          >
-            {mounted && (isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />)}
-          </Button>
-        </div>
-        <div className="hidden sm:block h-5 w-px bg-border shrink-0" aria-hidden />
+    <header
+      className={cn(
+        glassPanelStyles,
+        'sticky top-0 z-30 h-16 w-full border-b flex items-center justify-between px-4 sm:px-6 transition-all duration-200',
+      )}
+    >
+      <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+        <MobileMoreMenu
+          permissions={permissions}
+          isAdmin={isAdmin}
+          unreadCount={unreadCount}
+        />
+        <GlobalSearchTrigger className="flex-1 max-w-xl" />
+      </div>
+
+      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+        {!isMobile && (
+          <>
+            <ThemeToggle />
+            <NavNotificationBell />
+            <div className="hidden sm:block h-5 w-px bg-border shrink-0 mx-1" aria-hidden />
+          </>
+        )}
+        {isMobile && <ThemeToggle />}
         <ProfileMenu user={user} />
       </div>
     </header>

@@ -7,8 +7,10 @@ import PriorityBadge from './PriorityBadge';
 import { ChevronRight } from 'lucide-react';
 import SlaTimer from './SlaTimer';
 import { getSlaStatus } from './SlaBadge';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 
 export default function ComplaintTable({ complaints }) {
+  const { pausedStatusNames } = useSlaSettings();
   if (complaints.length === 0) {
     return (
       <div className="text-center py-16 text-muted-foreground">
@@ -37,7 +39,7 @@ export default function ComplaintTable({ complaints }) {
         </TableHeader>
         <TableBody>
           {complaints.map(c => {
-            const slaStatus = getSlaStatus(c);
+            const slaStatus = getSlaStatus(c, pausedStatusNames);
             const rowHighlight = slaStatus === 'breached' ? 'bg-red-50/60 dark:bg-red-950/20' : slaStatus === 'at_risk' ? 'bg-amber-50/60 dark:bg-amber-950/20' : '';
             return (
             <TableRow key={c.id} className={`group hover:bg-muted/30 transition-colors cursor-pointer ${rowHighlight}`}>

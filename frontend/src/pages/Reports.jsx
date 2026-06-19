@@ -23,7 +23,8 @@ import ResolutionTimeChart from '@/components/reports/ResolutionTimeChart';
 import { useDepartments } from '@/lib/useDepartments';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { filterVisibleComplaints } from '@/lib/complaintVisibility';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, BarChart3 } from 'lucide-react';
+import PageHeader from '@/components/layout/PageHeader';
 
 const CHART_COLORS = ['#0ea5e9', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#14b8a6'];
 
@@ -121,15 +122,13 @@ export default function Reports() {
   return (
     <div className="space-y-6">
       {/* Header + Filters */}
-      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Reports & Analytics</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {filtered.length} complaints · {rangeLabel}
-          </p>
-        </div>
+      <PageHeader
+        icon={BarChart3}
+        title="Reports & Analytics"
+        description={`${filtered.length} complaints · ${rangeLabel}`}
+      />
 
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
           <Select value={range} onValueChange={v => setRange(v)}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -165,7 +164,6 @@ export default function Reports() {
               </div>
             </div>
           )}
-        </div>
       </div>
 
       <Tabs defaultValue="overview">

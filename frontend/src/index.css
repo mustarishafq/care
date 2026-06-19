@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,42 +6,45 @@
 
 @layer base {
   :root {
-    --font-sans: 'Inter', sans-serif;
+    --font-sans: 'Inter', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
     --background: 220 20% 97%;
     --foreground: 222 47% 11%;
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 199 89% 48%;
+    --primary: 206 92% 36%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 14% 96%;
     --secondary-foreground: 222 47% 11%;
     --muted: 220 14% 96%;
     --muted-foreground: 220 9% 46%;
-    --accent: 262 83% 58%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 220 14% 96%;
+    --accent-foreground: 222 47% 11%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 199 89% 48%;
-    --chart-1: 199 89% 48%;
-    --chart-2: 162 63% 41%;
-    --chart-3: 262 83% 58%;
-    --chart-4: 43 96% 56%;
-    --chart-5: 0 84% 60%;
+    --ring: 206 92% 36%;
+    --success: 160 84% 39%;
+    --warning: 38 92% 50%;
+    --info: 210 71% 35%;
+    --critical: 330 80% 55%;
+    --chart-1: 206 92% 36%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 210 71% 35%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 330 80% 55%;
     --radius: 0.75rem;
-    --success: 162 63% 41%;
-    --warning: 43 96% 56%;
     --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 220 14% 96%;
-    --sidebar-primary: 199 89% 48%;
+    --sidebar-foreground: 220 14% 80%;
+    --sidebar-primary: 206 92% 36%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 40% 16%;
     --sidebar-accent-foreground: 220 14% 96%;
     --sidebar-border: 222 40% 18%;
-    --sidebar-ring: 199 89% 48%;
+    --sidebar-ring: 206 92% 36%;
     --sidebar-muted: 220 9% 46%;
   }
 
@@ -52,34 +55,36 @@
     --card-foreground: 220 14% 96%;
     --popover: 222 47% 9%;
     --popover-foreground: 220 14% 96%;
-    --primary: 199 89% 48%;
+    --primary: 206 92% 36%;
     --primary-foreground: 0 0% 100%;
     --secondary: 222 40% 14%;
     --secondary-foreground: 220 14% 96%;
     --muted: 222 40% 14%;
     --muted-foreground: 220 9% 56%;
-    --accent: 262 83% 58%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 222 40% 14%;
+    --accent-foreground: 220 14% 96%;
     --destructive: 0 62% 30%;
     --destructive-foreground: 0 0% 98%;
-    --border: 222 40% 18%;
-    --input: 222 40% 18%;
-    --ring: 199 89% 48%;
-    --chart-1: 199 89% 48%;
-    --chart-2: 162 63% 41%;
-    --chart-3: 262 83% 58%;
-    --chart-4: 43 96% 56%;
-    --chart-5: 0 84% 60%;
-    --success: 162 63% 41%;
-    --warning: 43 96% 56%;
+    --border: 222 40% 16%;
+    --input: 222 40% 16%;
+    --ring: 206 92% 36%;
+    --success: 160 84% 39%;
+    --warning: 38 92% 50%;
+    --info: 210 71% 35%;
+    --critical: 330 80% 55%;
+    --chart-1: 206 92% 36%;
+    --chart-2: 160 84% 39%;
+    --chart-3: 210 71% 35%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 330 80% 55%;
     --sidebar-background: 222 47% 6%;
-    --sidebar-foreground: 220 14% 96%;
-    --sidebar-primary: 199 89% 48%;
+    --sidebar-foreground: 220 14% 80%;
+    --sidebar-primary: 206 92% 36%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 40% 12%;
     --sidebar-accent-foreground: 220 14% 96%;
-    --sidebar-border: 222 40% 14%;
-    --sidebar-ring: 199 89% 48%;
+    --sidebar-border: 222 40% 12%;
+    --sidebar-ring: 206 92% 36%;
     --sidebar-muted: 220 9% 46%;
   }
 }
@@ -91,4 +96,56 @@
   body {
     @apply bg-background text-foreground font-sans;
   }
+}
+
+/* Default scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.5);
+}
+
+/* Scrollbar visible on hover only */
+.scrollbar-on-hover {
+  scrollbar-gutter: stable;
+  scrollbar-color: transparent transparent;
+}
+
+.scrollbar-on-hover::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.scrollbar-on-hover:hover {
+  scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+.scrollbar-on-hover:hover::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.3);
+}
+
+/* Hidden scrollbar — bottom nav dock (§7.4) */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

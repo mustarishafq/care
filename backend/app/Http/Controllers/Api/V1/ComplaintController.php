@@ -40,7 +40,21 @@ class ComplaintController extends Controller
             $this->applyComplaintVisibilityScope($query, $user);
         }
 
-        $this->applyFilters($query, $request->except(['sort', 'limit']));
+        if ($search = $request->query('search')) {
+            $term = '%'.addcslashes($search, '%_\\').'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('ticket_id', 'like', $term)
+                    ->orWhere('customer_name', 'like', $term)
+                    ->orWhere('customer_phone', 'like', $term)
+                    ->orWhere('order_number', 'like', $term)
+                    ->orWhereHas('affectedProducts.product', function ($productQuery) use ($term) {
+                        $productQuery->where('name', 'like', $term)
+                            ->orWhere('sku', 'like', $term);
+                    });
+            });
+        }
+
+        $this->applyFilters($query, $request->except(['sort', 'limit', 'search']));
         $this->applySort($query, $request->query('sort', '-created_date'));
 
         if ($limit = $request->integer('limit')) {
@@ -80,6 +94,11 @@ class ComplaintController extends Controller
             'complaint_type_id' => ['required', 'integer', 'exists:complaint_types,id'],
             'description' => ['required', 'string'],
             'proof_files' => ['nullable', 'array'],
+            'closure_proof_files' => ['nullable', 'array'],
+            'closure_proof_files.*.path' => ['required_with:closure_proof_files', 'string'],
+            'closure_proof_files.*.type' => ['nullable', 'string', 'in:delivery,customer_conversation,vendor_screenshot,other'],
+            'closure_proof_files.*.name' => ['nullable', 'string', 'max:255'],
+            'closure_proof_notes' => ['nullable', 'string'],
             'courier_id' => ['nullable', 'integer', 'exists:couriers,id'],
             'tracking_number' => ['required', 'string', 'max:255'],
             'replacement_tracking_number' => ['nullable', 'string', 'max:255'],
@@ -183,6 +202,11 @@ class ComplaintController extends Controller
             'complaint_type_id' => ['sometimes', 'integer', 'exists:complaint_types,id'],
             'description' => ['sometimes', 'string'],
             'proof_files' => ['nullable', 'array'],
+            'closure_proof_files' => ['nullable', 'array'],
+            'closure_proof_files.*.path' => ['required_with:closure_proof_files', 'string'],
+            'closure_proof_files.*.type' => ['nullable', 'string', 'in:delivery,customer_conversation,vendor_screenshot,other'],
+            'closure_proof_files.*.name' => ['nullable', 'string', 'max:255'],
+            'closure_proof_notes' => ['nullable', 'string'],
             'courier_id' => ['nullable', 'integer', 'exists:couriers,id'],
             'tracking_number' => ['nullable', 'string', 'max:255'],
             'replacement_tracking_number' => ['nullable', 'string', 'max:255'],
@@ -205,6 +229,10 @@ class ComplaintController extends Controller
             $data['proof_files'] = StoragePath::normalizeMany($data['proof_files']);
         }
 
+        if (isset($data['closure_proof_files'])) {
+            $data['closure_proof_files'] = StoragePath::normalizeClosureProofMany($data['closure_proof_files']);
+        }
+
         $affectedProducts = null;
         if ($request->hasAny([
             'affected_products',
@@ -222,6 +250,7 @@ class ComplaintController extends Controller
         }
 
         $data = ComplaintInput::normalizeForUpdate($data);
+        ComplaintInput::ensureClosureProofForClose($complaint, $data);
         $data = ComplaintInput::applyStatusTimestamps($complaint, $data);
 
         $this->ensureComplaintUpdatePermissions($request->user(), $data);

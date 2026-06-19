@@ -22,11 +22,24 @@ export const STATUS_ORDER = [
   'Drop',
 ];
 
-export const SLA_PAUSED_STATUSES = ['Waiting for Customer', 'Waiting for Vendor'];
+import { DEFAULT_SLA_PAUSED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
+
+/** @deprecated Use settings from useSlaSettings() instead */
+export const SLA_PAUSED_STATUSES = DEFAULT_SLA_PAUSED_STATUS_NAMES;
 
 export const SLA_CLOSED_STATUSES = ['Delivered', 'Closed', 'Rejected', 'Drop'];
 
 export const TERMINAL_STATUSES = ['Rejected', 'Drop'];
+
+export const CLOSURE_PROOF_REQUIRED_STATUSES = ['Closed', 'Drop'];
+
+export function requiresClosureProof(status) {
+  return CLOSURE_PROOF_REQUIRED_STATUSES.includes(status);
+}
+
+export function hasClosureProof(complaint) {
+  return Array.isArray(complaint?.closure_proof_files) && complaint.closure_proof_files.length > 0;
+}
 
 export const STATUS_COLORS = {
   'New Complaint': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
@@ -83,7 +96,13 @@ export function buildStatusOrder(statuses = [], { includeNames = [] } = {}) {
 }
 
 /** Side-effect fields applied when a complaint status changes (Kanban, detail page, etc.). */
-export function buildStatusChangeUpdates(complaint, newStatus, statuses = [], now = new Date()) {
+export function buildStatusChangeUpdates(
+  complaint,
+  newStatus,
+  statuses = [],
+  now = new Date(),
+  pausedStatusNames = DEFAULT_SLA_PAUSED_STATUS_NAMES,
+) {
   const updates = {
     status: newStatus,
     status_id: findStatusIdByName(statuses, newStatus),
@@ -103,11 +122,11 @@ export function buildStatusChangeUpdates(complaint, newStatus, statuses = [], no
     updates.closed_at = isoNow;
   }
 
-  if (SLA_PAUSED_STATUSES.includes(newStatus)) {
+  if (isSlaPausedStatus(newStatus, pausedStatusNames)) {
     updates.sla_paused_at = isoNow;
   }
 
-  if (SLA_PAUSED_STATUSES.includes(complaint.status) && !SLA_PAUSED_STATUSES.includes(newStatus)) {
+  if (isSlaPausedStatus(complaint.status, pausedStatusNames) && !isSlaPausedStatus(newStatus, pausedStatusNames)) {
     if (complaint.sla_paused_at) {
       const pausedSeconds = Math.floor((now - new Date(complaint.sla_paused_at)) / 1000);
       updates.sla_paused_duration = (complaint.sla_paused_duration || 0) + pausedSeconds;

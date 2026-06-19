@@ -28,7 +28,22 @@ class UserController extends Controller
             $this->ensurePermission($user, 'users.view');
         }
 
-        return UserResource::collection(User::with(['departments', 'role'])->orderBy('full_name')->get());
+        $query = User::with(['departments', 'role'])->orderBy('full_name');
+
+        if ($search = $request->query('search')) {
+            $term = '%'.addcslashes($search, '%_\\').'%';
+            $query->where(function ($q) use ($term) {
+                $q->where('full_name', 'like', $term)
+                    ->orWhere('email', 'like', $term)
+                    ->orWhere('name', 'like', $term);
+            });
+        }
+
+        if ($limit = $request->integer('limit')) {
+            $query->limit($limit);
+        }
+
+        return UserResource::collection($query->get());
     }
 
     public function update(Request $request, string $id): UserResource

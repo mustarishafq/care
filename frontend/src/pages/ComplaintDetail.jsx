@@ -12,13 +12,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, User, Package, Truck, Clock, Loader2, ExternalLink, UserCheck, CornerUpLeft, X } from 'lucide-react';
+import { ArrowLeft, User, Package, Truck, Clock, Loader2, UserCheck, CornerUpLeft, X } from 'lucide-react';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
 import { Link } from 'react-router-dom';
 import { format, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
-import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
+import { buildStatusOrder, buildStatusChangeUpdates, requiresClosureProof, hasClosureProof, CLOSURE_PROOF_REQUIRED_STATUSES } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 import { useDepartments } from '@/lib/useDepartments';
 import { canViewComplaint } from '@/lib/complaintVisibility';
@@ -28,10 +29,11 @@ import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
 import TicketTimeline from '@/components/complaints/TicketTimeline';
 import InternalNotes from '@/components/complaints/InternalNotes';
-import ProofFileThumbnail from '@/components/complaints/ProofFileThumbnail';
+import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import WhatsappNotifyCard from '@/components/complaints/WhatsappNotifyCard';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 import { getAffectedProducts, groupAffectedProductsByProduct } from '@/lib/whatsappShare';
+import ClosureProofEditor from '@/components/complaints/ClosureProofEditor';
 
 export default function ComplaintDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -67,6 +69,7 @@ export default function ComplaintDetail() {
 
   const { data: departments = [] } = useDepartments();
   const { data: complaintStatuses = [] } = useComplaintStatuses();
+  const { pausedStatusNames } = useSlaSettings();
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [complaint?.status] });
 
   const updateComplaint = async (
@@ -95,15 +98,20 @@ export default function ComplaintDetail() {
       queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
       queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
       invalidateNotificationQueries(queryClient);
-    } catch {
-      toast.error('Failed to update ticket');
+    } catch (err) {
+      toast.error(err.message || 'Failed to update ticket');
     } finally {
       setUpdating(false);
     }
   };
 
   const handleStatusChange = async (newStatus) => {
-    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
+    if (requiresClosureProof(newStatus) && !hasClosureProof(complaint)) {
+      toast.error('Add and save at least one closure proof before closing this ticket.');
+      return;
+    }
+
+    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames);
 
     await updateComplaint(
       updates,
@@ -165,6 +173,8 @@ export default function ComplaintDetail() {
 
   const ageHours = differenceInHours(new Date(), new Date(complaint.created_date));
   const affectedProductGroups = groupAffectedProductsByProduct(getAffectedProducts(complaint));
+  const closureLocked = CLOSURE_PROOF_REQUIRED_STATUSES.includes(complaint.status);
+  const canManageClosureProof = (canChangeStatus || canEdit) && !closureLocked;
 
   return (
     <div className="space-y-6">
@@ -298,24 +308,14 @@ export default function ComplaintDetail() {
                 <CardTitle className="text-base flex items-center gap-2"><Package className="w-4 h-4" />Proof & Attachments</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {complaint.proof_files.map((url, i) => (
-                    <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                      className="block aspect-video rounded-lg bg-muted overflow-hidden border hover:border-primary transition-colors relative group">
-                      <ProofFileThumbnail url={url} name={`Proof ${i + 1}`} />
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-                        <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </a>
-                  ))}
-                </div>
+                <ProofImageGallery items={complaint.proof_files} />
               </CardContent>
             </Card>
           )}
 
-          {/* Replacement Tracking — mobile/tablet only */}
-          {canEdit && (
-            <div className="lg:hidden">
+          {/* Replacement Tracking + Closure Proof — mobile/tablet only */}
+          <div className="lg:hidden space-y-4">
+            {canEdit && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-sm font-semibold">Replacement Tracking</CardTitle>
@@ -324,8 +324,20 @@ export default function ComplaintDetail() {
                   <TrackingForm complaint={complaint} updateComplaint={updateComplaint} updating={updating} />
                 </CardContent>
               </Card>
-            </div>
-          )}
+            )}
+            {(canManageClosureProof || closureLocked || hasClosureProof(complaint)) && (
+              <ClosureProofEditor
+                complaint={complaint}
+                complaintId={complaintId}
+                user={user}
+                readOnly={!canManageClosureProof}
+                onSaved={() => {
+                  queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+                  queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
+                }}
+              />
+            )}
+          </div>
 
           {/* Tabs: Notes & Timeline */}
           <Tabs defaultValue="notes">
@@ -411,6 +423,21 @@ export default function ComplaintDetail() {
                 <TrackingForm complaint={complaint} updateComplaint={updateComplaint} updating={updating} />
               </CardContent>
             </Card>
+          )}
+
+          {(canManageClosureProof || closureLocked || hasClosureProof(complaint)) && (
+            <div className="hidden lg:block">
+              <ClosureProofEditor
+                complaint={complaint}
+                complaintId={complaintId}
+                user={user}
+                readOnly={!canManageClosureProof}
+                onSaved={() => {
+                  queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+                  queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
+                }}
+              />
+            </div>
           )}
         </div>
       </div>

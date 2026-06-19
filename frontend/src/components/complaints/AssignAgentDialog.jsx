@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 import { getAssignedAgentIds, getAssignedAgents } from '@/lib/assignedAgents';
 
@@ -32,6 +33,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
   const [saving, setSaving] = useState(false);
 
   const { data: complaintStatuses = [] } = useComplaintStatuses();
+  const { pausedStatusNames } = useSlaSettings();
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [complaint?.status] });
 
   const assignedIds = useMemo(() => getAssignedAgentIds(complaint), [complaint]);
@@ -88,7 +90,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
       }
 
       if (newStatus && newStatus !== complaint.status) {
-        const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
+        const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames);
         await db.entities.Complaint.update(complaint.id, updates);
       }
 

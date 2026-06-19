@@ -3,7 +3,9 @@ import { differenceInSeconds } from 'date-fns';
 import { Clock, AlertTriangle, CheckCircle, AlertCircle, PauseCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getEffectiveDeadline, getResolvedAt } from './SlaBadge';
-import { SLA_PAUSED_STATUSES, SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+import { isSlaPausedStatus } from '@/lib/slaSettings';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 
 function formatCountdown(totalSeconds) {
   if (totalSeconds <= 0) return null;
@@ -17,10 +19,11 @@ function formatCountdown(totalSeconds) {
 }
 
 export default function SlaTimer({ complaint }) {
+  const { pausedStatusNames } = useSlaSettings();
   const [now, setNow] = useState(() => new Date());
 
   const isClosed = SLA_CLOSED_STATUSES.includes(complaint.status);
-  const isPaused = SLA_PAUSED_STATUSES.includes(complaint.status);
+  const isPaused = isSlaPausedStatus(complaint.status, pausedStatusNames);
 
   useEffect(() => {
     if (isClosed || isPaused) return;
@@ -28,9 +31,8 @@ export default function SlaTimer({ complaint }) {
     return () => clearInterval(id);
   }, [isClosed, isPaused]);
 
-  const deadline = getEffectiveDeadline(complaint);
+  const deadline = getEffectiveDeadline(complaint, pausedStatusNames);
 
-  // Paused — SLA clock is stopped
   if (isPaused) {
     return (
       <Badge className="border-0 text-xs font-medium gap-1.5 bg-orange-100 text-orange-700">
@@ -40,7 +42,6 @@ export default function SlaTimer({ complaint }) {
     );
   }
 
-  // Closed tickets — show static met/breached
   if (isClosed) {
     const resolvedAt = getResolvedAt(complaint) ?? now;
     const met = resolvedAt <= deadline;
@@ -55,7 +56,6 @@ export default function SlaTimer({ complaint }) {
   const secsLeft = differenceInSeconds(deadline, now);
   const hoursLeft = secsLeft / 3600;
 
-  // Breached
   if (secsLeft <= 0) {
     const overdueSecs = Math.abs(secsLeft);
     return (
@@ -66,7 +66,6 @@ export default function SlaTimer({ complaint }) {
     );
   }
 
-  // At risk (≤ 4h)
   if (hoursLeft <= 4) {
     return (
       <Badge className="border-0 text-xs font-medium gap-1.5 bg-warning/15 text-warning">
@@ -76,7 +75,6 @@ export default function SlaTimer({ complaint }) {
     );
   }
 
-  // On track
   return (
     <Badge className="border-0 text-xs font-medium gap-1.5 bg-primary/15 text-primary">
       <Clock className="w-3 h-3" />

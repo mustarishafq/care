@@ -27,6 +27,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import RoleSelectOptions from '@/components/users/RoleSelectOptions';
+import PageHeader from '@/components/layout/PageHeader';
 import { getRoleLabel } from '@/lib/roles';
 import { usePermissions } from '@/lib/usePermissions';
 import StatCard from '@/components/dashboard/StatCard';
@@ -266,31 +267,30 @@ export default function Users() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {hasActiveFilters
-              ? `${filteredUsers.length} of ${users.length} users`
-              : `${users.length} users`}
-          </p>
-        </div>
-        {(canManage || canInvite) && (
-          <div className="flex items-center gap-2">
+    <div className="space-y-6">
+      <PageHeader
+        icon={UsersIcon}
+        title="User Management"
+        description={
+          hasActiveFilters
+            ? `${filteredUsers.length} of ${users.length} users`
+            : `${users.length} users`
+        }
+        actions={(canManage || canInvite) ? (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             {canManage && (
-              <Button variant="outline" onClick={openAddUser}>
-                <UserPlus className="w-4 h-4 mr-2" />Add User
+              <Button variant="outline" onClick={openAddUser} className="gap-2 h-10 sm:h-9">
+                <UserPlus className="w-4 h-4" />Add User
               </Button>
             )}
             {canInvite && (
-              <Button onClick={() => setInviteOpen(true)}>
-                <Mail className="w-4 h-4 mr-2" />Invite User
+              <Button onClick={() => setInviteOpen(true)} className="gap-2 h-10 sm:h-9 shadow-md shadow-primary/20 hover:shadow-primary/30">
+                <Mail className="w-4 h-4" />Invite User
               </Button>
             )}
           </div>
-        )}
-      </div>
+        ) : null}
+      />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <StatCard label="Total Users" value={stats.total} icon={UsersIcon} color="primary" />

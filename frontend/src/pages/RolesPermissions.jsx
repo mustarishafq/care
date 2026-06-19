@@ -11,7 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Pencil, Trash2, Shield, Loader2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Shield, Loader2, ShieldCheck } from 'lucide-react';
+import PageHeader from '@/components/layout/PageHeader';
 import { toast } from 'sonner';
 
 export const ALL_PERMISSIONS = [
@@ -98,18 +99,21 @@ export default function RolesPermissions() {
   if (isLoading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Roles & Permissions</h1>
-          <p className="text-muted-foreground text-sm mt-1">Manage roles and control access</p>
-        </div>
-        <Button onClick={openCreate}><Plus className="w-4 h-4 mr-2" />New Role</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        icon={ShieldCheck}
+        title="Roles & Permissions"
+        description="Manage roles and control access"
+        actions={(
+          <Button onClick={openCreate} className="gap-2 h-10 w-full sm:w-auto sm:h-9 shadow-md shadow-primary/20 hover:shadow-primary/30">
+            <Plus className="w-4 h-4" />New Role
+          </Button>
+        )}
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {roles.map(role => (
-          <Card key={role.id}>
+          <Card key={role.id} className="rounded-2xl">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">

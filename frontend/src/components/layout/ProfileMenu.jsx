@@ -79,16 +79,16 @@ export default function ProfileMenu({ user }) {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2.5 rounded-lg pl-2 pr-1 py-1 -mr-1 hover:bg-accent transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring">
-            <span className="text-sm font-medium leading-none text-foreground truncate max-w-[160px] hidden sm:inline">
+          <button className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-muted transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-ring">
+            <span className="text-sm font-medium leading-none text-foreground truncate max-w-[160px] hidden md:inline">
               {user?.full_name || 'Loading...'}
             </span>
-            <Avatar className="h-8 w-8 bg-primary/10 border border-primary/25 shrink-0">
-              <AvatarFallback className="text-xs font-semibold text-primary bg-transparent">{initials}</AvatarFallback>
+            <Avatar className="h-8 w-8 rounded-lg shrink-0">
+              <AvatarFallback className="rounded-lg bg-primary/10 text-sm font-semibold text-primary">{initials}</AvatarFallback>
             </Avatar>
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuContent align="end" className="w-48">
           <div className="px-3 py-2 border-b border-border mb-1">
             <p className="text-sm font-semibold truncate">{user?.full_name}</p>
             <p className="text-xs text-muted-foreground truncate">{user?.email}</p>

@@ -9,12 +9,14 @@ import {
   getSlaStatus,
   hasSlaPolicy,
 } from '@/components/complaints/SlaBadge';
-import { SLA_PAUSED_STATUSES, SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+import { isSlaPausedStatus } from '@/lib/slaSettings';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 
-function formatRemaining(complaint) {
-  if (SLA_PAUSED_STATUSES.includes(complaint.status)) return 'Paused';
+function formatRemaining(complaint, pausedStatusNames) {
+  if (isSlaPausedStatus(complaint.status, pausedStatusNames)) return 'Paused';
 
-  const deadline = getEffectiveDeadline(complaint);
+  const deadline = getEffectiveDeadline(complaint, pausedStatusNames);
   const now = new Date();
   const diffH = differenceInHours(deadline, now);
   if (diffH < 0) return `${Math.abs(diffH)}h overdue`;
@@ -26,26 +28,31 @@ function formatRemaining(complaint) {
 }
 
 export default function SlaReport({ complaints }) {
+  const { pausedStatusNames } = useSlaSettings();
   const withSla = complaints.filter(hasSlaPolicy);
 
   const stats = {
     total: withSla.length,
-    met: withSla.filter(c => getSlaStatus(c) === 'met').length,
-    breached: withSla.filter(c => getSlaStatus(c) === 'breached').length,
-    warning: withSla.filter(c => getSlaStatus(c) === 'at_risk').length,
-    on_track: withSla.filter(c => getSlaStatus(c) === 'on_track').length,
+    met: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'met').length,
+    breached: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'breached').length,
+    warning: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'at_risk').length,
+    on_track: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'on_track').length,
   };
 
   const breachByPriority = ['Low', 'Medium', 'High', 'Urgent'].map(p => {
     const total = withSla.filter(c => c.priority === p).length;
-    const breached = withSla.filter(c => c.priority === p && getSlaStatus(c) === 'breached').length;
+    const breached = withSla.filter(c => c.priority === p && getSlaStatus(c, pausedStatusNames) === 'breached').length;
     return { name: p, total, breached };
   });
 
   const openWithSla = withSla
     .filter(c => !SLA_CLOSED_STATUSES.includes(c.status))
-    .map(c => ({ ...c, status_sla: getSlaStatus(c), remaining: formatRemaining(c) }))
-    .sort((a, b) => getEffectiveDeadline(a) - getEffectiveDeadline(b))
+    .map(c => ({
+      ...c,
+      status_sla: getSlaStatus(c, pausedStatusNames),
+      remaining: formatRemaining(c, pausedStatusNames),
+    }))
+    .sort((a, b) => getEffectiveDeadline(a, pausedStatusNames) - getEffectiveDeadline(b, pausedStatusNames))
     .slice(0, 10);
 
   const breachRate = stats.total > 0 ? ((stats.breached / stats.total) * 100).toFixed(1) : 0;

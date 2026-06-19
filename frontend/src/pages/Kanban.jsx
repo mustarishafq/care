@@ -1,9 +1,9 @@
 import { db } from '@/api/db';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { STATUS_COLORS, buildStatusChangeUpdates, buildStatusOrder } from '@/lib/ticketUtils';
+import { STATUS_COLORS, buildStatusChangeUpdates, buildStatusOrder, requiresClosureProof, hasClosureProof } from '@/lib/ticketUtils';
 import { filterVisibleComplaints } from '@/lib/complaintVisibility';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
@@ -15,13 +15,41 @@ import PriorityBadge from '@/components/complaints/PriorityBadge';
 import SlaTimer from '@/components/complaints/SlaTimer';
 import ColumnOrderDialog from '@/components/kanban/ColumnOrderDialog';
 import { format } from 'date-fns';
-import { Clock, ArrowUpDown, Columns } from 'lucide-react';
+import { Clock, ArrowUpDown, Columns, Columns3 } from 'lucide-react';
+import PageHeader from '@/components/layout/PageHeader';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { buildPriorityOrder, useComplaintStatuses, usePriorities } from '@/lib/useLookups';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 import { toast } from 'sonner';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 
 const STORAGE_KEY = 'kanban_column_order';
+const AUTO_SCROLL_EDGE = 72;
+const AUTO_SCROLL_SPEED = 14;
+
+function resolveDropStatus(result, pointer) {
+  const { destination, source } = result;
+
+  // Prefer the column under the pointer — reliable after horizontal scroll.
+  // elementsFromPoint skips the drag ghost layer when present.
+  if (pointer.x > 0 && pointer.y > 0) {
+    const elements = document.elementsFromPoint(pointer.x, pointer.y);
+    for (const el of elements) {
+      const column = el.closest?.('[data-kanban-status]');
+      if (column) {
+        const status = column.getAttribute('data-kanban-status');
+        if (status && status !== source.droppableId) {
+          return status;
+        }
+        break;
+      }
+    }
+  }
+
+  if (!destination) return null;
+  if (destination.droppableId === source.droppableId) return null;
+  return destination.droppableId;
+}
 
 function loadColumnOrder(statusOrder, existing = []) {
   const activeNames = new Set(statusOrder);
@@ -57,9 +85,13 @@ export default function Kanban() {
   const { hasPermission, loading: permLoading } = usePermissions();
   const canChangeStatus = hasPermission('complaints.change_status');
   const queryClient = useQueryClient();
-  const [draggingId, setDraggingId] = useState(null);
   const [columnSorts, setColumnSorts] = useState({});
+  const boardRef = useRef(null);
+  const pointerRef = useRef({ x: 0, y: 0 });
+  const autoScrollRaf = useRef(null);
+  const isDraggingRef = useRef(false);
   const { data: complaintStatuses = [] } = useComplaintStatuses();
+  const { pausedStatusNames } = useSlaSettings();
   const [columnOrder, setColumnOrder] = useState([]);
   const [columnOrderOpen, setColumnOrderOpen] = useState(false);
 
@@ -88,18 +120,71 @@ export default function Kanban() {
     setColumnOrder((prev) => (prev.length ? loadColumnOrder(statusOrder, prev) : loadColumnOrder(statusOrder)));
   }, [statusOrder.join('|')]);
 
-  const onDragEnd = async (result) => {
-    if (!canChangeStatus) return;
-    setDraggingId(null);
-    const { destination, source, draggableId } = result;
-    if (!destination) return;
-    if (destination.droppableId === source.droppableId) return;
+  useEffect(() => {
+    const trackPointer = (e) => {
+      pointerRef.current = {
+        x: e.clientX ?? e.touches?.[0]?.clientX ?? 0,
+        y: e.clientY ?? e.touches?.[0]?.clientY ?? 0,
+      };
+    };
+    window.addEventListener('mousemove', trackPointer);
+    window.addEventListener('touchmove', trackPointer, { passive: true });
+    return () => {
+      window.removeEventListener('mousemove', trackPointer);
+      window.removeEventListener('touchmove', trackPointer);
+    };
+  }, []);
 
-    const newStatus = destination.droppableId;
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRaf.current) {
+      cancelAnimationFrame(autoScrollRaf.current);
+      autoScrollRaf.current = null;
+    }
+  }, []);
+
+  const startAutoScroll = useCallback(() => {
+    stopAutoScroll();
+    const tick = () => {
+      if (!isDraggingRef.current) return;
+      const container = boardRef.current;
+      const { x } = pointerRef.current;
+      if (container && x) {
+        const rect = container.getBoundingClientRect();
+        if (x < rect.left + AUTO_SCROLL_EDGE) {
+          container.scrollLeft -= AUTO_SCROLL_SPEED;
+        } else if (x > rect.right - AUTO_SCROLL_EDGE) {
+          container.scrollLeft += AUTO_SCROLL_SPEED;
+        }
+      }
+      autoScrollRaf.current = requestAnimationFrame(tick);
+    };
+    autoScrollRaf.current = requestAnimationFrame(tick);
+  }, [stopAutoScroll]);
+
+  useEffect(() => () => stopAutoScroll(), [stopAutoScroll]);
+
+  const onDragStart = () => {
+    isDraggingRef.current = true;
+    startAutoScroll();
+  };
+
+  const onDragEnd = async (result) => {
+    isDraggingRef.current = false;
+    stopAutoScroll();
+    if (!canChangeStatus) return;
+
+    const { draggableId } = result;
+    const newStatus = resolveDropStatus(result, pointerRef.current);
+    if (!newStatus) return;
     const complaint = complaints.find(c => c.id === draggableId);
     if (!complaint) return;
 
-    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
+    if (requiresClosureProof(newStatus) && !hasClosureProof(complaint)) {
+      toast.error('Add and save closure proof on the ticket before closing.');
+      return;
+    }
+
+    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames);
 
     const previousComplaints = queryClient.getQueryData(['complaints']);
     queryClient.setQueryData(['complaints'], (old = []) =>
@@ -164,20 +249,17 @@ export default function Kanban() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Kanban Board</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            {canChangeStatus ? 'Drag & drop tickets to update status' : 'View-only board — you cannot change ticket status'}
-          </p>
-        </div>
-        {isAdmin && (
-          <Button variant="outline" size="sm" onClick={() => setColumnOrderOpen(true)} className="self-start sm:self-auto">
-            <Columns className="w-4 h-4 mr-2" />Edit Column Order
+    <div className="space-y-6">
+      <PageHeader
+        icon={Columns3}
+        title="Kanban Board"
+        description={canChangeStatus ? 'Drag & drop tickets to update status' : 'View-only board — you cannot change ticket status'}
+        actions={isAdmin ? (
+          <Button variant="outline" size="sm" onClick={() => setColumnOrderOpen(true)} className="gap-2 h-10 w-full sm:w-auto sm:h-9">
+            <Columns className="w-4 h-4" />Edit Column Order
           </Button>
-        )}
-      </div>
+        ) : null}
+      />
 
       <ColumnOrderDialog
         open={columnOrderOpen}
@@ -187,15 +269,15 @@ export default function Kanban() {
         onSave={saveColumnOrder}
       />
 
-      <DragDropContext onDragEnd={onDragEnd} onDragStart={r => setDraggingId(r.draggableId)}>
-        <div className="flex gap-4 overflow-x-auto pb-4">
+      <DragDropContext onDragEnd={onDragEnd} onDragStart={onDragStart}>
+        <div ref={boardRef} className="flex gap-4 overflow-x-auto pb-4 scrollbar-on-hover">
           {columnOrder.map(status => {
             const rawCards = visibleComplaints.filter(c => c.status === status);
             const sortBy = columnSorts[status] || 'date_desc';
             const cards = sortCards(rawCards, sortBy, priorityOrder);
             const colors = STATUS_COLORS[status];
             return (
-              <div key={status} className="shrink-0 w-[270px]">
+              <div key={status} className="shrink-0 w-[270px]" data-kanban-status={status}>
                 <div className={`flex items-center gap-2 px-3 py-2 rounded-t-lg ${colors.bg}`}>
                   <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
                   <span className={`text-xs font-semibold ${colors.text}`}>{status}</span>
@@ -221,50 +303,52 @@ export default function Kanban() {
                     <div
                       ref={provided.innerRef}
                       {...provided.droppableProps}
-                      className={`border border-t-0 border-border rounded-b-lg p-2 space-y-2 min-h-[120px] max-h-[calc(100vh-280px)] overflow-y-auto transition-colors ${
+                      className={`border border-t-0 border-border rounded-b-lg flex flex-col min-h-[120px] max-h-[calc(100vh-280px)] transition-colors ${
                         snapshot.isDraggingOver ? 'bg-primary/5 border-primary/30' : 'bg-muted/30'
                       }`}
                     >
-                      {cards.map((c, index) => (
-                        <Draggable key={c.id} draggableId={c.id} index={index} isDragDisabled={!canChangeStatus}>
-                          {(provided, snapshot) => (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...(canChangeStatus ? provided.dragHandleProps : {})}
-                              className={`bg-card border border-border rounded-lg p-3 transition-shadow select-none ${
-                                snapshot.isDragging ? 'shadow-xl rotate-1 opacity-90' : canChangeStatus ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : 'hover:shadow-sm'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between mb-2">
-                                <Link
-                                  to={`/complaints/${c.id}`}
-                                  onClick={e => e.stopPropagation()}
-                                  className="font-mono text-xs font-semibold text-primary hover:underline"
-                                >
-                                  {c.ticket_id}
-                                </Link>
-                                <PriorityBadge priority={c.priority} />
-                              </div>
-                              <p className="text-sm font-medium truncate">{c.customer_name}</p>
-                              <p className="text-xs text-muted-foreground truncate mt-0.5">{c.product_name}</p>
-                              <div className="mt-2 pt-2 border-t border-border space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] text-muted-foreground">{c.complaint_type}</span>
-                                  <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    {format(new Date(c.created_date), 'MMM dd')}
-                                  </span>
+                      <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-2">
+                        {cards.map((c, index) => (
+                          <Draggable key={c.id} draggableId={String(c.id)} index={index} isDragDisabled={!canChangeStatus}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...(canChangeStatus ? provided.dragHandleProps : {})}
+                                className={`bg-card border border-border rounded-lg p-3 transition-shadow select-none ${
+                                  snapshot.isDragging ? 'shadow-xl rotate-1 opacity-90' : canChangeStatus ? 'hover:shadow-md cursor-grab active:cursor-grabbing' : 'hover:shadow-sm'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between mb-2">
+                                  <Link
+                                    to={`/complaints/${c.id}`}
+                                    onClick={e => e.stopPropagation()}
+                                    className="font-mono text-xs font-semibold text-primary hover:underline"
+                                  >
+                                    {c.ticket_id}
+                                  </Link>
+                                  <PriorityBadge priority={c.priority} />
                                 </div>
-                                <SlaTimer complaint={c} />
+                                <p className="text-sm font-medium truncate">{c.customer_name}</p>
+                                <p className="text-xs text-muted-foreground truncate mt-0.5">{c.product_name}</p>
+                                <div className="mt-2 pt-2 border-t border-border space-y-1.5">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-muted-foreground">{c.complaint_type}</span>
+                                    <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {format(new Date(c.created_date), 'MMM dd')}
+                                    </span>
+                                  </div>
+                                  <SlaTimer complaint={c} />
+                                </div>
                               </div>
-                            </div>
-                          )}
-                        </Draggable>
-                      ))}
+                            )}
+                          </Draggable>
+                        ))}
+                      </div>
                       {provided.placeholder}
                       {cards.length === 0 && !snapshot.isDraggingOver && (
-                        <p className="text-xs text-muted-foreground text-center py-8">No tickets</p>
+                        <p className="text-xs text-muted-foreground text-center py-8 px-2">No tickets</p>
                       )}
                     </div>
                   )}

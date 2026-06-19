@@ -6,6 +6,7 @@ module.exports = {
   	extend: {
   		fontFamily: {
   			sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+  			mono: ['var(--font-mono)', 'monospace'],
   		},
   		borderRadius: {
   			lg: 'var(--radius)',
@@ -15,6 +16,8 @@ module.exports = {
   		colors: {
   			success: 'hsl(var(--success))',
   			warning: 'hsl(var(--warning))',
+  			info: 'hsl(var(--info))',
+  			critical: 'hsl(var(--critical))',
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
   			card: {

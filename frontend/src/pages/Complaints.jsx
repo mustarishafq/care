@@ -4,7 +4,8 @@ import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, FileText } from 'lucide-react';
+import PageHeader from '@/components/layout/PageHeader';
 import ComplaintFilters from '@/components/complaints/ComplaintFilters';
 import ComplaintTable from '@/components/complaints/ComplaintTable';
 import CreateComplaintDialog from '@/components/complaints/CreateComplaintDialog';
@@ -34,7 +35,7 @@ export default function Complaints() {
       if (filters.courier && c.courier_id !== filters.courier) return false;
       if (filters.search) {
         const s = filters.search.toLowerCase();
-        const searchable = `${c.ticket_id} ${c.customer_name} ${c.order_number} ${c.product_name}`.toLowerCase();
+        const searchable = `${c.ticket_id} ${c.customer_name} ${c.customer_phone ?? ''} ${c.order_number} ${c.product_name}`.toLowerCase();
         if (!searchable.includes(s)) return false;
       }
       return true;
@@ -75,18 +76,17 @@ export default function Complaints() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Complaints</h1>
-          <p className="text-muted-foreground text-sm mt-1">{filtered.length} tickets found</p>
-        </div>
-        {canCreate && (
-          <Button onClick={() => setCreateOpen(true)} className="self-start sm:self-auto">
-            <Plus className="w-4 h-4 mr-2" />New Complaint
+    <div className="space-y-6">
+      <PageHeader
+        icon={FileText}
+        title="Complaints"
+        description={`${filtered.length} tickets found`}
+        actions={canCreate ? (
+          <Button onClick={() => setCreateOpen(true)} className="gap-2 h-10 w-full sm:w-auto sm:h-9 shadow-md shadow-primary/20 hover:shadow-primary/30">
+            <Plus className="w-4 h-4" />New Complaint
           </Button>
-        )}
-      </div>
+        ) : null}
+      />
 
       <ComplaintFilters filters={filters} setFilters={setFilters} />
       <ComplaintTable complaints={filtered} />

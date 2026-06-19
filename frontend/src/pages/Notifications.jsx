@@ -7,8 +7,8 @@ import { useNotifications } from '@/lib/useNotifications';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Bell, CheckCheck, FileText, RefreshCw, AlertTriangle, Clock, UserPlus } from 'lucide-react';
+import PageHeader from '@/components/layout/PageHeader';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
 
@@ -47,18 +47,17 @@ export default function Notifications() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
-          <p className="text-muted-foreground text-sm mt-1">{unreadCount} unread</p>
-        </div>
-        {unreadCount > 0 && (
-          <Button variant="outline" size="sm" onClick={markAllRead}>
-            <CheckCheck className="w-4 h-4 mr-2" />Mark All Read
+    <div className="space-y-6">
+      <PageHeader
+        icon={Bell}
+        title="Notifications"
+        description={`${unreadCount} unread`}
+        actions={unreadCount > 0 ? (
+          <Button variant="outline" size="sm" onClick={markAllRead} className="gap-2 h-10 w-full sm:w-auto sm:h-9">
+            <CheckCheck className="w-4 h-4" />Mark All Read
           </Button>
-        )}
-      </div>
+        ) : null}
+      />
 
       <div className="space-y-2">
         {notifications.length === 0 && (

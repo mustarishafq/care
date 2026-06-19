@@ -19,6 +19,8 @@ class Complaint extends Model
         'complaint_type_id',
         'description',
         'proof_files',
+        'closure_proof_files',
+        'closure_proof_notes',
         'courier_id',
         'tracking_number',
         'replacement_tracking_number',
@@ -104,6 +106,7 @@ class Complaint extends Model
     {
         return [
             'proof_files' => 'array',
+            'closure_proof_files' => 'array',
             'purchase_date' => 'date',
             'sla_deadline' => 'datetime',
             'sla_paused_at' => 'datetime',

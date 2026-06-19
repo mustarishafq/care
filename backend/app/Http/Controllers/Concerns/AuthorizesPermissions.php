@@ -27,8 +27,9 @@ trait AuthorizesPermissions
         }
 
         $statusSideEffectFields = [
-            'first_response_at', 'resolved_at', 'closed_at', 'sla_paused_at', 'sla_paused_duration',
+            'first_response_at', 'resolved_at', 'closed_at', 'delivered_at', 'sla_paused_at', 'sla_paused_duration',
         ];
+        $closureProofFields = ['closure_proof_files', 'closure_proof_notes'];
 
         if ((isset($data['status']) || isset($data['status_id'])) && ! $user->hasPermission('complaints.change_status')) {
             throw new HttpResponseException(response()->json([
@@ -44,9 +45,18 @@ trait AuthorizesPermissions
             ], 403));
         }
 
+        $hasClosureProofChange = ! empty(array_intersect(array_keys($data), $closureProofFields));
+        if ($hasClosureProofChange
+            && ! $user->hasPermission('complaints.change_status')
+            && ! $user->hasPermission('complaints.edit')) {
+            throw new HttpResponseException(response()->json([
+                'message' => 'You do not have permission to add closure proof.',
+            ], 403));
+        }
+
         $editFields = array_diff(
             array_keys($data),
-            array_merge(['status', 'status_id'], $assignFields, $statusSideEffectFields)
+            array_merge(['status', 'status_id'], $assignFields, $statusSideEffectFields, $closureProofFields)
         );
 
         if (! empty($editFields) && ! $user->hasPermission('complaints.edit')) {

@@ -44,14 +44,18 @@ export default function NavNotificationBell() {
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
+        <button
+          type="button"
+          className="p-2 rounded-lg hover:bg-muted transition-colors relative"
+          aria-label="Notifications"
+        >
           <Bell className="w-5 h-5" />
           {unread.length > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center leading-none">
-              {unread.length > 9 ? '9+' : unread.length}
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center px-0.5 animate-pulse">
+              {unread.length > 99 ? '99+' : unread.length}
             </span>
           )}
-        </Button>
+        </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-0 shadow-xl">
         {/* Header */}
