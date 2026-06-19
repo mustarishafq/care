@@ -35,7 +35,7 @@ class DatabaseSeeder extends Seeder
         }
 
         $defaultComplaintTypes = [
-            'Damaged Product', 'Broken Item', 'Missing Item', 'Wrong Item', 'Leakage', 'Packaging Damage', 'Other',
+            'Damaged Product', 'Broken Item', 'Missing Item', 'Wrong Item', 'Leakage', 'Packaging Damage', 'Parcel Not Arrived', 'Other',
         ];
 
         foreach ($defaultComplaintTypes as $index => $name) {

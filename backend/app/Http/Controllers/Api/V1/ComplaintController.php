@@ -10,6 +10,7 @@ use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
 use App\Services\ComplaintAffectedProductService;
 use App\Services\ComplaintNotificationService;
+use App\Services\ComplaintRoutingService;
 use App\Services\OutgoingWebhookService;
 use App\Services\TicketIdGenerator;
 use App\Support\ComplaintInput;
@@ -17,6 +18,7 @@ use App\Support\StoragePath;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 
 class ComplaintController extends Controller
 {
@@ -27,6 +29,7 @@ class ComplaintController extends Controller
         private ComplaintAffectedProductService $affectedProductService,
         private OutgoingWebhookService $outgoingWebhook,
         private ComplaintNotificationService $complaintNotifications,
+        private ComplaintRoutingService $complaintRouting,
     ) {}
 
     public function index(Request $request): AnonymousResourceCollection
@@ -95,7 +98,24 @@ class ComplaintController extends Controller
             abort(422, 'At least one affected product is required.');
         }
 
+        $hadExplicitDepartment = array_key_exists('assigned_department_id', $data)
+            && $data['assigned_department_id'] !== null;
+        $hadExplicitStatus = array_key_exists('status_id', $data)
+            || array_key_exists('status', $data);
+
         $data = ComplaintInput::normalizeForCreate($data);
+        $data = $this->complaintRouting->applyToCreate($data, [
+            'had_explicit_department' => $hadExplicitDepartment,
+            'had_explicit_status' => $hadExplicitStatus,
+        ]);
+
+        if (empty($data['assigned_department_id'])) {
+            $customerServiceId = DB::table('departments')->where('name', 'Customer Service')->value('id');
+            if ($customerServiceId) {
+                $data['assigned_department_id'] = (int) $customerServiceId;
+            }
+        }
+
         $data['ticket_id'] = $this->ticketIdGenerator->generate();
 
         if (! isset($data['assigned_user_id']) && $request->user()) {

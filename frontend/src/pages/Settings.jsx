@@ -10,15 +10,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Shield, FileText, RefreshCw, Building2, Truck, AlertCircle, Pencil, Plus, X, Loader2, Bell, Link2, Eye, EyeOff, Copy, Check, Ruler, Clock } from 'lucide-react';
+import { Shield, FileText, RefreshCw, Building2, Truck, AlertCircle, Pencil, Plus, X, Loader2, Bell, Link2, Eye, EyeOff, Copy, Check, Ruler, Clock, GitBranch } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { usePermissions } from '@/lib/usePermissions';
 import { useDepartments } from '@/lib/useDepartments';
-import { useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement } from '@/lib/useLookups';
+import { useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement, useComplaintStatuses } from '@/lib/useLookups';
 
 const SLA_DEFAULT = { first_response: 2, low: 72, medium: 48, high: 24, urgent: 6, stale_alert_hours: 24 };
 const AUTO_CLOSE_DEFAULT = { enabled: false, delay_amount: 1, delay_unit: 'days' };
+const ROUTING_DEFAULT = { enabled: false, default_department_id: '', default_status_id: '', rules: [] };
 
 function formatAutoCloseDelay({ delay_amount, delay_unit }) {
   const unit = delay_unit === 'hours'
@@ -54,6 +55,8 @@ export default function Settings() {
   const [ssoForm, setSsoForm] = useState({ api_key: '', issuer_url: '', enabled: false });
   const [autoCloseOpen, setAutoCloseOpen] = useState(false);
   const [autoCloseForm, setAutoCloseForm] = useState(AUTO_CLOSE_DEFAULT);
+  const [routingOpen, setRoutingOpen] = useState(false);
+  const [routingForm, setRoutingForm] = useState(ROUTING_DEFAULT);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
@@ -67,6 +70,7 @@ export default function Settings() {
   const { data: couriers = [], refetch: refetchCouriers } = useCouriers();
   const { data: unitsOfMeasurement = [], refetch: refetchUnitsOfMeasurement } = useUnitsOfMeasurement();
   const { data: priorities = [], refetch: refetchPriorities } = usePriorities();
+  const { data: complaintStatuses = [] } = useComplaintStatuses();
 
   const lookupData = {
     departments,
@@ -149,6 +153,65 @@ export default function Settings() {
   };
 
   const autoClose = getAutoClose();
+
+  const getRouting = () => {
+    const found = configs.find(c => c.key === 'complaint_routing');
+    const raw = found?.json_value ?? {};
+    return {
+      enabled: raw.enabled ?? false,
+      default_department_id: raw.default_department_id ? String(raw.default_department_id) : '',
+      default_status_id: raw.default_status_id ? String(raw.default_status_id) : '',
+      rules: Array.isArray(raw.rules) ? raw.rules : [],
+    };
+  };
+
+  const openRouting = () => {
+    const saved = getRouting();
+    const rules = complaintTypes.map((type) => {
+      const existing = saved.rules.find((rule) => String(rule.complaint_type_id) === String(type.id));
+      return {
+        complaint_type_id: String(type.id),
+        complaint_type_name: type.name,
+        department_id: existing?.department_id ? String(existing.department_id) : '',
+        status_id: existing?.status_id ? String(existing.status_id) : '',
+      };
+    });
+    setRoutingForm({ ...saved, rules });
+    setRoutingOpen(true);
+  };
+
+  const saveRouting = async () => {
+    setSaving(true);
+    const payload = {
+      enabled: !!routingForm.enabled,
+      default_department_id: routingForm.default_department_id || null,
+      default_status_id: routingForm.default_status_id || null,
+      rules: routingForm.rules
+        .filter((rule) => rule.department_id || rule.status_id)
+        .map((rule) => ({
+          complaint_type_id: rule.complaint_type_id,
+          department_id: rule.department_id || null,
+          status_id: rule.status_id || null,
+        })),
+    };
+    const existing = configs.find(c => c.key === 'complaint_routing');
+    if (existing) {
+      await db.entities.SystemConfig.update(existing.id, { json_value: payload });
+    } else {
+      await db.entities.SystemConfig.create({
+        key: 'complaint_routing',
+        label: 'Complaint Routing',
+        json_value: payload,
+      });
+    }
+    queryClient.invalidateQueries({ queryKey: ['system_configs'] });
+    toast.success('Complaint routing saved');
+    setSaving(false);
+    setRoutingOpen(false);
+  };
+
+  const routing = getRouting();
+  const routingRuleCount = routing.rules.filter((rule) => rule.department_id || rule.status_id).length;
 
   const getSso = () => {
     const found = configs.find(c => c.key === 'nexus_sso');
@@ -351,6 +414,54 @@ export default function Settings() {
               { label: 'Status', value: autoClose.enabled ? 'Active' : 'Inactive' },
               { label: 'Close after', value: autoClose.enabled ? formatAutoCloseDelay(autoClose) : '—' },
               { label: 'Action', value: 'Auto-close Delivered tickets' },
+            ].map(row => (
+              <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-border last:border-0">
+                <span className="text-sm">{row.label}</span>
+                <span className="text-xs text-muted-foreground">{row.value}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Complaint Routing */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2">
+                <GitBranch className="w-4 h-4" />Complaint Routing
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Badge variant={routing.enabled ? 'default' : 'secondary'} className="text-[10px]">
+                  {routing.enabled ? 'Enabled' : 'Disabled'}
+                </Badge>
+                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={openRouting} disabled={!canManage}>
+                  <Pencil className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {[
+              {
+                label: 'Status',
+                value: routing.enabled ? 'Active' : 'Inactive',
+              },
+              {
+                label: 'Type rules',
+                value: routing.enabled ? `${routingRuleCount} configured` : '—',
+              },
+              {
+                label: 'Default department',
+                value: routing.default_department_id
+                  ? (departments.find((d) => String(d.id) === String(routing.default_department_id))?.name ?? '—')
+                  : '—',
+              },
+              {
+                label: 'Default status',
+                value: routing.default_status_id
+                  ? (complaintStatuses.find((s) => String(s.id) === String(routing.default_status_id))?.name ?? '—')
+                  : '—',
+              },
             ].map(row => (
               <div key={row.label} className="flex justify-between items-center py-1.5 border-b border-border last:border-0">
                 <span className="text-sm">{row.label}</span>
@@ -604,6 +715,142 @@ export default function Settings() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setAutoCloseOpen(false)}>Cancel</Button>
             <Button onClick={saveAutoClose} disabled={saving}>
+              {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complaint Routing Dialog */}
+      <Dialog open={routingOpen} onOpenChange={setRoutingOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
+          <DialogHeader className="shrink-0 border-b px-6 py-4 pr-12">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <GitBranch className="w-4 h-4" />Complaint Routing
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            <div className="rounded-lg bg-muted/50 border p-3 text-xs text-muted-foreground">
+              When enabled, new tickets are automatically assigned to a department and set to an initial status based on complaint type. Per-type rules override defaults.
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="routing-enabled" className="text-sm">Enable complaint routing</Label>
+              <Switch
+                id="routing-enabled"
+                checked={!!routingForm.enabled}
+                onCheckedChange={checked => setRoutingForm(p => ({ ...p, enabled: checked }))}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Default department (fallback)</Label>
+                <Select
+                  value={routingForm.default_department_id || '__none__'}
+                  onValueChange={value => setRoutingForm(p => ({
+                    ...p,
+                    default_department_id: value === '__none__' ? '' : value,
+                  }))}
+                  disabled={!routingForm.enabled}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Default status (fallback)</Label>
+                <Select
+                  value={routingForm.default_status_id || '__none__'}
+                  onValueChange={value => setRoutingForm(p => ({
+                    ...p,
+                    default_status_id: value === '__none__' ? '' : value,
+                  }))}
+                  disabled={!routingForm.enabled}
+                >
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None (use New Complaint)</SelectItem>
+                    {complaintStatuses.map((status) => (
+                      <SelectItem key={status.id} value={String(status.id)}>{status.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs">Rules by complaint type</Label>
+              <div className="rounded-lg border overflow-hidden">
+                <div className="grid grid-cols-[1fr_1fr_1fr] gap-2 px-3 py-2 bg-muted/50 text-[11px] font-medium text-muted-foreground">
+                  <span>Complaint Type</span>
+                  <span>Assign Department</span>
+                  <span>Initial Status</span>
+                </div>
+                <div className="divide-y max-h-72 overflow-y-auto">
+                  {routingForm.rules.map((rule, index) => (
+                    <div key={rule.complaint_type_id} className="grid grid-cols-[1fr_1fr_1fr] gap-2 px-3 py-2 items-center">
+                      <span className="text-sm truncate" title={rule.complaint_type_name}>{rule.complaint_type_name}</span>
+                      <Select
+                        value={rule.department_id || '__none__'}
+                        onValueChange={value => setRoutingForm(p => ({
+                          ...p,
+                          rules: p.rules.map((item, i) => i === index
+                            ? { ...item, department_id: value === '__none__' ? '' : value }
+                            : item),
+                        }))}
+                        disabled={!routingForm.enabled}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Default" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Use default</SelectItem>
+                          {departments.map((dept) => (
+                            <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select
+                        value={rule.status_id || '__none__'}
+                        onValueChange={value => setRoutingForm(p => ({
+                          ...p,
+                          rules: p.rules.map((item, i) => i === index
+                            ? { ...item, status_id: value === '__none__' ? '' : value }
+                            : item),
+                        }))}
+                        disabled={!routingForm.enabled}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Default" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">Use default</SelectItem>
+                          {complaintStatuses.map((status) => (
+                            <SelectItem key={status.id} value={String(status.id)}>{status.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="shrink-0 border-t px-6 py-4 bg-background">
+            <Button variant="outline" onClick={() => setRoutingOpen(false)}>Cancel</Button>
+            <Button onClick={saveRouting} disabled={saving}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save
             </Button>
           </DialogFooter>

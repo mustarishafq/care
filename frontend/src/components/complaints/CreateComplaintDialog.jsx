@@ -10,8 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateTicketId } from '@/lib/ticketUtils';
-import { findDepartmentIdByName, useDepartments } from '@/lib/useDepartments';
-import { findIdByName, useComplaintStatuses, useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement } from '@/lib/useLookups';
+import { findIdByName, useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement } from '@/lib/useLookups';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Loader2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
@@ -39,7 +38,6 @@ const EMPTY_FORM = {
   courier_id: '',
   tracking_number: '',
   priority_id: '',
-  assigned_department_id: '',
   proof_files: [],
 };
 
@@ -49,12 +47,10 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
-  const { data: departments = [] } = useDepartments();
   const { data: complaintTypes = [] } = useComplaintTypes();
   const { data: couriers = [] } = useCouriers();
   const { data: priorities = [] } = usePriorities();
   const { data: unitsOfMeasurement = [] } = useUnitsOfMeasurement();
-  const { data: complaintStatuses = [] } = useComplaintStatuses();
   const [form, setForm] = useState(EMPTY_FORM);
 
   const { data: products = [] } = useQuery({
@@ -68,9 +64,8 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     setForm({
       ...EMPTY_FORM,
       priority_id: findIdByName(priorities, 'Medium') || '',
-      assigned_department_id: findDepartmentIdByName(departments, 'Customer Service') || '',
     });
-  }, [open, priorities, departments]);
+  }, [open, priorities]);
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
 
@@ -155,13 +150,11 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       complaint_type_id: form.complaint_type_id,
       description: form.description,
       proof_files: form.proof_files.map((file) => file.path),
-      assigned_department_id: form.assigned_department_id || findDepartmentIdByName(departments, 'Customer Service') || null,
       assigned_user_id: user?.id || null,
       courier_id: form.courier_id || null,
       tracking_number: form.tracking_number,
       priority_id: form.priority_id || findIdByName(priorities, 'Medium') || null,
       ticket_id: ticketId,
-      status_id: findIdByName(complaintStatuses, 'New Complaint'),
     };
     const created = await db.entities.Complaint.create(complaintData);
     await db.entities.TicketActivity.create({
@@ -175,14 +168,14 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       ...created,
       complaint_type: created.complaint_type ?? complaintTypes.find((t) => String(t.id) === String(form.complaint_type_id))?.name,
       priority: created.priority ?? priorities.find((p) => String(p.id) === String(form.priority_id))?.name,
-      assigned_department: created.assigned_department ?? departments.find((d) => String(d.id) === String(form.assigned_department_id))?.name,
+      assigned_department: created.assigned_department,
       assigned_user_name: created.assigned_user_name ?? user?.full_name,
       customer_name: created.customer_name ?? form.customer_name,
       order_number: created.order_number ?? form.order_number,
       order_source: created.order_source ?? form.order_source,
       purchase_date: created.purchase_date ?? form.purchase_date,
       tracking_number: created.tracking_number ?? form.tracking_number,
-      status: created.status ?? complaintStatuses.find((s) => String(s.id) === String(complaintData.status_id))?.name,
+      status: created.status,
       affected_products: (created.affected_products ?? []).map((item) => ({
         ...item,
         product_name: item.product_name ?? products.find((p) => String(p.id) === String(item.product_id))?.name,

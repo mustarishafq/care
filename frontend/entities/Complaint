@@ -75,6 +75,7 @@
         "Wrong Item",
         "Leakage",
         "Packaging Damage",
+        "Parcel Not Arrived",
         "Other"
       ],
       "description": "Type of complaint"
