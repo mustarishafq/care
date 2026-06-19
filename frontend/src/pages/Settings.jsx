@@ -39,6 +39,7 @@ import {
   SLA_DEFAULT,
 } from '@/components/settings/constants';
 import { getPausedStatusNames, normalizeSlaSettings, togglePausedStatusId } from '@/lib/slaSettings';
+import { DEFAULT_STATUS_COLOR, defaultColorForIndex } from '@/lib/statusColors';
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -253,7 +254,13 @@ export default function Settings() {
     try {
       const result = await lookupRefetchers[section.key]?.();
       const items = result?.data ?? lookupData[section.key] ?? [];
-      setLookupItems(items.map((item) => ({ id: String(item.id), name: item.name })));
+      setLookupItems(items.map((item, index) => ({
+        id: String(item.id),
+        name: item.name,
+        ...(section.key === 'complaint_statuses'
+          ? { color: item.color || defaultColorForIndex(index) }
+          : {}),
+      })));
     } catch (err) {
       toast.error(err.message || `Failed to load ${section.label}`);
       setLookupOpen(false);
@@ -284,10 +291,14 @@ export default function Settings() {
       for (const [index, item] of lookupItems.entries()) {
         const name = item.name.trim();
         if (!name) continue;
+        const payload = { name, sort_order: index };
+        if (lookupMeta.key === 'complaint_statuses') {
+          payload.color = item.color || DEFAULT_STATUS_COLOR;
+        }
         if (item.id) {
-          await db.entities[lookupMeta.entity].update(item.id, { name, sort_order: index });
+          await db.entities[lookupMeta.entity].update(item.id, payload);
         } else {
-          await db.entities[lookupMeta.entity].create({ name, sort_order: index, is_active: true });
+          await db.entities[lookupMeta.entity].create({ ...payload, is_active: true });
         }
       }
 
@@ -303,7 +314,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6 max-w-6xl">
+    <div className="space-y-6">
       <PageHeader
         icon={Settings2}
         title="Settings"

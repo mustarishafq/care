@@ -266,6 +266,7 @@ export default function Kanban() {
         onOpenChange={setColumnOrderOpen}
         columnOrder={columnOrder}
         defaultOrder={statusOrder}
+        complaintStatuses={complaintStatuses}
         onSave={saveColumnOrder}
       />
 
@@ -275,12 +276,12 @@ export default function Kanban() {
             const rawCards = visibleComplaints.filter(c => c.status === status);
             const sortBy = columnSorts[status] || 'date_desc';
             const cards = sortCards(rawCards, sortBy, priorityOrder);
-            const colors = getStatusColors(status);
+            const colors = getStatusColors(status, complaintStatuses);
             return (
               <div key={status} className="shrink-0 w-[270px]" data-kanban-status={status}>
-                <div className={`flex items-center gap-2 px-3 py-2 rounded-t-lg ${colors.bg}`}>
-                  <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
-                  <span className={`text-xs font-semibold ${colors.text}`}>{status}</span>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-t-lg" style={colors.badge}>
+                  <span className="w-2 h-2 rounded-full shrink-0" style={colors.dot} />
+                  <span className="text-xs font-semibold">{status}</span>
                   <Badge variant="secondary" className="ml-auto text-[10px] h-5">{cards.length}</Badge>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

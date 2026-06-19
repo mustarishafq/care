@@ -1,6 +1,6 @@
 import { db } from '@/api/db';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,13 +12,31 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Package, Search, Loader2 } from 'lucide-react';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Plus, Pencil, Trash2, Package, Search, Loader2,
+  PackageCheck, PackageX, MoreHorizontal,
+} from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
+import StatCard from '@/components/dashboard/StatCard';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/lib/usePermissions';
 
-const emptyProduct = { name: '', sku: '', category_id: '', description: '', is_active: true };
+const EMPTY_FILTERS = { search: '', status: '' };
+const emptyProduct = { name: '', sku: '', description: '', is_active: true };
+
+function productInitials(name) {
+  return (name || '??')
+    .split(' ')
+    .map(w => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 export default function Products() {
   const queryClient = useQueryClient();
@@ -28,73 +46,125 @@ export default function Products() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [form, setForm] = useState(emptyProduct);
   const [saving, setSaving] = useState(false);
-  const [search, setSearch] = useState('');
+  const [actionProductId, setActionProductId] = useState(null);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: () => db.entities.Product.list('name', 500),
   });
 
-  const { data: categories = [] } = useQuery({
-    queryKey: ['product_categories'],
-    queryFn: () => db.entities.ProductCategory.list('sort_order'),
-  });
+  const stats = useMemo(() => ({
+    total: products.length,
+    active: products.filter(p => p.is_active !== false).length,
+    inactive: products.filter(p => p.is_active === false).length,
+  }), [products]);
 
-  const filtered = products.filter(p =>
-    !search || `${p.name} ${p.sku} ${p.category}`.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = useMemo(() => {
+    const search = filters.search.trim().toLowerCase();
+    return products.filter(p => {
+      if (filters.status === 'active' && p.is_active === false) return false;
+      if (filters.status === 'inactive' && p.is_active !== false) return false;
+      if (search) {
+        const haystack = `${p.name || ''} ${p.sku || ''} ${p.description || ''}`.toLowerCase();
+        if (!haystack.includes(search)) return false;
+      }
+      return true;
+    });
+  }, [products, filters]);
 
-  const openCreate = () => { setEditingProduct(null); setForm(emptyProduct); setDialogOpen(true); };
+  const hasActiveFilters = Object.values(filters).some(Boolean);
+
+  const openCreate = () => {
+    setEditingProduct(null);
+    setForm(emptyProduct);
+    setDialogOpen(true);
+  };
+
   const openEdit = (p) => {
     setEditingProduct(p);
     setForm({
       name: p.name,
       sku: p.sku || '',
-      category_id: p.category_id || '',
       description: p.description || '',
       is_active: p.is_active !== false,
     });
     setDialogOpen(true);
   };
 
+  const invalidateProducts = () => queryClient.invalidateQueries({ queryKey: ['products'] });
+
   const handleSave = async () => {
-    if (!form.name.trim()) { toast.error('Product name is required'); return; }
-    setSaving(true);
-    const payload = {
-      ...form,
-      category_id: form.category_id || null,
-    };
-    if (editingProduct) {
-      await db.entities.Product.update(editingProduct.id, payload);
-      toast.success('Product updated');
-    } else {
-      await db.entities.Product.create(payload);
-      toast.success('Product created');
+    if (!form.name.trim()) {
+      toast.error('Product name is required');
+      return;
     }
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    setSaving(false);
-    setDialogOpen(false);
+    setSaving(true);
+    try {
+      if (editingProduct) {
+        await db.entities.Product.update(editingProduct.id, form);
+        toast.success('Product updated');
+      } else {
+        await db.entities.Product.create(form);
+        toast.success('Product created');
+      }
+      invalidateProducts();
+      setDialogOpen(false);
+    } catch (err) {
+      toast.error(err.message || 'Failed to save product');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = async (id) => {
-    await db.entities.Product.delete(id);
-    queryClient.invalidateQueries({ queryKey: ['products'] });
-    toast.success('Product deleted');
+  const handleDelete = async (product) => {
+    if (!window.confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
+    setActionProductId(product.id);
+    try {
+      await db.entities.Product.delete(product.id);
+      invalidateProducts();
+      toast.success('Product deleted');
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete product');
+    } finally {
+      setActionProductId(null);
+    }
   };
 
   const handleToggleActive = async (product) => {
-    await db.entities.Product.update(product.id, { is_active: !product.is_active });
-    queryClient.invalidateQueries({ queryKey: ['products'] });
+    setActionProductId(product.id);
+    try {
+      const active = product.is_active === false;
+      await db.entities.Product.update(product.id, { is_active: !active });
+      invalidateProducts();
+      toast.success(`${product.name} ${active ? 'activated' : 'deactivated'}`);
+    } catch (err) {
+      toast.error(err.message || 'Failed to update status');
+    } finally {
+      setActionProductId(null);
+    }
   };
 
-  if (isLoading || permLoading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" /></div>;
+  if (isLoading || permLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const colSpan = canManage ? 4 : 3;
 
   return (
     <div className="space-y-6">
       <PageHeader
         icon={Package}
         title="Products"
-        description={`${products.length} products in catalog`}
+        description={
+          hasActiveFilters
+            ? `${filtered.length} of ${products.length} products`
+            : `${products.length} products in catalog`
+        }
         actions={canManage ? (
           <Button onClick={openCreate} className="gap-2 h-10 w-full sm:w-auto sm:h-9 shadow-md shadow-primary/20 hover:shadow-primary/30">
             <Plus className="w-4 h-4" />Add Product
@@ -102,9 +172,37 @@ export default function Products() {
         ) : null}
       />
 
-      <div className="relative max-w-sm">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input className="pl-9" placeholder="Search products..." value={search} onChange={e => setSearch(e.target.value)} />
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <StatCard label="Total Products" value={stats.total} icon={Package} color="primary" />
+        <StatCard label="Active" value={stats.active} icon={PackageCheck} color="success" />
+        <StatCard label="Inactive" value={stats.inactive} icon={PackageX} color="danger" />
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-3">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            className="pl-9"
+            placeholder="Search by name, SKU, or description..."
+            value={filters.search}
+            onChange={e => setFilters(p => ({ ...p, search: e.target.value }))}
+          />
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Select value={filters.status || 'all'} onValueChange={v => setFilters(p => ({ ...p, status: v === 'all' ? '' : v }))}>
+            <SelectTrigger className="w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
+              Clear filters
+            </Button>
+          )}
+        </div>
       </div>
 
       <Card className="rounded-2xl">
@@ -114,47 +212,101 @@ export default function Products() {
               <TableRow className="bg-muted/50">
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Product</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">SKU</TableHead>
-                <TableHead className="font-semibold text-xs uppercase tracking-wider">Category</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
-                {canManage && <TableHead className="font-semibold text-xs uppercase tracking-wider w-24">Actions</TableHead>}
+                {canManage && <TableHead className="font-semibold text-xs uppercase tracking-wider w-28">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(p => (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Package className="w-4 h-4 text-primary" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-sm">{p.name}</p>
-                        {p.description && <p className="text-xs text-muted-foreground truncate max-w-[200px]">{p.description}</p>}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-sm font-mono">{p.sku || '—'}</TableCell>
-                  <TableCell>
-                    {p.category ? <Badge variant="secondary" className="text-xs">{p.category}</Badge> : <span className="text-muted-foreground text-sm">—</span>}
-                  </TableCell>
-                  <TableCell>
-                    <Switch checked={p.is_active !== false} onCheckedChange={() => handleToggleActive(p)} disabled={!canManage} />
-                  </TableCell>
-                  {canManage && (
+              {filtered.map(p => {
+                const isActive = p.is_active !== false;
+                const isBusy = actionProductId === p.id;
+                return (
+                  <TableRow key={p.id} className={!isActive ? 'opacity-70' : undefined}>
                     <TableCell>
-                      <div className="flex gap-1">
-                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(p)}><Pencil className="w-3.5 h-3.5" /></Button>
-                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => handleDelete(p.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-[10px] font-bold text-primary">{productInitials(p.name)}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm">{p.name}</p>
+                          {p.description && (
+                            <p className="text-xs text-muted-foreground truncate max-w-[280px]">{p.description}</p>
+                          )}
+                        </div>
                       </div>
                     </TableCell>
-                  )}
-                </TableRow>
-              ))}
+                    <TableCell>
+                      {p.sku
+                        ? <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{p.sku}</code>
+                        : <span className="text-muted-foreground text-sm">—</span>
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {canManage ? (
+                          <Switch
+                            checked={isActive}
+                            onCheckedChange={() => handleToggleActive(p)}
+                            disabled={isBusy}
+                          />
+                        ) : (
+                          <Badge className={`text-xs border-0 w-fit ${isActive
+                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {isActive ? 'Active' : 'Inactive'}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    {canManage && (
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="icon" variant="ghost" className="h-8 w-8" disabled={isBusy}>
+                              {isBusy
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <MoreHorizontal className="w-4 h-4" />
+                              }
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => openEdit(p)}>
+                              <Pencil className="w-4 h-4 mr-2" />Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => handleDelete(p)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center py-10 text-muted-foreground">
-                    <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    {search ? 'No products match your search' : 'No products yet. Add your first product.'}
+                  <TableCell colSpan={colSpan} className="text-center py-12 text-muted-foreground">
+                    <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                    <p className="font-medium">
+                      {hasActiveFilters ? 'No products match your filters' : 'No products yet'}
+                    </p>
+                    <p className="text-sm mt-1">
+                      {hasActiveFilters
+                        ? 'Try adjusting your search or filters.'
+                        : canManage
+                          ? 'Add your first product to get started.'
+                          : 'Products will appear here once added.'}
+                    </p>
+                    {canManage && !hasActiveFilters && (
+                      <Button onClick={openCreate} variant="outline" size="sm" className="mt-4 gap-2">
+                        <Plus className="w-4 h-4" />Add Product
+                      </Button>
+                    )}
                   </TableCell>
                 </TableRow>
               )}
@@ -168,40 +320,45 @@ export default function Products() {
           <DialogHeader>
             <DialogTitle>{editingProduct ? 'Edit Product' : 'Add Product'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="space-y-1.5">
               <Label className="text-xs">Product Name *</Label>
-              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="Product name" />
+              <Input
+                value={form.name}
+                onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                placeholder="e.g. Organic Almond Milk 1L"
+                autoFocus
+              />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs">SKU</Label>
-                <Input value={form.sku} onChange={e => setForm(p => ({ ...p, sku: e.target.value }))} placeholder="SKU-XXX-001" />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Category</Label>
-                <Select value={String(form.category_id || '')} onValueChange={v => setForm(p => ({ ...p, category_id: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                  <SelectContent>
-                    {categories.map(cat => (
-                      <SelectItem key={cat.id} value={String(cat.id)}>{cat.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">SKU</Label>
+              <Input
+                value={form.sku}
+                onChange={e => setForm(p => ({ ...p, sku: e.target.value }))}
+                placeholder="SKU-XXX-001"
+                className="font-mono"
+              />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Description</Label>
-              <Textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Optional description" rows={2} />
+              <Textarea
+                value={form.description}
+                onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                placeholder="Optional product details"
+                rows={3}
+              />
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <Label className="text-sm">Active</Label>
+                <p className="text-xs text-muted-foreground">Inactive products are hidden from complaint forms</p>
+              </div>
               <Switch checked={form.is_active} onCheckedChange={v => setForm(p => ({ ...p, is_active: v }))} />
-              <Label className="text-xs">Active</Label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={saving}>
+            <Button onClick={handleSave} disabled={saving || !form.name.trim()}>
               {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
               {editingProduct ? 'Save Changes' : 'Add Product'}
             </Button>

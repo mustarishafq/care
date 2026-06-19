@@ -1,3 +1,6 @@
+import { DEFAULT_SLA_PAUSED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
+import { getStatusColorStyles } from '@/lib/statusColors';
+
 export function generateTicketId() {
   const now = new Date();
   const y = now.getFullYear().toString().slice(-2);
@@ -22,8 +25,6 @@ export const STATUS_ORDER = [
   'Drop',
 ];
 
-import { DEFAULT_SLA_PAUSED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
-
 /** @deprecated Use settings from useSlaSettings() instead */
 export const SLA_PAUSED_STATUSES = DEFAULT_SLA_PAUSED_STATUS_NAMES;
 
@@ -41,29 +42,9 @@ export function hasClosureProof(complaint) {
   return Array.isArray(complaint?.closure_proof_files) && complaint.closure_proof_files.length > 0;
 }
 
-export const STATUS_COLORS = {
-  'New Complaint': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
-  'Under Review': { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
-  'Waiting for Customer': { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
-  'Waiting for Vendor': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500' },
-  'Approved Replacement': { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
-  'Rejected': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-500' },
-  'Reprocessing by Fulfillment': { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
-  'Ready to Ship': { bg: 'bg-cyan-100 dark:bg-cyan-900/30', text: 'text-cyan-700 dark:text-cyan-300', dot: 'bg-cyan-500' },
-  'Shipped': { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-300', dot: 'bg-indigo-500' },
-  'Delivered': { bg: 'bg-teal-100 dark:bg-teal-900/30', text: 'text-teal-700 dark:text-teal-300', dot: 'bg-teal-500' },
-  'Closed': { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-700 dark:text-gray-300', dot: 'bg-gray-500' },
-  'Drop': { bg: 'bg-slate-100 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-300', dot: 'bg-slate-500' },
-};
-
-export const DEFAULT_STATUS_COLORS = {
-  bg: 'bg-muted',
-  text: 'text-muted-foreground',
-  dot: 'bg-muted-foreground',
-};
-
-export function getStatusColors(status) {
-  return STATUS_COLORS[status] ?? DEFAULT_STATUS_COLORS;
+/** @deprecated Use getStatusColorStyles() with complaint statuses from the API. */
+export function getStatusColors(status, statuses = []) {
+  return getStatusColorStyles(status, statuses);
 }
 
 export const PRIORITY_COLORS = {

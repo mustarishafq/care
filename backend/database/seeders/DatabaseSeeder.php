@@ -93,10 +93,29 @@ class DatabaseSeeder extends Seeder
             'Drop',
         ];
 
+        $defaultStatusColors = [
+            'New Complaint' => '#3b82f6',
+            'Under Review' => '#f59e0b',
+            'Waiting for Customer' => '#f97316',
+            'Waiting for Vendor' => '#eab308',
+            'Approved Replacement' => '#10b981',
+            'Rejected' => '#ef4444',
+            'Reprocessing by Fulfillment' => '#a855f7',
+            'Ready to Ship' => '#06b6d4',
+            'Shipped' => '#6366f1',
+            'Delivered' => '#14b8a6',
+            'Closed' => '#6b7280',
+            'Drop' => '#64748b',
+        ];
+
         foreach ($defaultStatuses as $index => $name) {
             ComplaintStatus::firstOrCreate(
                 ['name' => $name],
-                ['is_active' => true, 'sort_order' => $index]
+                [
+                    'color' => $defaultStatusColors[$name] ?? '#6b7280',
+                    'is_active' => true,
+                    'sort_order' => $index,
+                ]
             );
         }
 

@@ -1,5 +1,6 @@
 import React from 'react';
-import { STATUS_COLORS, buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
+import { buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
+import { getStatusColorStyles } from '@/lib/statusColors';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { CheckCircle2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -9,11 +10,11 @@ export default function StatusProgressBar({ currentStatus }) {
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [currentStatus] });
 
   if (TERMINAL_STATUSES.includes(currentStatus)) {
-    const colors = STATUS_COLORS[currentStatus] ?? STATUS_COLORS.Rejected;
+    const colors = getStatusColorStyles(currentStatus, complaintStatuses);
     return (
       <div className="flex items-center gap-2 py-2">
-        <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${colors.bg} ${colors.text}`}>
-          <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+        <div className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full" style={colors.badge}>
+          <span className="w-2 h-2 rounded-full shrink-0" style={colors.dot} />
           {currentStatus}
         </div>
       </div>
@@ -29,17 +30,21 @@ export default function StatusProgressBar({ currentStatus }) {
         {steps.map((step, i) => {
           const isPast = i < activeIndex;
           const isCurrent = i === activeIndex;
+          const stepColors = getStatusColorStyles(step, complaintStatuses);
           return (
             <React.Fragment key={step}>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full whitespace-nowrap shrink-0 cursor-default ${
-                    isPast ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' :
-                    isCurrent ? `${STATUS_COLORS[step]?.bg} ${STATUS_COLORS[step]?.text}` :
-                    'bg-muted text-muted-foreground'
-                  }`}>
+                  <div
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-full whitespace-nowrap shrink-0 cursor-default ${
+                      isPast ? 'bg-emerald-100 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300' :
+                      isCurrent ? '' :
+                      'bg-muted text-muted-foreground'
+                    }`}
+                    style={isCurrent ? stepColors.badge : undefined}
+                  >
                     {isPast && <CheckCircle2 className="w-3 h-3" />}
-                    {isCurrent && <span className="w-2 h-2 rounded-full bg-current animate-pulse" />}
+                    {isCurrent && <span className="w-2 h-2 rounded-full animate-pulse" style={stepColors.dot} />}
                     <span className="hidden sm:inline">{step}</span>
                   </div>
                 </TooltipTrigger>

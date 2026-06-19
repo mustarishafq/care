@@ -7,6 +7,7 @@ import { useNotifications } from '@/lib/useNotifications';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Bell, CheckCheck, FileText, RefreshCw, AlertTriangle, Clock, UserPlus } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import { format } from 'date-fns';
@@ -59,42 +60,66 @@ export default function Notifications() {
         ) : null}
       />
 
-      <div className="space-y-2">
-        {notifications.length === 0 && (
+      <div className="mx-auto w-full max-w-2xl">
+        {notifications.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
             <Bell className="w-10 h-10 mx-auto mb-3 opacity-30" />
             <p>No notifications yet</p>
           </div>
+        ) : (
+          <Card className="rounded-2xl overflow-hidden">
+            <CardContent className="p-0 divide-y">
+              {notifications.map(n => {
+                const Icon = TYPE_ICONS[n.type] || Bell;
+                return (
+                  <div
+                    key={n.id}
+                    className={`flex items-start gap-3 px-4 py-3.5 sm:px-5 ${!n.is_read ? 'bg-primary/5' : ''}`}
+                  >
+                    <div className={`p-2 rounded-lg shrink-0 mt-0.5 ${!n.is_read ? 'bg-primary/10' : 'bg-muted'}`}>
+                      <Icon className={`w-4 h-4 ${!n.is_read ? 'text-primary' : 'text-muted-foreground'}`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-2">
+                        <p className={`text-sm leading-snug ${!n.is_read ? 'font-semibold' : 'font-medium'}`}>
+                          {n.title}
+                        </p>
+                        {!n.is_read && (
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0 shrink-0">New</Badge>
+                        )}
+                      </div>
+                      {n.message && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{n.message}</p>
+                      )}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(n.created_date), 'MMM dd, yyyy HH:mm')}
+                        </span>
+                        {n.complaint_id && (
+                          <Link
+                            to={`/complaints/${n.complaint_id}`}
+                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                          >
+                            <FileText className="w-3 h-3" />View ticket
+                          </Link>
+                        )}
+                        {!n.is_read && (
+                          <button
+                            type="button"
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                            onClick={() => markRead(n.id)}
+                          >
+                            Mark read
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </CardContent>
+          </Card>
         )}
-        {notifications.map(n => {
-          const Icon = TYPE_ICONS[n.type] || Bell;
-          return (
-            <Card key={n.id} className={`transition-colors ${!n.is_read ? 'bg-primary/5 border-primary/20' : ''}`}>
-              <CardContent className="flex items-start gap-3 py-3 px-4">
-                <div className={`p-2 rounded-lg shrink-0 ${!n.is_read ? 'bg-primary/10' : 'bg-muted'}`}>
-                  <Icon className={`w-4 h-4 ${!n.is_read ? 'text-primary' : 'text-muted-foreground'}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm ${!n.is_read ? 'font-semibold' : 'font-medium'}`}>{n.title}</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">{n.message}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {format(new Date(n.created_date), 'MMM dd, yyyy HH:mm')}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {n.complaint_id && (
-                    <Link to={`/complaints/${n.complaint_id}`}>
-                      <Button variant="ghost" size="sm" className="text-xs"><FileText className="w-3 h-3 mr-1" />View</Button>
-                    </Link>
-                  )}
-                  {!n.is_read && (
-                    <Button variant="ghost" size="sm" className="text-xs" onClick={() => markRead(n.id)}>Mark Read</Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
       </div>
     </div>
   );

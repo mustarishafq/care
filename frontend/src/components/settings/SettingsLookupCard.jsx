@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { StatusBadgePreview } from '@/components/settings/StatusColorPreview';
 import { Pencil } from 'lucide-react';
 
 const PREVIEW_LIMIT = 8;
@@ -43,6 +44,15 @@ export default function SettingsLookupCard({ section, items = [], canManage, onE
       <CardContent>
         {items.length === 0 ? (
           <p className="text-xs text-muted-foreground">No items yet. Click to add.</p>
+        ) : section.key === 'complaint_statuses' ? (
+          <div className="flex flex-wrap gap-1.5">
+            {preview.map((item) => (
+              <StatusBadgePreview key={item.id} name={item.name} color={item.color} />
+            ))}
+            {remaining > 0 && (
+              <Badge variant="secondary" className="text-xs font-normal">+{remaining} more</Badge>
+            )}
+          </div>
         ) : (
           <div className="flex flex-wrap gap-1.5">
             {preview.map((item) => (

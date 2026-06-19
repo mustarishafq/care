@@ -12,6 +12,7 @@ class ComplaintStatusResource extends JsonResource
         return [
             'id' => (string) $this->id,
             'name' => $this->name,
+            'color' => $this->color,
             'is_active' => $this->is_active,
             'sort_order' => $this->sort_order,
         ];

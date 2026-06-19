@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { getStatusColors } from '@/lib/ticketUtils';
+import { getStatusColorStyles } from '@/lib/statusColors';
 import { GripVertical, RotateCcw } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
-export default function ColumnOrderDialog({ open, onOpenChange, columnOrder, defaultOrder, onSave }) {
+export default function ColumnOrderDialog({ open, onOpenChange, columnOrder, defaultOrder, complaintStatuses = [], onSave }) {
   const [order, setOrder] = useState(columnOrder);
 
   const onDragEnd = ({ destination, source }) => {
@@ -35,7 +35,7 @@ export default function ColumnOrderDialog({ open, onOpenChange, columnOrder, def
             {(provided) => (
               <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-1.5 mt-1">
                 {order.map((status, index) => {
-                  const colors = getStatusColors(status);
+                  const colors = getStatusColorStyles(status, complaintStatuses);
                   return (
                     <Draggable key={status} draggableId={status} index={index}>
                       {(provided, snapshot) => (
@@ -52,7 +52,7 @@ export default function ColumnOrderDialog({ open, onOpenChange, columnOrder, def
                           }`}
                         >
                           <GripVertical className="w-4 h-4 text-muted-foreground shrink-0" />
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${colors.dot}`} />
+                          <span className="w-2 h-2 rounded-full shrink-0" style={colors.dot} />
                           <span className="text-sm font-medium flex-1">{status}</span>
                           <span className="text-xs text-muted-foreground">#{index + 1}</span>
                         </div>

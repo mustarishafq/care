@@ -34,6 +34,8 @@ Route::prefix('v1')->group(function () {
 
     Route::post('webhook/tracking-update', [WebhookController::class, 'trackingUpdate'])->middleware('throttle:60,1');
 
+    Route::get('complaint-statuses', [ComplaintStatusController::class, 'index'])->middleware('throttle:60,1');
+
     Route::middleware(['auth:sanctum', EnsureUserIsApproved::class])->group(function () {
         Route::get('webhook/settings', [WebhookController::class, 'settings']);
         Route::patch('webhook/settings', [WebhookController::class, 'updateSettings']);
@@ -46,7 +48,7 @@ Route::prefix('v1')->group(function () {
 
         Route::apiResource('departments', DepartmentController::class);
         Route::apiResource('complaint-types', ComplaintTypeController::class);
-        Route::apiResource('complaint-statuses', ComplaintStatusController::class);
+        Route::apiResource('complaint-statuses', ComplaintStatusController::class)->except(['index']);
         Route::apiResource('couriers', CourierController::class);
         Route::apiResource('priorities', PriorityController::class);
         Route::apiResource('units-of-measurement', UnitOfMeasurementController::class);

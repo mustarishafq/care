@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Search, Package, Phone, AlertCircle, CheckCircle2, Clock, Truck, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { STATUS_COLORS, buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
+import { buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
+import { getStatusColorStyles } from '@/lib/statusColors';
 import { useComplaintStatuses } from '@/lib/useLookups';
 
 const STATUS_ICONS = {
@@ -30,10 +31,10 @@ function StatusProgressBar({ status }) {
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [status] });
 
   if (TERMINAL_STATUSES.includes(status)) {
-    const colors = STATUS_COLORS[status] ?? STATUS_COLORS.Rejected;
+    const colors = getStatusColorStyles(status, complaintStatuses);
     return (
       <div className="flex items-center gap-2 mt-4">
-        <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full ${colors.bg} ${colors.text}`}>
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full" style={colors.badge}>
           <AlertCircle className="w-4 h-4" /> {status}
         </span>
       </div>);
@@ -73,7 +74,8 @@ function StatusProgressBar({ status }) {
 }
 
 function ComplaintCard({ complaint }) {
-  const colors = STATUS_COLORS[complaint.status] || STATUS_COLORS['New Complaint'];
+  const { data: complaintStatuses = [] } = useComplaintStatuses();
+  const colors = getStatusColorStyles(complaint.status, complaintStatuses);
   const Icon = STATUS_ICONS[complaint.status] || Clock;
 
   return (
@@ -84,7 +86,7 @@ function ComplaintCard({ complaint }) {
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Ticket ID</p>
             <p className="text-lg font-bold font-mono">{complaint.ticket_id || complaint.id?.slice(0, 8).toUpperCase()}</p>
           </div>
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium ${colors.bg} ${colors.text}`}>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium" style={colors.badge}>
             <Icon className="w-4 h-4" />
             {complaint.status}
           </span>

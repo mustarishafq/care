@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ComplaintStatus extends Model
 {
-    protected $fillable = ['name', 'is_active', 'sort_order'];
+    protected $fillable = ['name', 'color', 'is_active', 'sort_order'];
 
     protected function casts(): array
     {

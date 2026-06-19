@@ -1,12 +1,15 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
-import { STATUS_COLORS } from '@/lib/ticketUtils';
+import { getStatusColorStyles } from '@/lib/statusColors';
+import { useComplaintStatuses } from '@/lib/useLookups';
 
 export default function StatusBadge({ status }) {
-  const colors = STATUS_COLORS[status] || STATUS_COLORS['New Complaint'];
+  const { data: complaintStatuses = [] } = useComplaintStatuses();
+  const colors = getStatusColorStyles(status, complaintStatuses);
+
   return (
-    <Badge className={`${colors.bg} ${colors.text} border-0 text-xs font-medium gap-1.5`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
+    <Badge className="border-0 text-xs font-medium gap-1.5" style={colors.badge}>
+      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={colors.dot} />
       {status}
     </Badge>
   );
