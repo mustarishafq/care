@@ -11,19 +11,28 @@ export const STATUS_ORDER = [
   'New Complaint',
   'Under Review',
   'Waiting for Customer',
+  'Waiting for Vendor',
   'Approved Replacement',
   'Rejected',
   'Reprocessing by Fulfillment',
   'Ready to Ship',
   'Shipped',
   'Delivered',
-  'Closed'
+  'Closed',
+  'Drop',
 ];
+
+export const SLA_PAUSED_STATUSES = ['Waiting for Customer', 'Waiting for Vendor'];
+
+export const SLA_CLOSED_STATUSES = ['Delivered', 'Closed', 'Rejected', 'Drop'];
+
+export const TERMINAL_STATUSES = ['Rejected', 'Drop'];
 
 export const STATUS_COLORS = {
   'New Complaint': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', dot: 'bg-blue-500' },
   'Under Review': { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', dot: 'bg-amber-500' },
   'Waiting for Customer': { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500' },
+  'Waiting for Vendor': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500' },
   'Approved Replacement': { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
   'Rejected': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', dot: 'bg-red-500' },
   'Reprocessing by Fulfillment': { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500' },
@@ -31,6 +40,7 @@ export const STATUS_COLORS = {
   'Shipped': { bg: 'bg-indigo-100 dark:bg-indigo-900/30', text: 'text-indigo-700 dark:text-indigo-300', dot: 'bg-indigo-500' },
   'Delivered': { bg: 'bg-teal-100 dark:bg-teal-900/30', text: 'text-teal-700 dark:text-teal-300', dot: 'bg-teal-500' },
   'Closed': { bg: 'bg-gray-100 dark:bg-gray-900/30', text: 'text-gray-700 dark:text-gray-300', dot: 'bg-gray-500' },
+  'Drop': { bg: 'bg-slate-100 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-300', dot: 'bg-slate-500' },
 };
 
 export const PRIORITY_COLORS = {
@@ -74,27 +84,30 @@ export function buildStatusOrder(statuses = [], { includeNames = [] } = {}) {
 
 /** Side-effect fields applied when a complaint status changes (Kanban, detail page, etc.). */
 export function buildStatusChangeUpdates(complaint, newStatus, statuses = [], now = new Date()) {
-  const updates = { status_id: findStatusIdByName(statuses, newStatus) };
+  const updates = {
+    status: newStatus,
+    status_id: findStatusIdByName(statuses, newStatus),
+  };
   const isoNow = now.toISOString();
 
   if (newStatus !== 'New Complaint' && !complaint.first_response_at) {
     updates.first_response_at = isoNow;
   }
-  if (['Delivered', 'Closed'].includes(newStatus)) {
+  if (SLA_CLOSED_STATUSES.includes(newStatus)) {
     updates.resolved_at = isoNow;
   }
   if (newStatus === 'Delivered') {
     updates.delivered_at = isoNow;
   }
-  if (newStatus === 'Closed') {
+  if (newStatus === 'Closed' || newStatus === 'Drop') {
     updates.closed_at = isoNow;
   }
 
-  if (newStatus === 'Waiting for Customer') {
+  if (SLA_PAUSED_STATUSES.includes(newStatus)) {
     updates.sla_paused_at = isoNow;
   }
 
-  if (complaint.status === 'Waiting for Customer' && newStatus !== 'Waiting for Customer') {
+  if (SLA_PAUSED_STATUSES.includes(complaint.status) && !SLA_PAUSED_STATUSES.includes(newStatus)) {
     if (complaint.sla_paused_at) {
       const pausedSeconds = Math.floor((now - new Date(complaint.sla_paused_at)) / 1000);
       updates.sla_paused_duration = (complaint.sla_paused_duration || 0) + pausedSeconds;

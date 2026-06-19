@@ -119,13 +119,15 @@
         "New Complaint",
         "Under Review",
         "Waiting for Customer",
+        "Waiting for Vendor",
         "Approved Replacement",
         "Rejected",
         "Reprocessing by Fulfillment",
         "Ready to Ship",
         "Shipped",
         "Delivered",
-        "Closed"
+        "Closed",
+        "Drop"
       ],
       "default": "New Complaint",
       "description": "Current workflow status"
@@ -160,7 +162,7 @@
     "sla_paused_at": {
       "type": "string",
       "format": "date-time",
-      "description": "Timestamp when SLA was paused (Waiting for Customer)"
+      "description": "Timestamp when SLA was paused (Waiting for Customer or Waiting for Vendor)"
     },
     "sla_paused_duration": {
       "type": "number",

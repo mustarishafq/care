@@ -3,6 +3,7 @@ import { differenceInSeconds } from 'date-fns';
 import { Clock, AlertTriangle, CheckCircle, AlertCircle, PauseCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getEffectiveDeadline, getResolvedAt } from './SlaBadge';
+import { SLA_PAUSED_STATUSES, SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
 
 function formatCountdown(totalSeconds) {
   if (totalSeconds <= 0) return null;
@@ -18,8 +19,8 @@ function formatCountdown(totalSeconds) {
 export default function SlaTimer({ complaint }) {
   const [now, setNow] = useState(() => new Date());
 
-  const isClosed = ['Delivered', 'Closed', 'Rejected'].includes(complaint.status);
-  const isPaused = complaint.status === 'Waiting for Customer';
+  const isClosed = SLA_CLOSED_STATUSES.includes(complaint.status);
+  const isPaused = SLA_PAUSED_STATUSES.includes(complaint.status);
 
   useEffect(() => {
     if (isClosed || isPaused) return;

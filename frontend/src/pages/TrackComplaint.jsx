@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Search, Package, Phone, AlertCircle, CheckCircle2, Clock, Truck, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { STATUS_COLORS, buildStatusOrder } from '@/lib/ticketUtils';
+import { STATUS_COLORS, buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
 
 const STATUS_ICONS = {
@@ -21,23 +21,24 @@ const STATUS_ICONS = {
   'Ready to Ship': Package,
   'Shipped': Truck,
   'Delivered': CheckCircle2,
-  'Closed': CheckCircle2
+  'Closed': CheckCircle2,
+  'Drop': CheckCircle2,
 };
 
 function StatusProgressBar({ status }) {
   const { data: complaintStatuses = [] } = useComplaintStatuses();
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [status] });
 
-  if (status === 'Rejected') {
+  if (TERMINAL_STATUSES.includes(status)) {
+    const colors = STATUS_COLORS[status] ?? STATUS_COLORS.Rejected;
     return (
       <div className="flex items-center gap-2 mt-4">
-        <span className="inline-flex items-center gap-1.5 bg-red-100 text-red-700 text-sm font-medium px-3 py-1.5 rounded-full">
-          <AlertCircle className="w-4 h-4" /> Rejected
+        <span className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full ${colors.bg} ${colors.text}`}>
+          <AlertCircle className="w-4 h-4" /> {status}
         </span>
       </div>);
-
   }
-  const steps = statusOrder.filter((s) => s !== 'Rejected');
+  const steps = statusOrder.filter((s) => !TERMINAL_STATUSES.includes(s));
   const currentIdx = steps.indexOf(status);
   return (
     <div className="mt-4 w-full">
@@ -137,7 +138,7 @@ function ComplaintCard({ complaint }) {
 
 }
 
-const CLOSED_STATUSES = ['Closed', 'Delivered', 'Rejected'];
+const CLOSED_STATUSES = SLA_CLOSED_STATUSES;
 
 function ResultsTabs({ results, phone }) {
   const active = results.filter((c) => !CLOSED_STATUSES.includes(c.status));

@@ -2,7 +2,9 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
-const RESOLVED_STATUSES = ['Delivered', 'Closed', 'Rejected'];
+import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+
+const RESOLVED_STATUSES = SLA_CLOSED_STATUSES;
 
 export default function ResolvedUnresolvedChart({ complaints }) {
   const total = complaints.length;

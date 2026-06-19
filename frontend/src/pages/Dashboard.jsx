@@ -8,6 +8,7 @@ import {
   Package, Truck, Timer, TrendingUp, UserCheck
 } from 'lucide-react';
 import { isToday, isThisMonth, differenceInHours } from 'date-fns';
+import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
 import StatCard from '@/components/dashboard/StatCard';
 import ComplaintTrendChart from '@/components/dashboard/ComplaintTrendChart';
 import RecentActivity from '@/components/dashboard/RecentActivity';
@@ -48,7 +49,7 @@ export default function Dashboard() {
 
   const todayCount = visibleComplaints.filter(c => isToday(new Date(c.created_date))).length;
   const monthCount = visibleComplaints.filter(c => isThisMonth(new Date(c.created_date))).length;
-  const openCount = visibleComplaints.filter(c => !['Closed', 'Delivered', 'Rejected'].includes(c.status)).length;
+  const openCount = visibleComplaints.filter(c => !SLA_CLOSED_STATUSES.includes(c.status)).length;
   const closedCount = visibleComplaints.filter(c => c.status === 'Closed').length;
   const pendingFulfillment = visibleComplaints.filter(c => ['Approved Replacement', 'Reprocessing by Fulfillment'].includes(c.status)).length;
   const pendingLogistics = visibleComplaints.filter(c => c.status === 'Ready to Ship').length;
@@ -140,7 +141,7 @@ export default function Dashboard() {
 
 function UnassignedTickets({ complaints, onAssign }) {
   const unassigned = complaints
-    .filter(c => !hasAssignedAgents(c) && !['Closed', 'Delivered', 'Rejected'].includes(c.status))
+    .filter(c => !hasAssignedAgents(c) && !SLA_CLOSED_STATUSES.includes(c.status))
     .slice(0, 10);
 
   if (!unassigned.length) return null;

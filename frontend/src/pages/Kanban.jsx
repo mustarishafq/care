@@ -101,21 +101,29 @@ export default function Kanban() {
 
     const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses);
 
-    queryClient.setQueryData(['complaints'], (old) =>
+    const previousComplaints = queryClient.getQueryData(['complaints']);
+    queryClient.setQueryData(['complaints'], (old = []) =>
       old.map(c => c.id === draggableId ? { ...c, ...updates } : c)
     );
 
-    await db.entities.Complaint.update(draggableId, updates);
-    await db.entities.TicketActivity.create({
-      complaint_id: draggableId,
-      action_type: 'status_changed',
-      description: `Status changed from "${complaint.status}" to "${newStatus}" via Kanban`,
-      user_id: user?.id,
-    });
+    try {
+      await db.entities.Complaint.update(draggableId, updates);
+      await db.entities.TicketActivity.create({
+        complaint_id: draggableId,
+        action_type: 'status_changed',
+        description: `Status changed from "${complaint.status}" to "${newStatus}" via Kanban`,
+        user_id: user?.id,
+      });
 
-    invalidateNotificationQueries(queryClient);
-    toast.success(`Moved to "${newStatus}"`);
-    queryClient.invalidateQueries({ queryKey: ['complaints'] });
+      invalidateNotificationQueries(queryClient);
+      toast.success(`Moved to "${newStatus}"`);
+      queryClient.invalidateQueries({ queryKey: ['complaints'] });
+    } catch {
+      if (previousComplaints !== undefined) {
+        queryClient.setQueryData(['complaints'], previousComplaints);
+      }
+      toast.error('Failed to update status');
+    }
   };
 
   if (isLoading || !user || permLoading) {

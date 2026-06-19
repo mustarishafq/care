@@ -75,6 +75,7 @@ class ComplaintInput
         $now = now();
         $deliveredId = self::lookupId('complaint_statuses', 'Delivered');
         $closedId = self::lookupId('complaint_statuses', 'Closed');
+        $dropId = self::lookupId('complaint_statuses', 'Drop');
 
         if ($deliveredId && (int) $data['status_id'] === $deliveredId) {
             $data['delivered_at'] = $now;
@@ -84,6 +85,43 @@ class ComplaintInput
         if ($closedId && (int) $data['status_id'] === $closedId) {
             $data['closed_at'] = $now;
             $data['resolved_at'] = $complaint->resolved_at ?? $now;
+        }
+
+        if ($dropId && (int) $data['status_id'] === $dropId) {
+            $data['closed_at'] = $now;
+            $data['resolved_at'] = $complaint->resolved_at ?? $now;
+        }
+
+        return self::applySlaPauseChanges($complaint, $data, $now);
+    }
+
+    /** @var list<string> */
+    private const SLA_PAUSED_STATUSES = ['Waiting for Customer', 'Waiting for Vendor'];
+
+    private static function applySlaPauseChanges(Complaint $complaint, array $data, $now): array
+    {
+        $newStatusName = DB::table('complaint_statuses')->where('id', $data['status_id'])->value('name');
+        $oldStatusName = $complaint->complaintStatus?->name ?? '';
+
+        if (! is_string($newStatusName)) {
+            return $data;
+        }
+
+        $enteringPause = in_array($newStatusName, self::SLA_PAUSED_STATUSES, true)
+            && ! in_array($oldStatusName, self::SLA_PAUSED_STATUSES, true);
+        $leavingPause = in_array($oldStatusName, self::SLA_PAUSED_STATUSES, true)
+            && ! in_array($newStatusName, self::SLA_PAUSED_STATUSES, true);
+
+        if ($enteringPause) {
+            $data['sla_paused_at'] = $now;
+        }
+
+        if ($leavingPause) {
+            if ($complaint->sla_paused_at) {
+                $pausedSeconds = $complaint->sla_paused_at->diffInSeconds($now);
+                $data['sla_paused_duration'] = ($complaint->sla_paused_duration ?? 0) + $pausedSeconds;
+            }
+            $data['sla_paused_at'] = null;
         }
 
         return $data;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { STATUS_COLORS, buildStatusOrder } from '@/lib/ticketUtils';
+import { STATUS_COLORS, buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { CheckCircle2 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -8,18 +8,19 @@ export default function StatusProgressBar({ currentStatus }) {
   const { data: complaintStatuses = [] } = useComplaintStatuses();
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [currentStatus] });
 
-  if (currentStatus === 'Rejected') {
+  if (TERMINAL_STATUSES.includes(currentStatus)) {
+    const colors = STATUS_COLORS[currentStatus] ?? STATUS_COLORS.Rejected;
     return (
       <div className="flex items-center gap-2 py-2">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-3 py-1.5 rounded-full">
-          <span className="w-2 h-2 rounded-full bg-red-500" />
-          Rejected
+        <div className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full ${colors.bg} ${colors.text}`}>
+          <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
+          {currentStatus}
         </div>
       </div>
     );
   }
 
-  const steps = statusOrder.filter(s => s !== 'Rejected');
+  const steps = statusOrder.filter(s => !TERMINAL_STATUSES.includes(s));
   const activeIndex = steps.indexOf(currentStatus);
 
   return (

@@ -9,9 +9,10 @@ import {
   getSlaStatus,
   hasSlaPolicy,
 } from '@/components/complaints/SlaBadge';
+import { SLA_PAUSED_STATUSES, SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
 
 function formatRemaining(complaint) {
-  if (complaint.status === 'Waiting for Customer') return 'Paused';
+  if (SLA_PAUSED_STATUSES.includes(complaint.status)) return 'Paused';
 
   const deadline = getEffectiveDeadline(complaint);
   const now = new Date();
@@ -42,7 +43,7 @@ export default function SlaReport({ complaints }) {
   });
 
   const openWithSla = withSla
-    .filter(c => !['Closed', 'Delivered', 'Rejected'].includes(c.status))
+    .filter(c => !SLA_CLOSED_STATUSES.includes(c.status))
     .map(c => ({ ...c, status_sla: getSlaStatus(c), remaining: formatRemaining(c) }))
     .sort((a, b) => getEffectiveDeadline(a) - getEffectiveDeadline(b))
     .slice(0, 10);

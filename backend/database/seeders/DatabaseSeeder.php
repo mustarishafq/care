@@ -81,6 +81,7 @@ class DatabaseSeeder extends Seeder
             'New Complaint',
             'Under Review',
             'Waiting for Customer',
+            'Waiting for Vendor',
             'Approved Replacement',
             'Rejected',
             'Reprocessing by Fulfillment',
@@ -88,6 +89,7 @@ class DatabaseSeeder extends Seeder
             'Shipped',
             'Delivered',
             'Closed',
+            'Drop',
         ];
 
         foreach ($defaultStatuses as $index => $name) {

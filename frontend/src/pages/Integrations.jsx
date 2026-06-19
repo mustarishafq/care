@@ -136,8 +136,8 @@ const EMPTY_OUTGOING_WEBHOOK = {
 };
 
 const STATUSES = [
-  'Under Review', 'Approved Replacement', 'Reprocessing by Fulfillment',
-  'Ready to Ship', 'Shipped', 'Delivered', 'Closed',
+  'Under Review', 'Approved Replacement', 'Waiting for Vendor', 'Reprocessing by Fulfillment',
+  'Ready to Ship', 'Shipped', 'Delivered', 'Closed', 'Drop',
 ];
 
 function createOutgoingWebhook() {
