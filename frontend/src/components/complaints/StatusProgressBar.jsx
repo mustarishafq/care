@@ -1,5 +1,5 @@
 import React from 'react';
-import { buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
+import { buildStatusOrder, TERMINAL_STATUSES } from '@/lib/ticketUtils';
 import { getStatusColorStyles } from '@/lib/statusColors';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { CheckCircle2 } from 'lucide-react';

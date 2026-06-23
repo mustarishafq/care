@@ -20,6 +20,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { buildPriorityOrder, useComplaintStatuses, usePriorities } from '@/lib/useLookups';
 import { useSlaSettings } from '@/lib/useSlaSettings';
+import { useAutoCloseSettings } from '@/lib/useAutoCloseSettings';
 import { toast } from 'sonner';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 
@@ -91,7 +92,8 @@ export default function Kanban() {
   const autoScrollRaf = useRef(null);
   const isDraggingRef = useRef(false);
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const { pausedStatusNames } = useSlaSettings();
+  const { pausedStatusNames, resolvedStatusNames } = useSlaSettings();
+  const { triggerStatusName: autoCloseTriggerStatusName } = useAutoCloseSettings();
   const [columnOrder, setColumnOrder] = useState([]);
   const [columnOrderOpen, setColumnOrderOpen] = useState(false);
 
@@ -184,7 +186,7 @@ export default function Kanban() {
       return;
     }
 
-    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames);
+    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames, resolvedStatusNames, autoCloseTriggerStatusName);
 
     const previousComplaints = queryClient.getQueryData(['complaints']);
     queryClient.setQueryData(['complaints'], (old = []) =>

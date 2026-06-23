@@ -3,7 +3,6 @@ import { differenceInSeconds } from 'date-fns';
 import { Clock, AlertTriangle, CheckCircle, AlertCircle, PauseCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { getEffectiveDeadline, getResolvedAt } from './SlaBadge';
-import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
 import { isSlaPausedStatus } from '@/lib/slaSettings';
 import { useSlaSettings } from '@/lib/useSlaSettings';
 
@@ -19,10 +18,10 @@ function formatCountdown(totalSeconds) {
 }
 
 export default function SlaTimer({ complaint }) {
-  const { pausedStatusNames } = useSlaSettings();
+  const { pausedStatusNames, resolvedStatusNames } = useSlaSettings();
   const [now, setNow] = useState(() => new Date());
 
-  const isClosed = SLA_CLOSED_STATUSES.includes(complaint.status);
+  const isClosed = resolvedStatusNames.includes(complaint.status);
   const isPaused = isSlaPausedStatus(complaint.status, pausedStatusNames);
 
   useEffect(() => {
@@ -43,7 +42,7 @@ export default function SlaTimer({ complaint }) {
   }
 
   if (isClosed) {
-    const resolvedAt = getResolvedAt(complaint) ?? now;
+    const resolvedAt = getResolvedAt(complaint, resolvedStatusNames) ?? now;
     const met = resolvedAt <= deadline;
     return (
       <Badge className={`border-0 text-xs font-medium gap-1.5 ${met ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'}`}>

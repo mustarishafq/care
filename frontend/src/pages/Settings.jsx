@@ -38,7 +38,12 @@ import {
   ROUTING_DEFAULT,
   SLA_DEFAULT,
 } from '@/components/settings/constants';
-import { getPausedStatusNames, normalizeSlaSettings, togglePausedStatusId } from '@/lib/slaSettings';
+import { getPausedStatusNames, getResolvedStatusNames, normalizeSlaSettings, toggleStatusId } from '@/lib/slaSettings';
+import {
+  getAutoCloseTargetStatusName,
+  getAutoCloseTriggerStatusName,
+  normalizeAutoCloseSettings,
+} from '@/lib/autoCloseSettings';
 import { DEFAULT_STATUS_COLOR, defaultColorForIndex } from '@/lib/statusColors';
 
 export default function Settings() {
@@ -101,14 +106,10 @@ export default function Settings() {
     configs.find((c) => c.key === 'sla_settings')?.json_value,
     complaintStatuses,
   );
-  const getAutoClose = () => {
-    const raw = configs.find((c) => c.key === 'auto_close_delivered')?.json_value ?? {};
-    return {
-      enabled: raw.enabled ?? false,
-      delay_amount: Math.max(1, Number(raw.delay_amount ?? AUTO_CLOSE_DEFAULT.delay_amount)),
-      delay_unit: raw.delay_unit === 'hours' ? 'hours' : 'days',
-    };
-  };
+  const getAutoClose = () => normalizeAutoCloseSettings(
+    configs.find((c) => c.key === 'auto_close_delivered')?.json_value,
+    complaintStatuses,
+  );
   const getRouting = () => {
     const raw = configs.find((c) => c.key === 'complaint_routing')?.json_value ?? {};
     return {
@@ -130,7 +131,10 @@ export default function Settings() {
 
   const sla = getSla();
   const slaPausedStatusNames = getPausedStatusNames(sla, complaintStatuses);
+  const slaResolvedStatusNames = getResolvedStatusNames(sla, complaintStatuses);
   const autoClose = getAutoClose();
+  const autoCloseTriggerStatusName = getAutoCloseTriggerStatusName(autoClose, complaintStatuses);
+  const autoCloseTargetStatusName = getAutoCloseTargetStatusName(autoClose, complaintStatuses);
   const routing = getRouting();
   const sso = getSso();
   const routingRuleCount = routing.rules.filter((rule) => rule.department_id || rule.status_id).length;
@@ -170,6 +174,9 @@ export default function Settings() {
         paused_status_ids: (slaForm.paused_status_ids ?? [])
           .map((id) => Number(id))
           .filter((id) => id > 0),
+        resolved_status_ids: (slaForm.resolved_status_ids ?? [])
+          .map((id) => Number(id))
+          .filter((id) => id > 0),
       });
       toast.success('SLA settings saved');
       setSlaOpen(false);
@@ -182,7 +189,12 @@ export default function Settings() {
   const saveAutoClose = async () => {
     setSaving(true);
     try {
-      await saveConfig('auto_close_delivered', 'Auto-Close Delivered Tickets', autoCloseForm);
+      await saveConfig('auto_close_delivered', 'Auto-Close Delivered Tickets', {
+        ...autoCloseForm,
+        delay_amount: Math.max(1, Number(autoCloseForm.delay_amount) || 1),
+        trigger_status_id: autoCloseForm.trigger_status_id ? Number(autoCloseForm.trigger_status_id) : null,
+        target_status_id: autoCloseForm.target_status_id ? Number(autoCloseForm.target_status_id) : null,
+      });
       toast.success('Auto-close settings saved');
       setAutoCloseOpen(false);
     } finally {
@@ -457,19 +469,25 @@ export default function Settings() {
                     ? `${slaPausedStatusNames.length} status${slaPausedStatusNames.length === 1 ? '' : 'es'}`
                     : 'None',
                 },
+                {
+                  label: 'SLA stops in',
+                  value: slaResolvedStatusNames.length
+                    ? `${slaResolvedStatusNames.length} status${slaResolvedStatusNames.length === 1 ? '' : 'es'}`
+                    : 'None',
+                },
               ]}
             />
 
             <SettingsConfigCard
               title="Auto-Close Delivered"
-              description="Automatically close tickets after a delivery waiting period"
+              description="Automatically close tickets after a waiting period in a trigger status"
               icon={Clock}
               enabled={autoClose.enabled}
               canManage={canManage}
               onEdit={openAutoClose}
               rows={[
-                { label: 'Trigger status', value: 'Delivered' },
-                { label: 'Action', value: 'Move to Closed' },
+                { label: 'Trigger status', value: autoCloseTriggerStatusName },
+                { label: 'Action', value: `Move to ${autoCloseTargetStatusName}` },
                 { label: 'Delay', value: autoClose.enabled ? formatAutoCloseDelay(autoClose) : '—' },
               ]}
             />
@@ -616,18 +634,48 @@ export default function Settings() {
       <Dialog open={autoCloseOpen} onOpenChange={setAutoCloseOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><Clock className="w-4 h-4" />Auto-Close Delivered Tickets</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><Clock className="w-4 h-4" />Auto-Close Tickets</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-1">
             <div className="rounded-lg bg-muted/50 border p-3 text-xs text-muted-foreground">
-              Tickets in <strong>Delivered</strong> status are moved to <strong>Closed</strong> after the configured waiting period.
+              Tickets in the trigger status are moved to the target status after the configured waiting period.
             </div>
             <div className="flex items-center justify-between gap-3">
               <Label htmlFor="auto-close-enabled" className="text-sm">Enable auto-close</Label>
               <Switch id="auto-close-enabled" checked={!!autoCloseForm.enabled} onCheckedChange={(checked) => setAutoCloseForm((p) => ({ ...p, enabled: checked }))} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Close after delivered for</Label>
+              <Label className="text-xs">Trigger status</Label>
+              <Select
+                value={autoCloseForm.trigger_status_id || '__none__'}
+                onValueChange={(value) => setAutoCloseForm((p) => ({ ...p, trigger_status_id: value === '__none__' ? '' : value }))}
+                disabled={!autoCloseForm.enabled}
+              >
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
+                <SelectContent>
+                  {complaintStatuses.map((status) => (
+                    <SelectItem key={status.id} value={String(status.id)}>{status.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Target status</Label>
+              <Select
+                value={autoCloseForm.target_status_id || '__none__'}
+                onValueChange={(value) => setAutoCloseForm((p) => ({ ...p, target_status_id: value === '__none__' ? '' : value }))}
+                disabled={!autoCloseForm.enabled}
+              >
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
+                <SelectContent>
+                  {complaintStatuses.map((status) => (
+                    <SelectItem key={`target-${status.id}`} value={String(status.id)}>{status.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Close after waiting for</Label>
               <div className="flex items-center gap-2">
                 <Input type="number" min={1} value={autoCloseForm.delay_amount} onChange={(e) => setAutoCloseForm((p) => ({ ...p, delay_amount: Math.max(1, Number(e.target.value) || 1) }))} className="h-8 text-sm w-20" disabled={!autoCloseForm.enabled} />
                 <Select value={autoCloseForm.delay_unit} onValueChange={(value) => setAutoCloseForm((p) => ({ ...p, delay_unit: value }))} disabled={!autoCloseForm.enabled}>
@@ -761,7 +809,38 @@ export default function Settings() {
                         checked={checked}
                         onCheckedChange={() => setSlaForm((prev) => ({
                           ...prev,
-                          paused_status_ids: togglePausedStatusId(prev.paused_status_ids, status.id),
+                          paused_status_ids: toggleStatusId(prev.paused_status_ids, status.id),
+                        }))}
+                      />
+                      <span className="text-sm">{status.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2 border-t">
+              <div>
+                <Label className="text-xs font-medium">SLA stop statuses</Label>
+                <p className="text-[11px] text-muted-foreground mt-1">
+                  When a ticket reaches one of these statuses, the SLA timer stops and shows met or breached.
+                </p>
+              </div>
+              <div className="rounded-lg border divide-y max-h-48 overflow-y-auto">
+                {complaintStatuses.map((status) => {
+                  const checked = (slaForm.resolved_status_ids ?? []).map(String).includes(String(status.id));
+                  return (
+                    <label
+                      key={`resolved-${status.id}`}
+                      htmlFor={`sla-resolved-${status.id}`}
+                      className="flex items-center gap-3 px-3 py-2.5 hover:bg-muted/40 cursor-pointer"
+                    >
+                      <Checkbox
+                        id={`sla-resolved-${status.id}`}
+                        checked={checked}
+                        onCheckedChange={() => setSlaForm((prev) => ({
+                          ...prev,
+                          resolved_status_ids: toggleStatusId(prev.resolved_status_ids, status.id),
                         }))}
                       />
                       <span className="text-sm">{status.name}</span>

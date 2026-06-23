@@ -10,6 +10,7 @@ use App\Models\Priority;
 use App\Models\Role;
 use App\Models\SystemConfig;
 use App\Models\UnitOfMeasurement;
+use App\Services\AutoCloseDeliveredComplaintsService;
 use App\Services\SlaSettingsService;
 use Illuminate\Database\Seeder;
 use App\Models\User;
@@ -158,6 +159,10 @@ class DatabaseSeeder extends Seeder
                         ->whereIn('name', SlaSettingsService::DEFAULT_PAUSED_STATUS_NAMES)
                         ->pluck('id')
                         ->all(),
+                    'resolved_status_ids' => ComplaintStatus::query()
+                        ->whereIn('name', SlaSettingsService::DEFAULT_RESOLVED_STATUS_NAMES)
+                        ->pluck('id')
+                        ->all(),
                 ],
             ],
             [
@@ -189,6 +194,12 @@ class DatabaseSeeder extends Seeder
                     'enabled' => false,
                     'delay_amount' => 1,
                     'delay_unit' => 'days',
+                    'trigger_status_id' => ComplaintStatus::query()
+                        ->where('name', AutoCloseDeliveredComplaintsService::DEFAULT_TRIGGER_STATUS_NAME)
+                        ->value('id'),
+                    'target_status_id' => ComplaintStatus::query()
+                        ->where('name', AutoCloseDeliveredComplaintsService::DEFAULT_TARGET_STATUS_NAME)
+                        ->value('id'),
                 ],
             ],
         ];

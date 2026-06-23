@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Search, Package, Phone, AlertCircle, CheckCircle2, Clock, Truck, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
-import { buildStatusOrder, SLA_CLOSED_STATUSES, TERMINAL_STATUSES } from '@/lib/ticketUtils';
+import { buildStatusOrder, TERMINAL_STATUSES } from '@/lib/ticketUtils';
+import { useSlaSettings } from '@/lib/useSlaSettings';
 import { getStatusColorStyles } from '@/lib/statusColors';
 import { useComplaintStatuses } from '@/lib/useLookups';
 
@@ -140,11 +141,10 @@ function ComplaintCard({ complaint }) {
 
 }
 
-const CLOSED_STATUSES = SLA_CLOSED_STATUSES;
-
 function ResultsTabs({ results, phone }) {
-  const active = results.filter((c) => !CLOSED_STATUSES.includes(c.status));
-  const closed = results.filter((c) => CLOSED_STATUSES.includes(c.status));
+  const { resolvedStatusNames } = useSlaSettings();
+  const active = results.filter((c) => !resolvedStatusNames.includes(c.status));
+  const closed = results.filter((c) => resolvedStatusNames.includes(c.status));
 
   return (
     <div>

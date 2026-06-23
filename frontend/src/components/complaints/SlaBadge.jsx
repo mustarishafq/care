@@ -1,14 +1,13 @@
 import React from 'react';
 import { differenceInHours, addHours } from 'date-fns';
 import { AlertTriangle, CheckCircle, Clock, AlertCircle } from 'lucide-react';
-import { DEFAULT_SLA_PAUSED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
-import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
+import { DEFAULT_SLA_PAUSED_STATUS_NAMES, DEFAULT_SLA_RESOLVED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
 import { useSlaSettings } from '@/lib/useSlaSettings';
 
-export function getResolvedAt(complaint) {
+export function getResolvedAt(complaint, resolvedStatusNames = DEFAULT_SLA_RESOLVED_STATUS_NAMES) {
   if (complaint.resolved_at) return new Date(complaint.resolved_at);
   if (complaint.closed_at) return new Date(complaint.closed_at);
-  if (SLA_CLOSED_STATUSES.includes(complaint.status) && complaint.updated_date) {
+  if (resolvedStatusNames.includes(complaint.status) && complaint.updated_date) {
     return new Date(complaint.updated_date);
   }
   return null;
@@ -39,16 +38,20 @@ export function getEffectiveDeadline(complaint, pausedStatusNames = DEFAULT_SLA_
   return new Date(deadline.getTime() + totalPausedSeconds * 1000);
 }
 
-export function getSlaStatus(complaint, pausedStatusNames = DEFAULT_SLA_PAUSED_STATUS_NAMES) {
+export function getSlaStatus(
+  complaint,
+  pausedStatusNames = DEFAULT_SLA_PAUSED_STATUS_NAMES,
+  resolvedStatusNames = DEFAULT_SLA_RESOLVED_STATUS_NAMES,
+) {
   if (isSlaPausedStatus(complaint.status, pausedStatusNames)) return 'paused';
 
-  const closed = SLA_CLOSED_STATUSES.includes(complaint.status);
+  const closed = resolvedStatusNames.includes(complaint.status);
   const deadline = getEffectiveDeadline(complaint, pausedStatusNames);
   const now = new Date();
   const hoursLeft = differenceInHours(deadline, now);
 
   if (closed) {
-    const resolvedAt = getResolvedAt(complaint) ?? now;
+    const resolvedAt = getResolvedAt(complaint, resolvedStatusNames) ?? now;
     return resolvedAt <= deadline ? 'met' : 'breached';
   }
   if (now > deadline) return 'breached';
@@ -65,8 +68,8 @@ const CONFIG = {
 };
 
 export default function SlaBadge({ complaint }) {
-  const { pausedStatusNames } = useSlaSettings();
-  const status = getSlaStatus(complaint, pausedStatusNames);
+  const { pausedStatusNames, resolvedStatusNames } = useSlaSettings();
+  const status = getSlaStatus(complaint, pausedStatusNames, resolvedStatusNames);
   if (!status) return null;
   const { label, icon: Icon, className } = CONFIG[status];
   return (

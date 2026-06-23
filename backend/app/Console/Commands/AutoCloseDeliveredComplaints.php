@@ -9,14 +9,14 @@ class AutoCloseDeliveredComplaints extends Command
 {
     protected $signature = 'complaints:auto-close-delivered {--force : Run immediately regardless of schedule settings}';
 
-    protected $description = 'Close delivered complaints after the configured waiting period';
+    protected $description = 'Close complaints in the configured trigger status after the waiting period';
 
     public function handle(AutoCloseDeliveredComplaintsService $service): int
     {
         $count = $service->run($this->option('force'));
 
         if ($count > 0) {
-            $this->info("Auto-closed {$count} delivered complaint(s).");
+            $this->info("Auto-closed {$count} complaint(s).");
         }
 
         return self::SUCCESS;

@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { buildStatusOrder, buildStatusChangeUpdates } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { useSlaSettings } from '@/lib/useSlaSettings';
+import { useAutoCloseSettings } from '@/lib/useAutoCloseSettings';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 import { getAssignedAgentIds, getAssignedAgents } from '@/lib/assignedAgents';
 
@@ -33,7 +34,8 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
   const [saving, setSaving] = useState(false);
 
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const { pausedStatusNames } = useSlaSettings();
+  const { pausedStatusNames, resolvedStatusNames } = useSlaSettings();
+  const { triggerStatusName: autoCloseTriggerStatusName } = useAutoCloseSettings();
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [complaint?.status] });
 
   const assignedIds = useMemo(() => getAssignedAgentIds(complaint), [complaint]);
@@ -90,7 +92,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
       }
 
       if (newStatus && newStatus !== complaint.status) {
-        const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames);
+        const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames, resolvedStatusNames, autoCloseTriggerStatusName);
         await db.entities.Complaint.update(complaint.id, updates);
       }
 

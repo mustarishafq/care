@@ -1,4 +1,4 @@
-import { DEFAULT_SLA_PAUSED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
+import { DEFAULT_SLA_PAUSED_STATUS_NAMES, DEFAULT_SLA_RESOLVED_STATUS_NAMES, isSlaPausedStatus } from '@/lib/slaSettings';
 import { getStatusColorStyles } from '@/lib/statusColors';
 
 export function generateTicketId() {
@@ -28,7 +28,8 @@ export const STATUS_ORDER = [
 /** @deprecated Use settings from useSlaSettings() instead */
 export const SLA_PAUSED_STATUSES = DEFAULT_SLA_PAUSED_STATUS_NAMES;
 
-export const SLA_CLOSED_STATUSES = ['Delivered', 'Closed', 'Rejected', 'Drop'];
+/** @deprecated Use settings from useSlaSettings() instead */
+export const SLA_CLOSED_STATUSES = DEFAULT_SLA_RESOLVED_STATUS_NAMES;
 
 export const TERMINAL_STATUSES = ['Rejected', 'Drop'];
 
@@ -93,6 +94,8 @@ export function buildStatusChangeUpdates(
   statuses = [],
   now = new Date(),
   pausedStatusNames = DEFAULT_SLA_PAUSED_STATUS_NAMES,
+  resolvedStatusNames = DEFAULT_SLA_RESOLVED_STATUS_NAMES,
+  autoCloseTriggerStatusName = null,
 ) {
   const updates = {
     status: newStatus,
@@ -103,10 +106,10 @@ export function buildStatusChangeUpdates(
   if (newStatus !== 'New Complaint' && !complaint.first_response_at) {
     updates.first_response_at = isoNow;
   }
-  if (SLA_CLOSED_STATUSES.includes(newStatus)) {
+  if (resolvedStatusNames.includes(newStatus)) {
     updates.resolved_at = isoNow;
   }
-  if (newStatus === 'Delivered') {
+  if (autoCloseTriggerStatusName && newStatus === autoCloseTriggerStatusName) {
     updates.delivered_at = isoNow;
   }
   if (newStatus === 'Closed' || newStatus === 'Drop') {

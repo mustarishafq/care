@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { buildStatusOrder, buildStatusChangeUpdates, requiresClosureProof, hasClosureProof, CLOSURE_PROOF_REQUIRED_STATUSES } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { useSlaSettings } from '@/lib/useSlaSettings';
+import { useAutoCloseSettings } from '@/lib/useAutoCloseSettings';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 import { useDepartments } from '@/lib/useDepartments';
 import { canViewComplaint } from '@/lib/complaintVisibility';
@@ -69,7 +70,8 @@ export default function ComplaintDetail() {
 
   const { data: departments = [] } = useDepartments();
   const { data: complaintStatuses = [] } = useComplaintStatuses();
-  const { pausedStatusNames } = useSlaSettings();
+  const { pausedStatusNames, resolvedStatusNames } = useSlaSettings();
+  const { triggerStatusName: autoCloseTriggerStatusName } = useAutoCloseSettings();
   const statusOrder = buildStatusOrder(complaintStatuses, { includeNames: [complaint?.status] });
 
   const updateComplaint = async (
@@ -111,7 +113,7 @@ export default function ComplaintDetail() {
       return;
     }
 
-    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames);
+    const updates = buildStatusChangeUpdates(complaint, newStatus, complaintStatuses, new Date(), pausedStatusNames, resolvedStatusNames, autoCloseTriggerStatusName);
 
     await updateComplaint(
       updates,

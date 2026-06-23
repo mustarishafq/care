@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Complaint;
+use App\Services\AutoCloseDeliveredComplaintsService;
 use App\Services\SlaSettingsService;
 use Illuminate\Support\Facades\DB;
 
@@ -74,22 +75,25 @@ class ComplaintInput
         }
 
         $now = now();
-        $deliveredId = self::lookupId('complaint_statuses', 'Delivered');
+        $slaSettings = app(SlaSettingsService::class);
+        $autoCloseSettings = app(AutoCloseDeliveredComplaintsService::class);
+        $newStatusId = (int) $data['status_id'];
         $closedId = self::lookupId('complaint_statuses', 'Closed');
         $dropId = self::lookupId('complaint_statuses', 'Drop');
 
-        if ($deliveredId && (int) $data['status_id'] === $deliveredId) {
+        if ($autoCloseSettings->isTriggerStatusId($newStatusId)) {
             $data['delivered_at'] = $now;
-            $data['resolved_at'] = $complaint->resolved_at ?? $now;
         }
 
-        if ($closedId && (int) $data['status_id'] === $closedId) {
+        if ($closedId && $newStatusId === $closedId) {
             $data['closed_at'] = $now;
-            $data['resolved_at'] = $complaint->resolved_at ?? $now;
         }
 
-        if ($dropId && (int) $data['status_id'] === $dropId) {
+        if ($dropId && $newStatusId === $dropId) {
             $data['closed_at'] = $now;
+        }
+
+        if ($slaSettings->isResolvedStatusId($newStatusId)) {
             $data['resolved_at'] = $complaint->resolved_at ?? $now;
         }
 

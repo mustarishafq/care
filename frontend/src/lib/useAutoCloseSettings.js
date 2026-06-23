@@ -3,12 +3,12 @@ import { useQuery } from '@tanstack/react-query';
 import { db } from '@/api/db';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import {
-  getPausedStatusNames,
-  getResolvedStatusNames,
-  normalizeSlaSettings,
-} from '@/lib/slaSettings';
+  getAutoCloseTargetStatusName,
+  getAutoCloseTriggerStatusName,
+  normalizeAutoCloseSettings,
+} from '@/lib/autoCloseSettings';
 
-export function useSlaSettings() {
+export function useAutoCloseSettings() {
   const { data: configs = [], isLoading: loadingConfigs } = useQuery({
     queryKey: ['system_configs'],
     queryFn: () => db.entities.SystemConfig.list(),
@@ -17,27 +17,27 @@ export function useSlaSettings() {
 
   const { data: complaintStatuses = [], isLoading: loadingStatuses } = useComplaintStatuses();
 
-  const settings = useMemo(() => normalizeSlaSettings(
-    configs.find((config) => config.key === 'sla_settings')?.json_value,
+  const settings = useMemo(() => normalizeAutoCloseSettings(
+    configs.find((config) => config.key === 'auto_close_delivered')?.json_value,
     complaintStatuses,
   ), [configs, complaintStatuses]);
 
-  const pausedStatusNames = useMemo(
-    () => getPausedStatusNames(settings, complaintStatuses),
+  const triggerStatusName = useMemo(
+    () => getAutoCloseTriggerStatusName(settings, complaintStatuses),
     [settings, complaintStatuses],
   );
 
-  const resolvedStatusNames = useMemo(
-    () => getResolvedStatusNames(settings, complaintStatuses),
+  const targetStatusName = useMemo(
+    () => getAutoCloseTargetStatusName(settings, complaintStatuses),
     [settings, complaintStatuses],
   );
 
   return {
     settings,
-    pausedStatusNames,
-    resolvedStatusNames,
-    pausedStatusIds: settings.paused_status_ids,
-    resolvedStatusIds: settings.resolved_status_ids,
+    triggerStatusName,
+    targetStatusName,
+    triggerStatusId: settings.trigger_status_id,
+    targetStatusId: settings.target_status_id,
     isLoading: loadingConfigs || loadingStatuses,
   };
 }

@@ -3,8 +3,8 @@ import {
 } from 'lucide-react';
 
 export { SLA_DEFAULT } from '@/lib/slaSettings';
+export { AUTO_CLOSE_DEFAULT, formatAutoCloseDelay } from '@/lib/autoCloseSettings';
 
-export const AUTO_CLOSE_DEFAULT = { enabled: false, delay_amount: 1, delay_unit: 'days' };
 export const ROUTING_DEFAULT = { enabled: false, default_department_id: '', default_status_id: '', rules: [] };
 
 export const LOOKUP_SECTIONS = [
@@ -23,10 +23,3 @@ export const NOTIFICATION_TRIGGERS = [
   { event: 'Overdue', when: 'SLA deadline has passed', type: 'overdue' },
   { event: 'Internal Note', when: 'A new internal note is added', type: 'mention' },
 ];
-
-export function formatAutoCloseDelay({ delay_amount, delay_unit }) {
-  const unit = delay_unit === 'hours'
-    ? (delay_amount === 1 ? 'hour' : 'hours')
-    : (delay_amount === 1 ? 'day' : 'days');
-  return `${delay_amount} ${unit}`;
-}

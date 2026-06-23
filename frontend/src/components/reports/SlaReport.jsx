@@ -9,7 +9,6 @@ import {
   getSlaStatus,
   hasSlaPolicy,
 } from '@/components/complaints/SlaBadge';
-import { SLA_CLOSED_STATUSES } from '@/lib/ticketUtils';
 import { isSlaPausedStatus } from '@/lib/slaSettings';
 import { useSlaSettings } from '@/lib/useSlaSettings';
 
@@ -28,28 +27,28 @@ function formatRemaining(complaint, pausedStatusNames) {
 }
 
 export default function SlaReport({ complaints }) {
-  const { pausedStatusNames } = useSlaSettings();
+  const { pausedStatusNames, resolvedStatusNames } = useSlaSettings();
   const withSla = complaints.filter(hasSlaPolicy);
 
   const stats = {
     total: withSla.length,
-    met: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'met').length,
-    breached: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'breached').length,
-    warning: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'at_risk').length,
-    on_track: withSla.filter(c => getSlaStatus(c, pausedStatusNames) === 'on_track').length,
+    met: withSla.filter(c => getSlaStatus(c, pausedStatusNames, resolvedStatusNames) === 'met').length,
+    breached: withSla.filter(c => getSlaStatus(c, pausedStatusNames, resolvedStatusNames) === 'breached').length,
+    warning: withSla.filter(c => getSlaStatus(c, pausedStatusNames, resolvedStatusNames) === 'at_risk').length,
+    on_track: withSla.filter(c => getSlaStatus(c, pausedStatusNames, resolvedStatusNames) === 'on_track').length,
   };
 
   const breachByPriority = ['Low', 'Medium', 'High', 'Urgent'].map(p => {
     const total = withSla.filter(c => c.priority === p).length;
-    const breached = withSla.filter(c => c.priority === p && getSlaStatus(c, pausedStatusNames) === 'breached').length;
+    const breached = withSla.filter(c => c.priority === p && getSlaStatus(c, pausedStatusNames, resolvedStatusNames) === 'breached').length;
     return { name: p, total, breached };
   });
 
   const openWithSla = withSla
-    .filter(c => !SLA_CLOSED_STATUSES.includes(c.status))
+    .filter(c => !resolvedStatusNames.includes(c.status))
     .map(c => ({
       ...c,
-      status_sla: getSlaStatus(c, pausedStatusNames),
+      status_sla: getSlaStatus(c, pausedStatusNames, resolvedStatusNames),
       remaining: formatRemaining(c, pausedStatusNames),
     }))
     .sort((a, b) => getEffectiveDeadline(a, pausedStatusNames) - getEffectiveDeadline(b, pausedStatusNames))
