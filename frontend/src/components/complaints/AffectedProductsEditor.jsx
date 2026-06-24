@@ -90,7 +90,7 @@ export default function AffectedProductsEditor({
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Product *</Label>
             <Select
-              value={item.product_id}
+              value={String(item.product_id || '')}
               onValueChange={(v) => updateProduct(productIndex, { product_id: v })}
               disabled={!products.length}
             >
@@ -162,7 +162,7 @@ export default function AffectedProductsEditor({
                     <Label className="text-xs font-medium">Unit</Label>
                     {unitsOfMeasurement.length > 0 ? (
                       <Select
-                        value={entry.unit_of_measurement_id}
+                        value={String(entry.unit_of_measurement_id || '')}
                         onValueChange={(v) => updateBatchEntry(productIndex, entryIndex, { unit_of_measurement_id: v })}
                       >
                         <SelectTrigger><SelectValue placeholder="Unit" /></SelectTrigger>

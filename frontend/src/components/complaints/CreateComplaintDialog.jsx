@@ -26,6 +26,26 @@ const storageUrl = (path) => {
 
 const ORDER_SOURCES = ['SiteGiant', 'FounderHQ'];
 
+const FIELD_LABELS = {
+  customer_name: 'Customer Name',
+  tracking_number: 'Tracking Number',
+  purchase_date: 'Purchase Date',
+  complaint_type_id: 'Complaint Type',
+  product_id: 'Product',
+  description: 'Description',
+};
+
+function getMissingComplaintFields(form) {
+  const missing = [];
+  if (!form.customer_name?.trim()) missing.push('customer_name');
+  if (!form.tracking_number?.trim()) missing.push('tracking_number');
+  if (!form.purchase_date) missing.push('purchase_date');
+  if (!form.complaint_type_id) missing.push('complaint_type_id');
+  if (!form.affected_products.some((item) => item.product_id)) missing.push('product_id');
+  if (!form.description?.trim()) missing.push('description');
+  return missing;
+}
+
 const EMPTY_FORM = {
   customer_name: '',
   customer_phone: '',
@@ -63,8 +83,15 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     setUploadError('');
     setForm({
       ...EMPTY_FORM,
-      priority_id: findIdByName(priorities, 'Medium') || '',
+      priority_id: String(findIdByName(priorities, 'Medium') || ''),
     });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const mediumId = findIdByName(priorities, 'Medium');
+    if (!mediumId) return;
+    setForm((prev) => (prev.priority_id ? prev : { ...prev, priority_id: String(mediumId) }));
   }, [open, priorities]);
 
   const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
@@ -120,9 +147,15 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   };
 
   const handleSubmit = async () => {
-    const hasValidProduct = form.affected_products.some((item) => item.product_id);
-    if (!form.customer_name || !form.tracking_number.trim() || !form.purchase_date || !hasValidProduct || !form.complaint_type_id || !form.description) {
-      toast.error('Please fill in all required fields');
+    const missing = getMissingComplaintFields(form);
+    if (missing.length) {
+      const labels = missing.map((key) => FIELD_LABELS[key] ?? key);
+      toast.error(
+        labels.length === 1
+          ? `Please fill in: ${labels[0]}`
+          : `Please fill in: ${labels.join(', ')}`,
+      );
+      document.getElementById(`complaint-field-${missing[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -196,7 +229,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
 
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1.5">
+          <div id="complaint-field-customer_name" className="space-y-1.5">
             <Label className="text-xs font-medium">Customer Name *</Label>
             <Input value={form.customer_name} onChange={e => update('customer_name', e.target.value)} placeholder="Full name" />
           </div>
@@ -204,7 +237,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
             <Label className="text-xs font-medium">Phone Number</Label>
             <Input value={form.customer_phone} onChange={e => update('customer_phone', e.target.value)} placeholder="60123456789" />
           </div>
-          <div className="space-y-1.5">
+          <div id="complaint-field-tracking_number" className="space-y-1.5">
             <Label className="text-xs font-medium">Tracking Number *</Label>
             <Input value={form.tracking_number} onChange={e => update('tracking_number', e.target.value)} placeholder="Tracking #" />
           </div>
@@ -223,7 +256,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+          <div id="complaint-field-purchase_date" className="space-y-1.5">
             <Label className="text-xs font-medium">Purchase Date *</Label>
             <Input
               type="date"
@@ -233,41 +266,43 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Courier</Label>
-            <Select value={form.courier_id} onValueChange={v => update('courier_id', v)}>
+            <Select value={String(form.courier_id || '')} onValueChange={v => update('courier_id', v)}>
               <SelectTrigger><SelectValue placeholder="Select courier" /></SelectTrigger>
               <SelectContent>
-                {couriers.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                {couriers.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
+          <div id="complaint-field-complaint_type_id" className="space-y-1.5">
             <Label className="text-xs font-medium">Complaint Type *</Label>
-            <Select value={form.complaint_type_id} onValueChange={v => update('complaint_type_id', v)}>
+            <Select value={String(form.complaint_type_id || '')} onValueChange={v => update('complaint_type_id', v)}>
               <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
               <SelectContent>
-                {complaintTypes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                {complaintTypes.map(t => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Priority</Label>
-            <Select value={form.priority_id} onValueChange={v => update('priority_id', v)}>
+            <Select value={String(form.priority_id || '')} onValueChange={v => update('priority_id', v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {priorities.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                {priorities.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.name}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <AffectedProductsEditor
-          products={products}
-          unitsOfMeasurement={unitsOfMeasurement}
-          value={form.affected_products}
-          onChange={(affected_products) => update('affected_products', affected_products)}
-        />
+        <div id="complaint-field-product_id">
+          <AffectedProductsEditor
+            products={products}
+            unitsOfMeasurement={unitsOfMeasurement}
+            value={form.affected_products}
+            onChange={(affected_products) => update('affected_products', affected_products)}
+          />
+        </div>
 
-        <div className="space-y-1.5">
+        <div id="complaint-field-description" className="space-y-1.5">
           <Label className="text-xs font-medium">Description *</Label>
           <Textarea value={form.description} onChange={e => update('description', e.target.value)} placeholder="Describe the complaint in detail..." rows={3} />
         </div>
