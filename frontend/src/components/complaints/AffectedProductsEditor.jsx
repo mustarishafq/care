@@ -20,6 +20,7 @@ export default function AffectedProductsEditor({
   unitsOfMeasurement = [],
   value = [],
   onChange,
+  invalid = false,
 }) {
   const updateProduct = (index, patch) => {
     onChange(value.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -94,7 +95,9 @@ export default function AffectedProductsEditor({
               onValueChange={(v) => updateProduct(productIndex, { product_id: v })}
               disabled={!products.length}
             >
-              <SelectTrigger><SelectValue placeholder="Select product" /></SelectTrigger>
+              <SelectTrigger className={invalid && !item.product_id ? 'border-destructive ring-1 ring-destructive/30' : undefined}>
+                <SelectValue placeholder="Select product" />
+              </SelectTrigger>
               <SelectContent>
                 {products.map((p) => (
                   <SelectItem key={p.id} value={String(p.id)}>

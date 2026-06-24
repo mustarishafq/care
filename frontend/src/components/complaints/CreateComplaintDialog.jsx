@@ -72,6 +72,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const { data: priorities = [] } = usePriorities();
   const { data: unitsOfMeasurement = [] } = useUnitsOfMeasurement();
   const [form, setForm] = useState(EMPTY_FORM);
+  const [invalidFields, setInvalidFields] = useState([]);
 
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
@@ -81,6 +82,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   useEffect(() => {
     if (!open) return;
     setUploadError('');
+    setInvalidFields([]);
     setForm({
       ...EMPTY_FORM,
       priority_id: String(findIdByName(priorities, 'Medium') || ''),
@@ -94,7 +96,20 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     setForm((prev) => (prev.priority_id ? prev : { ...prev, priority_id: String(mediumId) }));
   }, [open, priorities]);
 
-  const update = (key, value) => setForm(prev => ({ ...prev, [key]: value }));
+  const update = (key, value) => {
+    setInvalidFields((prev) => prev.filter((field) => field !== key));
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateAffectedProducts = (affected_products) => {
+    if (affected_products.some((item) => item.product_id)) {
+      setInvalidFields((prev) => prev.filter((field) => field !== 'product_id'));
+    }
+    setForm((prev) => ({ ...prev, affected_products }));
+  };
+
+  const fieldClass = (key, className = '') =>
+    invalidFields.includes(key) ? `${className} border-destructive ring-1 ring-destructive/30`.trim() : className;
 
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -149,6 +164,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const handleSubmit = async () => {
     const missing = getMissingComplaintFields(form);
     if (missing.length) {
+      setInvalidFields(missing);
       const labels = missing.map((key) => FIELD_LABELS[key] ?? key);
       toast.error(
         labels.length === 1
@@ -158,6 +174,8 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       document.getElementById(`complaint-field-${missing[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
+
+    setInvalidFields([]);
 
     const affectedProducts = form.affected_products
       .filter((item) => item.product_id)
@@ -231,7 +249,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
         <div className="grid grid-cols-2 gap-4">
           <div id="complaint-field-customer_name" className="space-y-1.5">
             <Label className="text-xs font-medium">Customer Name *</Label>
-            <Input value={form.customer_name} onChange={e => update('customer_name', e.target.value)} placeholder="Full name" />
+            <Input className={fieldClass('customer_name')} value={form.customer_name} onChange={e => update('customer_name', e.target.value)} placeholder="Full name" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Phone Number</Label>
@@ -239,7 +257,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           </div>
           <div id="complaint-field-tracking_number" className="space-y-1.5">
             <Label className="text-xs font-medium">Tracking Number *</Label>
-            <Input value={form.tracking_number} onChange={e => update('tracking_number', e.target.value)} placeholder="Tracking #" />
+            <Input className={fieldClass('tracking_number')} value={form.tracking_number} onChange={e => update('tracking_number', e.target.value)} placeholder="Tracking #" />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Order Number</Label>
@@ -260,8 +278,12 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
             <Label className="text-xs font-medium">Purchase Date *</Label>
             <Input
               type="date"
+              className={fieldClass('purchase_date')}
               value={form.purchase_date}
               onChange={e => update('purchase_date', e.target.value)}
+              onBlur={e => {
+                if (e.target.value) update('purchase_date', e.target.value);
+              }}
             />
           </div>
           <div className="space-y-1.5">
@@ -276,7 +298,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           <div id="complaint-field-complaint_type_id" className="space-y-1.5">
             <Label className="text-xs font-medium">Complaint Type *</Label>
             <Select value={String(form.complaint_type_id || '')} onValueChange={v => update('complaint_type_id', v)}>
-              <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+              <SelectTrigger className={fieldClass('complaint_type_id')}><SelectValue placeholder="Select type" /></SelectTrigger>
               <SelectContent>
                 {complaintTypes.map(t => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
               </SelectContent>
@@ -293,18 +315,25 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           </div>
         </div>
 
-        <div id="complaint-field-product_id">
+        <div id="complaint-field-description" className="space-y-1.5">
+          <Label className="text-xs font-medium">Description *</Label>
+          <Textarea
+            className={fieldClass('description')}
+            value={form.description}
+            onChange={e => update('description', e.target.value)}
+            placeholder="Describe the complaint in detail..."
+            rows={3}
+          />
+        </div>
+
+        <div id="complaint-field-product_id" className={invalidFields.includes('product_id') ? 'rounded-lg ring-1 ring-destructive/30' : undefined}>
           <AffectedProductsEditor
             products={products}
             unitsOfMeasurement={unitsOfMeasurement}
             value={form.affected_products}
-            onChange={(affected_products) => update('affected_products', affected_products)}
+            onChange={updateAffectedProducts}
+            invalid={invalidFields.includes('product_id')}
           />
-        </div>
-
-        <div id="complaint-field-description" className="space-y-1.5">
-          <Label className="text-xs font-medium">Description *</Label>
-          <Textarea value={form.description} onChange={e => update('description', e.target.value)} placeholder="Describe the complaint in detail..." rows={3} />
         </div>
 
         <div className="space-y-1.5">
