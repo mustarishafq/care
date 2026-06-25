@@ -21,6 +21,7 @@ export const STATUS_ORDER = [
   'Ready to Ship',
   'Shipped',
   'Delivered',
+  'Completed',
   'Closed',
   'Drop',
 ];

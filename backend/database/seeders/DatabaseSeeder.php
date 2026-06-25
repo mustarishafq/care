@@ -90,6 +90,7 @@ class DatabaseSeeder extends Seeder
             'Ready to Ship',
             'Shipped',
             'Delivered',
+            'Completed',
             'Closed',
             'Drop',
         ];
@@ -105,6 +106,7 @@ class DatabaseSeeder extends Seeder
             'Ready to Ship' => '#06b6d4',
             'Shipped' => '#6366f1',
             'Delivered' => '#14b8a6',
+            'Completed' => '#22c55e',
             'Closed' => '#6b7280',
             'Drop' => '#64748b',
         ];

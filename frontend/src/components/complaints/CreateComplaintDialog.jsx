@@ -7,10 +7,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { generateTicketId } from '@/lib/ticketUtils';
 import { findIdByName, useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement } from '@/lib/useLookups';
+import { useComplaintCreateOptions } from '@/lib/useComplaintCreateOptions';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
@@ -24,7 +26,6 @@ const storageUrl = (path) => {
   return `/storage/${path.replace(/^\//, '')}`;
 };
 
-const ORDER_SOURCES = ['SiteGiant', 'FounderHQ'];
 
 const FIELD_LABELS = {
   customer_name: 'Customer Name',
@@ -59,6 +60,10 @@ const EMPTY_FORM = {
   tracking_number: '',
   priority_id: '',
   proof_files: [],
+  pre_resolved: false,
+  closure_proof_files: [],
+  closure_proof_notes: '',
+  resolution_notes: '',
 };
 
 export default function CreateComplaintDialog({ open, onOpenChange }) {
@@ -71,6 +76,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const { data: couriers = [] } = useCouriers();
   const { data: priorities = [] } = usePriorities();
   const { data: unitsOfMeasurement = [] } = useUnitsOfMeasurement();
+  const { preResolved, orderSources, isLoading: loadingCreateOptions, error: createOptionsError, refetch: refetchCreateOptions } = useComplaintCreateOptions({ enabled: open });
   const [form, setForm] = useState(EMPTY_FORM);
   const [invalidFields, setInvalidFields] = useState([]);
 
@@ -161,6 +167,56 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     update('proof_files', form.proof_files.filter((_, i) => i !== index));
   };
 
+  const handleClosureProofUpload = async (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    setUploading(true);
+    setUploadError('');
+    const uploaded = [];
+    const errors = [];
+
+    try {
+      for (const file of files) {
+        if (file.size > MAX_PROOF_FILE_BYTES) {
+          const message = `"${file.name}" is too large (${formatProofFileSize(file.size)}). Maximum size is 10 MB.`;
+          errors.push(message);
+          toast.error(message);
+          continue;
+        }
+
+        try {
+          const { path, url } = await db.integrations.Core.UploadFile({ file });
+          uploaded.push({
+            path,
+            url: url || storageUrl(path),
+            name: file.name,
+            isImage: file.type.startsWith('image/'),
+            type: 'vendor_screenshot',
+          });
+        } catch (err) {
+          const message = err.message || `Failed to upload "${file.name}"`;
+          errors.push(message);
+          toast.error(message);
+        }
+      }
+
+      if (uploaded.length) {
+        setForm((prev) => ({ ...prev, closure_proof_files: [...prev.closure_proof_files, ...uploaded] }));
+      }
+      if (errors.length) {
+        setUploadError(errors.join(' '));
+      }
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  };
+
+  const removeClosureProofFile = (index) => {
+    update('closure_proof_files', form.closure_proof_files.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async () => {
     const missing = getMissingComplaintFields(form);
     if (missing.length) {
@@ -176,6 +232,17 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     }
 
     setInvalidFields([]);
+
+    if (form.pre_resolved) {
+      if (preResolved.require_closure_proof && form.closure_proof_files.length === 0) {
+        toast.error('Add at least one vendor closure proof before creating this ticket.');
+        return;
+      }
+      if (preResolved.require_resolution_notes && !form.resolution_notes?.trim()) {
+        toast.error('Resolution notes are required for pre-resolved complaints.');
+        return;
+      }
+    }
 
     const affectedProducts = form.affected_products
       .filter((item) => item.product_id)
@@ -206,12 +273,25 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       tracking_number: form.tracking_number,
       priority_id: form.priority_id || findIdByName(priorities, 'Medium') || null,
       ticket_id: ticketId,
+      pre_resolved: !!form.pre_resolved,
+      resolution_notes: form.pre_resolved ? (form.resolution_notes?.trim() || null) : null,
+      closure_proof_notes: form.pre_resolved ? (form.closure_proof_notes?.trim() || null) : null,
+      closure_proof_files: form.pre_resolved
+        ? form.closure_proof_files.map((file) => ({
+          path: file.path,
+          type: file.type || 'vendor_screenshot',
+          name: file.name,
+        }))
+        : undefined,
     };
     const created = await db.entities.Complaint.create(complaintData);
+    const statusLabel = created.status || (form.pre_resolved ? preResolved.status_name : null);
     await db.entities.TicketActivity.create({
       complaint_id: created.id,
       action_type: 'created',
-      description: `Ticket ${created.ticket_id || ticketId} created by ${user?.full_name || 'Unknown'}`,
+      description: form.pre_resolved && statusLabel
+        ? `Ticket ${created.ticket_id || ticketId} logged as ${statusLabel} (already resolved at vendor) by ${user?.full_name || 'Unknown'}`
+        : `Ticket ${created.ticket_id || ticketId} created by ${user?.full_name || 'Unknown'}`,
       user_id: user?.id,
     });
     queryClient.invalidateQueries({ queryKey: ['complaints'] });
@@ -233,7 +313,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
         unit_of_measurement: item.unit_of_measurement ?? unitsOfMeasurement.find((u) => String(u.id) === String(item.unit_of_measurement_id))?.name,
       })),
     };
-    offerWhatsappShareToast(sharePayload, { event: 'created' });
+    offerWhatsappShareToast(sharePayload, { event: form.pre_resolved ? 'status_changed' : 'created' });
     setSaving(false);
     onOpenChange(false);
   };
@@ -265,14 +345,22 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs font-medium">Order Source</Label>
-            <Select value={form.order_source} onValueChange={v => update('order_source', v)}>
-              <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
-              <SelectContent>
-                {ORDER_SOURCES.map(source => (
-                  <SelectItem key={source} value={source}>{source}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {orderSources.length > 0 ? (
+              <Select value={form.order_source} onValueChange={(v) => update('order_source', v)}>
+                <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                <SelectContent>
+                  {orderSources.map((source) => (
+                    <SelectItem key={source} value={source}>{source}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input
+                value={form.order_source}
+                onChange={(e) => update('order_source', e.target.value)}
+                placeholder="e.g. Shopee, TikTok"
+              />
+            )}
           </div>
           <div id="complaint-field-purchase_date" className="space-y-1.5">
             <Label className="text-xs font-medium">Purchase Date *</Label>
@@ -354,6 +442,82 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           )}
           <p className="text-xs text-muted-foreground">Maximum file size: 10 MB per file.</p>
         </div>
+
+        {loadingCreateOptions && (
+          <p className="text-xs text-muted-foreground">Loading form options…</p>
+        )}
+
+        {createOptionsError && (
+          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive flex items-center justify-between gap-2">
+            <span>Could not load pre-resolved options.</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => refetchCreateOptions()}>Retry</Button>
+          </div>
+        )}
+
+        {preResolved.enabled && (
+          <div className="rounded-lg border p-4 space-y-4 bg-muted/20">
+            <label className="flex items-start gap-3 cursor-pointer">
+              <Checkbox
+                checked={!!form.pre_resolved}
+                onCheckedChange={(checked) => update('pre_resolved', !!checked)}
+                className="mt-0.5"
+              />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">Already resolved at vendor</p>
+                <p className="text-xs text-muted-foreground">
+                  Use for marketplace orders settled directly with the vendor. Ticket will be created as
+                  {' '}
+                  <span className="font-medium text-foreground">{preResolved.status_name || 'the configured status'}</span>
+                  {' '}
+                  for later review before closing.
+                </p>
+              </div>
+            </label>
+
+            {form.pre_resolved && (
+              <>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">
+                    Resolution Notes{preResolved.require_resolution_notes ? ' *' : ''}
+                  </Label>
+                  <Textarea
+                    value={form.resolution_notes}
+                    onChange={(e) => update('resolution_notes', e.target.value)}
+                    placeholder="How was this resolved with the vendor?"
+                    rows={2}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">
+                    Vendor Closure Proof{preResolved.require_closure_proof ? ' *' : ''}
+                  </Label>
+                  <div className="space-y-3">
+                    <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer text-sm text-muted-foreground hover:text-primary transition-colors">
+                      {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                      <span>{uploading ? 'Uploading...' : 'Upload vendor screenshot / chat proof'}</span>
+                      <input type="file" multiple accept="image/*" className="hidden" onChange={handleClosureProofUpload} />
+                    </label>
+                    <ProofImageGallery
+                      items={form.closure_proof_files}
+                      onRemove={removeClosureProofFile}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium">Closure Proof Notes</Label>
+                  <Textarea
+                    value={form.closure_proof_notes}
+                    onChange={(e) => update('closure_proof_notes', e.target.value)}
+                    placeholder="Optional notes about the vendor proof"
+                    rows={2}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
         </div>
 
         <DialogFooter className="shrink-0 border-t px-6 py-4 bg-background flex-row gap-2 sm:justify-end">
@@ -362,7 +526,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           </Button>
           <Button className="flex-1 sm:flex-initial" onClick={handleSubmit} disabled={saving}>
             {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Create Ticket
+            {form.pre_resolved ? 'Log Pre-Resolved Ticket' : 'Create Ticket'}
           </Button>
         </DialogFooter>
       </DialogContent>

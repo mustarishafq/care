@@ -30,6 +30,8 @@ Route::prefix('v1')->group(function () {
     Route::post('sso/nexus/verify', [SsoController::class, 'verify'])->middleware('throttle:10,1');
 
     Route::get('complaints', [ComplaintController::class, 'index'])->middleware('throttle:30,1');
+    Route::get('complaints/create-form-options', [ComplaintController::class, 'createFormOptions'])
+        ->middleware(['auth:sanctum', EnsureUserIsApproved::class, 'throttle:60,1']);
     Route::get('complaints/{id}', [ComplaintController::class, 'show'])->middleware('throttle:30,1');
 
     Route::post('webhook/tracking-update', [WebhookController::class, 'trackingUpdate'])->middleware('throttle:60,1');

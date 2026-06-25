@@ -160,6 +160,10 @@ export const db = {
       const data = await http.delete(`/complaints/${complaintId}/agents/${userId}`);
       return data.data ?? data;
     },
+
+    async createFormOptions() {
+      return http.get('/complaints/create-form-options');
+    },
   },
 
   entities: new Proxy(

@@ -11,7 +11,9 @@ use App\Models\Complaint;
 use App\Services\ComplaintAffectedProductService;
 use App\Services\ComplaintNotificationService;
 use App\Services\ComplaintRoutingService;
+use App\Services\OrderSourceService;
 use App\Services\OutgoingWebhookService;
+use App\Services\PreResolvedComplaintService;
 use App\Services\TicketIdGenerator;
 use App\Support\ComplaintInput;
 use App\Support\StoragePath;
@@ -30,7 +32,19 @@ class ComplaintController extends Controller
         private OutgoingWebhookService $outgoingWebhook,
         private ComplaintNotificationService $complaintNotifications,
         private ComplaintRoutingService $complaintRouting,
+        private PreResolvedComplaintService $preResolvedComplaints,
+        private OrderSourceService $orderSources,
     ) {}
+
+    public function createFormOptions(Request $request): JsonResponse
+    {
+        $this->ensurePermission($request->user(), 'complaints.create');
+
+        return response()->json([
+            'pre_resolved' => $this->preResolvedComplaints->getPublicSettings(),
+            'order_sources' => $this->orderSources->getSources(),
+        ]);
+    }
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -68,11 +82,13 @@ class ComplaintController extends Controller
     {
         $this->ensurePermission($request->user(), 'complaints.create');
 
+        $preResolved = $request->boolean('pre_resolved');
+
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
             'order_number' => ['nullable', 'string', 'max:255'],
-            'order_source' => ['nullable', 'string', 'in:SiteGiant,FounderHQ'],
+            'order_source' => ['nullable', 'string', 'max:255'],
             'purchase_date' => ['required', 'date'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'product_id' => ['required_without_all:product_name,affected_products', 'integer', 'exists:products,id'],
@@ -109,6 +125,7 @@ class ComplaintController extends Controller
             'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'resolution_notes' => ['nullable', 'string'],
             'sla_deadline' => ['nullable', 'date'],
+            'pre_resolved' => ['sometimes', 'boolean'],
         ]);
 
         $affectedProducts = ComplaintInput::pullAffectedProducts($data);
@@ -125,8 +142,18 @@ class ComplaintController extends Controller
         $data = ComplaintInput::normalizeForCreate($data);
         $data = $this->complaintRouting->applyToCreate($data, [
             'had_explicit_department' => $hadExplicitDepartment,
-            'had_explicit_status' => $hadExplicitStatus,
+            'had_explicit_status' => $hadExplicitStatus || $preResolved,
         ]);
+
+        if ($preResolved) {
+            if (isset($data['closure_proof_files'])) {
+                $data['closure_proof_files'] = StoragePath::normalizeClosureProofMany($data['closure_proof_files']);
+            }
+
+            $this->preResolvedComplaints->ensureRequirements($data);
+            $data = $this->preResolvedComplaints->applyToCreate($data);
+            $data = ComplaintInput::applyStatusTimestampsOnCreate($data);
+        }
 
         if (empty($data['assigned_department_id'])) {
             $customerServiceId = DB::table('departments')->where('name', 'Customer Service')->value('id');
@@ -180,7 +207,7 @@ class ComplaintController extends Controller
             'customer_name' => ['sometimes', 'string', 'max:255'],
             'customer_phone' => ['nullable', 'string', 'max:50'],
             'order_number' => ['nullable', 'string', 'max:255'],
-            'order_source' => ['nullable', 'string', 'in:SiteGiant,FounderHQ'],
+            'order_source' => ['nullable', 'string', 'max:255'],
             'purchase_date' => ['sometimes', 'required', 'date'],
             'batch_number' => ['nullable', 'string', 'max:255'],
             'product_id' => ['sometimes', 'integer', 'exists:products,id'],

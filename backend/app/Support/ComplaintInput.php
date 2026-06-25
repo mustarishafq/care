@@ -12,10 +12,52 @@ class ComplaintInput
     public static function normalizeForCreate(array $data): array
     {
         $data = self::resolveStatus($data);
-        unset($data['status'], $data['product_name']);
+        unset($data['status'], $data['product_name'], $data['pre_resolved']);
 
         if (empty($data['status_id'])) {
             $data['status_id'] = self::lookupId('complaint_statuses', 'New Complaint');
+        }
+
+        return $data;
+    }
+
+    /** @param  array<string, mixed>  $data */
+    public static function applyStatusTimestampsOnCreate(array $data): array
+    {
+        if (empty($data['status_id'])) {
+            return $data;
+        }
+
+        $now = now();
+        $slaSettings = app(SlaSettingsService::class);
+        $autoCloseSettings = app(AutoCloseDeliveredComplaintsService::class);
+        $newStatusId = (int) $data['status_id'];
+        $newComplaintId = self::lookupId('complaint_statuses', 'New Complaint');
+        $closedId = self::lookupId('complaint_statuses', 'Closed');
+        $dropId = self::lookupId('complaint_statuses', 'Drop');
+
+        if (! $newComplaintId || $newStatusId !== (int) $newComplaintId) {
+            $data['first_response_at'] = $data['first_response_at'] ?? $now;
+        }
+
+        if ($autoCloseSettings->isTriggerStatusId($newStatusId)) {
+            $data['delivered_at'] = $now;
+        }
+
+        if ($closedId && $newStatusId === (int) $closedId) {
+            $data['closed_at'] = $now;
+        }
+
+        if ($dropId && $newStatusId === (int) $dropId) {
+            $data['closed_at'] = $now;
+        }
+
+        if ($slaSettings->isResolvedStatusId($newStatusId)) {
+            $data['resolved_at'] = $now;
+        }
+
+        if ($slaSettings->isPausedStatusId($newStatusId)) {
+            $data['sla_paused_at'] = $now;
         }
 
         return $data;

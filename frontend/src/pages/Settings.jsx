@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Bell, Clock, Database, GitBranch, Link2, Loader2, Eye, EyeOff, Copy, Check,
-  Shield, Settings2, Webhook, Lock, Sun,
+  Shield, Settings2, Webhook, Lock, Sun, ClipboardCheck, ShoppingBag,
 } from 'lucide-react';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { Switch } from '@/components/ui/switch';
@@ -37,8 +37,15 @@ import {
   NOTIFICATION_TRIGGERS,
   ROUTING_DEFAULT,
   SLA_DEFAULT,
+  PRE_RESOLVED_DEFAULT,
+  ORDER_SOURCES_DEFAULT,
 } from '@/components/settings/constants';
 import { getPausedStatusNames, getResolvedStatusNames, normalizeSlaSettings, toggleStatusId } from '@/lib/slaSettings';
+import {
+  getPreResolvedStatusName,
+  normalizeOrderSources,
+  normalizePreResolvedSettings,
+} from '@/lib/preResolvedSettings';
 import {
   getAutoCloseTargetStatusName,
   getAutoCloseTriggerStatusName,
@@ -60,6 +67,10 @@ export default function Settings() {
   const [autoCloseForm, setAutoCloseForm] = useState(AUTO_CLOSE_DEFAULT);
   const [routingOpen, setRoutingOpen] = useState(false);
   const [routingForm, setRoutingForm] = useState(ROUTING_DEFAULT);
+  const [preResolvedOpen, setPreResolvedOpen] = useState(false);
+  const [preResolvedForm, setPreResolvedForm] = useState(PRE_RESOLVED_DEFAULT);
+  const [orderSourcesOpen, setOrderSourcesOpen] = useState(false);
+  const [orderSourcesForm, setOrderSourcesForm] = useState(ORDER_SOURCES_DEFAULT);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
@@ -119,6 +130,12 @@ export default function Settings() {
       rules: Array.isArray(raw.rules) ? raw.rules : [],
     };
   };
+  const getPreResolved = () => normalizePreResolvedSettings(
+    configs.find((c) => c.key === 'pre_resolved_complaints')?.json_value,
+  );
+  const getOrderSources = () => normalizeOrderSources(
+    configs.find((c) => c.key === 'order_sources')?.json_value,
+  );
   const getSso = () => {
     const raw = configs.find((c) => c.key === 'nexus_sso')?.json_value ?? {};
     return {
@@ -136,9 +153,12 @@ export default function Settings() {
   const autoCloseTriggerStatusName = getAutoCloseTriggerStatusName(autoClose, complaintStatuses);
   const autoCloseTargetStatusName = getAutoCloseTargetStatusName(autoClose, complaintStatuses);
   const routing = getRouting();
+  const preResolved = getPreResolved();
+  const preResolvedStatusName = getPreResolvedStatusName(preResolved, complaintStatuses);
+  const orderSources = getOrderSources();
   const sso = getSso();
   const routingRuleCount = routing.rules.filter((rule) => rule.department_id || rule.status_id).length;
-  const automationActive = [routing.enabled, autoClose.enabled].filter(Boolean).length;
+  const automationActive = [routing.enabled, autoClose.enabled, preResolved.enabled].filter(Boolean).length;
 
   const routingPreview = useMemo(() => routing.rules
     .filter((rule) => rule.department_id || rule.status_id)
@@ -234,6 +254,53 @@ export default function Settings() {
       });
       toast.success('Complaint routing saved');
       setRoutingOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openPreResolved = () => {
+    setPreResolvedForm(getPreResolved());
+    setPreResolvedOpen(true);
+  };
+
+  const savePreResolved = async () => {
+    if (preResolvedForm.enabled && !preResolvedForm.status_id) {
+      toast.error('Select a target status for pre-resolved complaints.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await saveConfig('pre_resolved_complaints', 'Pre-Resolved Complaints', {
+        enabled: !!preResolvedForm.enabled,
+        status_id: preResolvedForm.status_id ? Number(preResolvedForm.status_id) : null,
+        require_closure_proof: !!preResolvedForm.require_closure_proof,
+        require_resolution_notes: !!preResolvedForm.require_resolution_notes,
+      });
+      toast.success('Pre-resolved complaint settings saved');
+      setPreResolvedOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['complaint_create_form_options'] });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openOrderSources = () => {
+    const saved = getOrderSources();
+    setOrderSourcesForm({
+      sources: saved.sources.length ? saved.sources : [''],
+    });
+    setOrderSourcesOpen(true);
+  };
+
+  const saveOrderSources = async () => {
+    setSaving(true);
+    try {
+      await saveConfig('order_sources', 'Order Sources', normalizeOrderSources(orderSourcesForm));
+      toast.success('Order sources saved');
+      setOrderSourcesOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['complaint_create_form_options'] });
     } finally {
       setSaving(false);
     }
@@ -395,6 +462,22 @@ export default function Settings() {
                 onEdit={openLookup}
               />
             ))}
+            <SettingsConfigCard
+              title="Order Sources"
+              description="Platforms shown when creating a complaint"
+              icon={ShoppingBag}
+              canManage={canManage}
+              onEdit={openOrderSources}
+              rows={[
+                { label: 'Configured sources', value: orderSources.sources.length ? `${orderSources.sources.length} options` : 'None' },
+                {
+                  label: 'Preview',
+                  value: orderSources.sources.length
+                    ? orderSources.sources.slice(0, 3).join(', ') + (orderSources.sources.length > 3 ? '…' : '')
+                    : '—',
+                },
+              ]}
+            />
           </div>
         </TabsContent>
 
@@ -489,6 +572,31 @@ export default function Settings() {
                 { label: 'Trigger status', value: autoCloseTriggerStatusName },
                 { label: 'Action', value: `Move to ${autoCloseTargetStatusName}` },
                 { label: 'Delay', value: autoClose.enabled ? formatAutoCloseDelay(autoClose) : '—' },
+              ]}
+            />
+
+            <SettingsConfigCard
+              title="Pre-Resolved at Vendor"
+              description="Log marketplace complaints already settled with the vendor"
+              icon={ClipboardCheck}
+              enabled={preResolved.enabled}
+              canManage={canManage}
+              onEdit={openPreResolved}
+              rows={[
+                {
+                  label: 'Create as status',
+                  value: preResolved.enabled
+                    ? (preResolvedStatusName ?? 'Not configured')
+                    : '—',
+                },
+                {
+                  label: 'Require closure proof',
+                  value: preResolved.enabled ? (preResolved.require_closure_proof ? 'Yes' : 'No') : '—',
+                },
+                {
+                  label: 'Require resolution notes',
+                  value: preResolved.enabled ? (preResolved.require_resolution_notes ? 'Yes' : 'No') : '—',
+                },
               ]}
             />
           </div>
@@ -760,6 +868,115 @@ export default function Settings() {
           <DialogFooter className="shrink-0 border-t px-6 py-4 bg-background">
             <Button variant="outline" onClick={() => setRoutingOpen(false)}>Cancel</Button>
             <Button onClick={saveRouting} disabled={saving}>{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={preResolvedOpen} onOpenChange={setPreResolvedOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ClipboardCheck className="w-4 h-4" />Pre-Resolved at Vendor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="rounded-lg bg-muted/50 border p-3 text-xs text-muted-foreground">
+              When enabled, agents can log complaints already settled with a marketplace vendor. Tickets are created in your chosen status for later review before closing.
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="pre-resolved-enabled" className="text-sm">Enable pre-resolved complaints</Label>
+              <Switch
+                id="pre-resolved-enabled"
+                checked={!!preResolvedForm.enabled}
+                onCheckedChange={(checked) => setPreResolvedForm((p) => ({ ...p, enabled: checked }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Create as status</Label>
+              <Select
+                value={preResolvedForm.status_id || '__none__'}
+                onValueChange={(value) => setPreResolvedForm((p) => ({ ...p, status_id: value === '__none__' ? '' : value }))}
+                disabled={!preResolvedForm.enabled}
+              >
+                <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
+                <SelectContent>
+                  {complaintStatuses.map((status) => (
+                    <SelectItem key={status.id} value={String(status.id)}>{status.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={!!preResolvedForm.require_closure_proof}
+                disabled={!preResolvedForm.enabled}
+                onCheckedChange={(checked) => setPreResolvedForm((p) => ({ ...p, require_closure_proof: !!checked }))}
+              />
+              Require closure proof on create
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox
+                checked={!!preResolvedForm.require_resolution_notes}
+                disabled={!preResolvedForm.enabled}
+                onCheckedChange={(checked) => setPreResolvedForm((p) => ({ ...p, require_resolution_notes: !!checked }))}
+              />
+              Require resolution notes on create
+            </label>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreResolvedOpen(false)}>Cancel</Button>
+            <Button onClick={savePreResolved} disabled={saving}>{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={orderSourcesOpen} onOpenChange={setOrderSourcesOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" />Order Sources</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-1">
+            <p className="text-xs text-muted-foreground">
+              Manage platform names shown in the create complaint form. Add Shopee, TikTok, or any channel you use.
+            </p>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {orderSourcesForm.sources.map((source, index) => (
+                <div key={`order-source-${index}`} className="flex items-center gap-2">
+                  <Input
+                    value={source}
+                    onChange={(e) => setOrderSourcesForm((prev) => ({
+                      ...prev,
+                      sources: prev.sources.map((item, i) => (i === index ? e.target.value : item)),
+                    }))}
+                    placeholder="e.g. Shopee"
+                    className="h-8 text-sm"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => setOrderSourcesForm((prev) => ({
+                      ...prev,
+                      sources: prev.sources.filter((_, i) => i !== index),
+                    }))}
+                    disabled={orderSourcesForm.sources.length <= 1}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setOrderSourcesForm((prev) => ({ ...prev, sources: [...prev.sources, ''] }))}
+            >
+              Add source
+            </Button>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOrderSourcesOpen(false)}>Cancel</Button>
+            <Button onClick={saveOrderSources} disabled={saving}>{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

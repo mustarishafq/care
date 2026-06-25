@@ -20,10 +20,6 @@
     },
     "order_source": {
       "type": "string",
-      "enum": [
-        "SiteGiant",
-        "FounderHQ"
-      ],
       "description": "Platform where the order was placed"
     },
     "purchase_date": {
