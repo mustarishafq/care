@@ -32,5 +32,6 @@
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
+        <env name="MCP_API_KEY" value="test-mcp-api-key-with-32-chars-min"/>
     </php>
 </phpunit>

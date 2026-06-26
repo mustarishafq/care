@@ -8,10 +8,10 @@ use App\Http\Resources\ComplaintResource;
 use App\Http\Resources\NotificationResource;
 use App\Models\Complaint;
 use App\Models\Notification;
+use App\Services\ComplaintTrackingUpdateService;
 use App\Services\OutgoingWebhookService;
 use App\Services\WebhookSettingsService;
 use App\Support\NotificationPayload;
-use App\Models\TicketActivity;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,6 +22,7 @@ class WebhookController extends Controller
     public function __construct(
         private WebhookSettingsService $webhookSettings,
         private OutgoingWebhookService $outgoingWebhook,
+        private ComplaintTrackingUpdateService $trackingUpdate,
     ) {}
 
     public function settings(Request $request): JsonResponse
@@ -218,41 +219,9 @@ class WebhookController extends Controller
             'status' => ['nullable', 'string'],
         ]);
 
-        $complaint = isset($data['ticket_id'])
-            ? Complaint::where('ticket_id', $data['ticket_id'])->first()
-            : Complaint::where('order_number', $data['order_number'])->first();
-
-        if (! $complaint) {
-            return response()->json(['message' => 'Complaint not found.'], 404);
-        }
-
-        $updates = array_filter([
-            'tracking_number' => $data['tracking_number'] ?? null,
-            'replacement_tracking_number' => $data['replacement_tracking_number'] ?? null,
-            'status' => $data['status'] ?? null,
-        ], fn ($v) => $v !== null);
-
-        if (! empty($updates)) {
-            $normalized = ComplaintInput::normalizeForUpdate($updates);
-            $complaint->update(ComplaintInput::applyStatusTimestamps($complaint, $normalized));
-
-            TicketActivity::create([
-                'complaint_id' => $complaint->id,
-                'action_type' => 'tracking_added',
-                'description' => 'Tracking updated via webhook',
-                'new_value' => json_encode($updates),
-            ]);
-
-            $this->outgoingWebhook->dispatchComplaint('complaint.tracking_updated', $complaint->fresh());
-        }
-
         return response()->json([
             'message' => 'Tracking updated successfully.',
-            'complaint' => new ComplaintResource($complaint->fresh()->load([
-                'complaintStatus',
-                'affectedProducts.product',
-                'affectedProducts.unitOfMeasurement',
-            ])),
+            'complaint' => $this->trackingUpdate->update($data),
         ]);
     }
 

@@ -84,7 +84,21 @@ DB_USERNAME=root
 DB_PASSWORD=
 
 SANCTUM_STATEFUL_DOMAINS=localhost,localhost:5173,127.0.0.1,127.0.0.1:5173
+
+# EMZI Nexus Brain MCP API (see docs/emzi-nexus-mcp-catalog-spec.md)
+MCP_API_KEY=your-long-random-secret-min-32-chars
+MCP_RATE_LIMIT=60
 ```
+
+### EMZI Nexus Brain (MCP API)
+
+Care exposes versioned MCP endpoints at `/api/mcp/v1/` for EMZI Nexus Brain. Set `MCP_API_KEY` in `.env`, then register the system in Nexus Brain with catalog URL `{base_url}/api/mcp/v1/catalog`.
+
+```bash
+curl -s -H "X-API-Key: YOUR_KEY" https://careapi.example.com/api/mcp/v1/catalog
+```
+
+Full specification: [`docs/emzi-nexus-mcp-catalog-spec.md`](docs/emzi-nexus-mcp-catalog-spec.md).
 
 ### Database Configuration (MySQL)
 
@@ -377,7 +391,15 @@ VITE_API_URL=https://careapi.example.com/api/v1
   `curl -i -X OPTIONS 'https://careapi.example.com/api/v1/auth/login' -H 'Origin: https://care.example.com' -H 'Access-Control-Request-Method: POST'`  
   Response should include `Access-Control-Allow-Origin`.
 
-**Same-domain alternative (no CORS):** proxy `/api` on the frontend host to Laravel (see `deploy/nginx/care.conf`) and build with `VITE_API_URL=/api/v1`.
+**Same-domain alternative (no CORS):** proxy `/api` on the frontend host to Laravel (see `deploy/nginx/care.conf`) and build with `VITE_API_URL=/api/v1`. This is **required** for Nexus Brain `GET /api/mcp/v1/catalog` when the app’s public URL is the frontend host (e.g. `care.emzinexus.com`).
+
+### `/api/mcp/v1/catalog` returns 404 or HTML on the frontend domain
+
+Nexus Brain calls `{public_app_url}/api/mcp/v1/catalog`. If the frontend nginx vhost only serves `frontend/dist` with `try_files … /index.html`, `/api/*` never reaches Laravel and the SPA may show a 404.
+
+- **Verify API host:** `curl -i https://careapi.emzinexus.com/api/mcp/v1/catalog` should return `401` JSON (not HTML) without credentials.
+- **Fix frontend nginx:** add the `/api/` proxy block from `deploy/nginx/care.conf`, then `sudo nginx -t && sudo systemctl reload nginx`.
+- **Re-verify:** `curl -i https://care.emzinexus.com/api/mcp/v1/catalog` should return the same `401` JSON as the API host.
 
 - Set `FRONTEND_URL` in backend `.env`
 - Add your domain to `SANCTUM_STATEFUL_DOMAINS` if using cookie-based Sanctum auth

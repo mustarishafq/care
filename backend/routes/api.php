@@ -1,6 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\McpCatalogController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ComplaintController;
 use App\Http\Controllers\Api\V1\ComplaintStatusController;
@@ -22,8 +21,6 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Middleware\EnsureUserIsApproved;
 use Illuminate\Support\Facades\Route;
-
-Route::get('mcp-catalog', McpCatalogController::class)->middleware('throttle:60,1');
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
