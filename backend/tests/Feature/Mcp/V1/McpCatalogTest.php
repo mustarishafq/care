@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Mcp\V1;
 
+use App\Services\WebhookSettingsService;
 use Tests\TestCase;
 
 class McpCatalogTest extends TestCase
@@ -17,6 +18,11 @@ class McpCatalogTest extends TestCase
             'mcp.api_keys' => [],
             'mcp.rate_limit' => 60,
         ]);
+
+        $this->mock(WebhookSettingsService::class, function ($mock): void {
+            $mock->shouldReceive('validateIncomingSecret')
+                ->andReturnUsing(fn (?string $secret) => $secret === 'incoming-webhook-secret');
+        });
     }
 
     public function test_catalog_requires_authentication(): void
@@ -61,6 +67,32 @@ class McpCatalogTest extends TestCase
         ]);
 
         $this->withHeader('X-API-Key', self::API_KEY)
+            ->getJson('/api/mcp/v1/catalog')
+            ->assertOk()
+            ->assertJson(['success' => true]);
+    }
+
+    public function test_webhook_secret_header_is_accepted(): void
+    {
+        $this->withHeader('X-Webhook-Secret', 'incoming-webhook-secret')
+            ->getJson('/api/mcp/v1/catalog')
+            ->assertOk()
+            ->assertJson(['success' => true]);
+    }
+
+    public function test_webhook_secret_via_bearer_is_accepted(): void
+    {
+        $this->withHeader('Authorization', 'Bearer incoming-webhook-secret')
+            ->getJson('/api/mcp/v1/catalog')
+            ->assertOk()
+            ->assertJson(['success' => true]);
+    }
+
+    public function test_webhook_secret_via_x_api_key_header_is_accepted(): void
+    {
+        config(['mcp.api_key' => null, 'mcp.api_keys' => []]);
+
+        $this->withHeader('X-API-Key', 'incoming-webhook-secret')
             ->getJson('/api/mcp/v1/catalog')
             ->assertOk()
             ->assertJson(['success' => true]);

@@ -92,10 +92,13 @@ MCP_RATE_LIMIT=60
 
 ### EMZI Nexus Brain (MCP API)
 
-Care exposes versioned MCP endpoints at `/api/mcp/v1/` for EMZI Nexus Brain. Set `MCP_API_KEY` in `.env`, then register the system in Nexus Brain with catalog URL `{base_url}/api/mcp/v1/catalog`.
+Care exposes versioned MCP endpoints at `/api/mcp/v1/` for EMZI Nexus Brain. Server-to-server auth accepts:
+
+- `MCP_API_KEY` via `X-API-Key` (recommended for new setups), or
+- the existing **incoming webhook secret** via `X-Webhook-Secret`, `Authorization: Bearer`, or `X-API-Key`
 
 ```bash
-curl -s -H "X-API-Key: YOUR_KEY" https://careapi.example.com/api/mcp/v1/catalog
+curl -s -H "X-Webhook-Secret: YOUR_WEBHOOK_SECRET" https://careapi.example.com/api/mcp/v1/catalog
 ```
 
 Full specification: [`docs/emzi-nexus-mcp-catalog-spec.md`](docs/emzi-nexus-mcp-catalog-spec.md).
