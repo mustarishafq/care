@@ -1,7 +1,9 @@
 import { db } from '@/api/db';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
+import { isToday, isThisMonth } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
 import { Plus, FileText } from 'lucide-react';
@@ -12,13 +14,21 @@ import CreateComplaintDialog from '@/components/complaints/CreateComplaintDialog
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
 import { canViewComplaint } from '@/lib/complaintVisibility';
+import { useSlaSettings } from '@/lib/useSlaSettings';
+import { parseComplaintFilters } from '@/lib/complaintFilterParams';
 
 export default function Complaints() {
+  const [searchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
-  const [filters, setFilters] = useState({ search: '', status: '', type: '', priority: '', department: '', courier: '' });
+  const [filters, setFilters] = useState(() => parseComplaintFilters(searchParams));
   const { user: currentUser, loading: userLoading } = useCurrentUser();
   const { hasPermission, loading: permLoading } = usePermissions();
+  const { resolvedStatusNames } = useSlaSettings();
   const canCreate = hasPermission('complaints.create');
+
+  useEffect(() => {
+    setFilters(parseComplaintFilters(searchParams));
+  }, [searchParams]);
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
@@ -28,6 +38,10 @@ export default function Complaints() {
   const filtered = useMemo(() => {
     return complaints.filter(c => {
       if (!canViewComplaint(currentUser, c)) return false;
+      if (filters.preset === 'today' && !isToday(new Date(c.created_date))) return false;
+      if (filters.preset === 'month' && !isThisMonth(new Date(c.created_date))) return false;
+      if (filters.preset === 'open' && resolvedStatusNames.includes(c.status)) return false;
+      if (filters.preset === 'pending-fulfillment' && !['Approved Replacement', 'Reprocessing by Fulfillment'].includes(c.status)) return false;
       if (filters.status && c.status !== filters.status) return false;
       if (filters.type && c.complaint_type_id !== filters.type) return false;
       if (filters.priority && c.priority_id !== filters.priority) return false;
@@ -40,7 +54,7 @@ export default function Complaints() {
       }
       return true;
     });
-  }, [complaints, filters, currentUser]);
+  }, [complaints, filters, currentUser, resolvedStatusNames]);
 
   if (isLoading || userLoading || permLoading) {
     return (

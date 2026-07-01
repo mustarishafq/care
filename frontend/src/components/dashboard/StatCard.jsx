@@ -11,10 +11,24 @@ const colorMap = {
   blue: 'bg-primary/10 text-primary',
 };
 
-export default function StatCard({ label, value, icon: Icon, trend, color = 'primary', index = 0 }) {
+export default function StatCard({ label, value, icon: Icon, trend, color = 'primary', index = 0, onClick }) {
+  const clickable = typeof onClick === 'function';
+
   return (
     <div
-      className="bg-card rounded-2xl border border-border p-4 sm:p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group"
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={clickable ? (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick();
+        }
+      } : undefined}
+      className={cn(
+        'bg-card rounded-2xl border border-border p-4 sm:p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group',
+        clickable && 'cursor-pointer hover:border-primary/30 active:scale-[0.98]',
+      )}
       style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex items-start justify-between gap-2">

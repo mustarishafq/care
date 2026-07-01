@@ -4,6 +4,7 @@ import { spawn, execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { getBackendPort, getBackendUrl } from './backend-url.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -54,12 +55,14 @@ try {
   run('php artisan db:seed --force', backend);
   run('php artisan storage:link', backend);
 
+  const backendUrl = getBackendUrl();
+
   console.log('\n=== Starting servers ===\n');
-  console.log('Backend:  http://localhost:8000');
+  console.log(`Backend:  ${backendUrl}`);
   console.log('Frontend: http://localhost:5173');
   console.log('Admin:    admin@admin.com / password\n');
 
-  const backendProc = spawn('php', ['artisan', 'serve', '--port=8000'], {
+  const backendProc = spawn('php', ['artisan', 'serve', `--port=${getBackendPort()}`], {
     cwd: backend,
     stdio: 'inherit',
   });

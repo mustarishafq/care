@@ -6,6 +6,7 @@ import { Search, X } from 'lucide-react';
 import { buildStatusOrder } from '@/lib/ticketUtils';
 import { useDepartments } from '@/lib/useDepartments';
 import { useComplaintStatuses, useComplaintTypes, useCouriers, usePriorities } from '@/lib/useLookups';
+import { DEFAULT_COMPLAINT_FILTERS } from '@/lib/complaintFilterParams';
 
 export default function ComplaintFilters({ filters, setFilters }) {
   const { data: departments = [] } = useDepartments();
@@ -20,7 +21,7 @@ export default function ComplaintFilters({ filters, setFilters }) {
   };
 
   const clearFilters = () => {
-    setFilters({ search: '', status: '', type: '', priority: '', department: '', courier: '' });
+    setFilters({ ...DEFAULT_COMPLAINT_FILTERS });
   };
 
   const hasFilters = Object.values(filters).some(v => v);

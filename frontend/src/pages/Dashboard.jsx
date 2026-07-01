@@ -1,6 +1,7 @@
 import { db } from '@/api/db';
 
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
@@ -22,11 +23,15 @@ import StatusBadge from '@/components/complaints/StatusBadge';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { filterVisibleComplaints, filterVisibleActivities } from '@/lib/complaintVisibility';
 import { hasAssignedAgents } from '@/lib/assignedAgents';
+import { buildComplaintsUrl } from '@/lib/complaintFilterParams';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [assignTarget, setAssignTarget] = useState(null);
   const { user } = useCurrentUser();
+
+  const goToComplaints = (filters) => navigate(buildComplaintsUrl(filters));
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
@@ -64,8 +69,16 @@ export default function Dashboard() {
 
   // Top complaint types
   const typeMap = {};
-  visibleComplaints.forEach(c => { typeMap[c.complaint_type] = (typeMap[c.complaint_type] || 0) + 1; });
-  const topTypes = Object.entries(typeMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  visibleComplaints.forEach(c => {
+    if (!c.complaint_type) return;
+    const existing = typeMap[c.complaint_type];
+    if (existing) {
+      existing.count += 1;
+    } else {
+      typeMap[c.complaint_type] = { name: c.complaint_type, count: 1, typeId: c.complaint_type_id };
+    }
+  });
+  const topTypes = Object.values(typeMap).sort((a, b) => b.count - a.count);
 
   // Top products
   const prodMap = {};
@@ -74,8 +87,16 @@ export default function Dashboard() {
 
   // Top couriers
   const courMap = {};
-  visibleComplaints.forEach(c => { if (c.courier_name) courMap[c.courier_name] = (courMap[c.courier_name] || 0) + 1; });
-  const topCouriers = Object.entries(courMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+  visibleComplaints.forEach(c => {
+    if (!c.courier_name) return;
+    const existing = courMap[c.courier_name];
+    if (existing) {
+      existing.count += 1;
+    } else {
+      courMap[c.courier_name] = { name: c.courier_name, count: 1, courierId: c.courier_id };
+    }
+  });
+  const topCouriers = Object.values(courMap).sort((a, b) => b.count - a.count);
 
   if (isLoading) {
     return (
@@ -95,14 +116,14 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label="Today's Complaints" value={todayCount} icon={FileText} color="blue" index={0} />
-        <StatCard label="This Month" value={monthCount} icon={TrendingUp} color="purple" index={1} />
-        <StatCard label="Open Tickets" value={openCount} icon={AlertCircle} color="warning" index={2} />
-        <StatCard label="Closed" value={closedCount} icon={CheckCircle2} color="success" index={3} />
-        <StatCard label="Pending Fulfillment" value={pendingFulfillment} icon={Package} color="purple" index={4} />
-        <StatCard label="Pending Courier" value={pendingLogistics} icon={Truck} color="blue" index={5} />
+        <StatCard label="Today's Complaints" value={todayCount} icon={FileText} color="blue" index={0} onClick={() => goToComplaints({ preset: 'today' })} />
+        <StatCard label="This Month" value={monthCount} icon={TrendingUp} color="purple" index={1} onClick={() => goToComplaints({ preset: 'month' })} />
+        <StatCard label="Open Tickets" value={openCount} icon={AlertCircle} color="warning" index={2} onClick={() => goToComplaints({ preset: 'open' })} />
+        <StatCard label="Closed" value={closedCount} icon={CheckCircle2} color="success" index={3} onClick={() => goToComplaints({ status: 'Closed' })} />
+        <StatCard label="Pending Fulfillment" value={pendingFulfillment} icon={Package} color="purple" index={4} onClick={() => goToComplaints({ preset: 'pending-fulfillment' })} />
+        <StatCard label="Pending Courier" value={pendingLogistics} icon={Truck} color="blue" index={5} onClick={() => goToComplaints({ status: 'Ready to Ship' })} />
         <StatCard label="Avg Resolution (hrs)" value={avgResolution} icon={Timer} color="primary" index={6} />
-        <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" index={7} />
+        <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" index={7} onClick={() => goToComplaints()} />
       </div>
 
       {/* Charts Row — on lg+: trend chart (2 cols) + recent activity (1 col); on mobile recent activity moves to bottom */}
@@ -115,9 +136,21 @@ export default function Dashboard() {
 
       {/* Bottom Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <TopIssuesCard title="Top Complaint Types" data={topTypes} />
-        <TopIssuesCard title="Most Problematic Products" data={topProducts} />
-        <TopIssuesCard title="Most Problematic Couriers" data={topCouriers} />
+        <TopIssuesCard
+          title="Top Complaint Types"
+          data={topTypes}
+          onItemClick={(item) => item.typeId && goToComplaints({ type: item.typeId })}
+        />
+        <TopIssuesCard
+          title="Most Problematic Products"
+          data={topProducts}
+          onItemClick={(item) => goToComplaints({ search: item.name })}
+        />
+        <TopIssuesCard
+          title="Most Problematic Couriers"
+          data={topCouriers}
+          onItemClick={(item) => item.courierId && goToComplaints({ courier: item.courierId })}
+        />
       </div>
 
       {/* Recent Activity — visible only on mobile/tablet, hidden on lg+ */}
