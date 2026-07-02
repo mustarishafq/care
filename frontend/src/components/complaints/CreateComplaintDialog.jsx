@@ -17,6 +17,7 @@ import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
+import { formatDateForDisplay, isValidIsoDate, parseDateInput } from '@/lib/dateInput';
 import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
 import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import AffectedProductsEditor, { EMPTY_AFFECTED_PRODUCT } from '@/components/complaints/AffectedProductsEditor';
@@ -40,7 +41,7 @@ function getMissingComplaintFields(form) {
   const missing = [];
   if (!form.customer_name?.trim()) missing.push('customer_name');
   if (!form.tracking_number?.trim()) missing.push('tracking_number');
-  if (!form.purchase_date) missing.push('purchase_date');
+  if (!isValidIsoDate(form.purchase_date)) missing.push('purchase_date');
   if (!form.complaint_type_id) missing.push('complaint_type_id');
   if (!form.affected_products.some((item) => item.product_id)) missing.push('product_id');
   if (!form.description?.trim()) missing.push('description');
@@ -78,6 +79,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const { data: unitsOfMeasurement = [] } = useUnitsOfMeasurement();
   const { preResolved, orderSources, isLoading: loadingCreateOptions, error: createOptionsError, refetch: refetchCreateOptions } = useComplaintCreateOptions({ enabled: open });
   const [form, setForm] = useState(EMPTY_FORM);
+  const [purchaseDateInput, setPurchaseDateInput] = useState('');
   const [invalidFields, setInvalidFields] = useState([]);
 
   const { data: products = [] } = useQuery({
@@ -89,6 +91,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     if (!open) return;
     setUploadError('');
     setInvalidFields([]);
+    setPurchaseDateInput('');
     setForm({
       ...EMPTY_FORM,
       priority_id: String(findIdByName(priorities, 'Medium') || ''),
@@ -105,6 +108,15 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const update = (key, value) => {
     setInvalidFields((prev) => prev.filter((field) => field !== key));
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const syncPurchaseDate = (text) => {
+    const isoDate = parseDateInput(text);
+    setPurchaseDateInput(isoDate ? formatDateForDisplay(isoDate) : text);
+    setForm((prev) => ({ ...prev, purchase_date: isoDate }));
+    if (isoDate) {
+      setInvalidFields((prev) => prev.filter((field) => field !== 'purchase_date'));
+    }
   };
 
   const updateAffectedProducts = (affected_products) => {
@@ -218,7 +230,9 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   };
 
   const handleSubmit = async () => {
-    const missing = getMissingComplaintFields(form);
+    const purchaseDate = parseDateInput(purchaseDateInput) || form.purchase_date;
+    const formForValidation = { ...form, purchase_date: purchaseDate };
+    const missing = getMissingComplaintFields(formForValidation);
     if (missing.length) {
       setInvalidFields(missing);
       const labels = missing.map((key) => FIELD_LABELS[key] ?? key);
@@ -232,6 +246,8 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     }
 
     setInvalidFields([]);
+    setForm((prev) => ({ ...prev, purchase_date: purchaseDate }));
+    setPurchaseDateInput(formatDateForDisplay(purchaseDate));
 
     if (form.pre_resolved) {
       if (preResolved.require_closure_proof && form.closure_proof_files.length === 0) {
@@ -263,7 +279,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       customer_phone: form.customer_phone,
       order_number: form.order_number.trim() || null,
       order_source: form.order_source || null,
-      purchase_date: form.purchase_date,
+      purchase_date: purchaseDate,
       affected_products: affectedProducts,
       complaint_type_id: form.complaint_type_id,
       description: form.description,
@@ -304,7 +320,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       customer_name: created.customer_name ?? form.customer_name,
       order_number: created.order_number ?? form.order_number,
       order_source: created.order_source ?? form.order_source,
-      purchase_date: created.purchase_date ?? form.purchase_date,
+      purchase_date: created.purchase_date ?? purchaseDate,
       tracking_number: created.tracking_number ?? form.tracking_number,
       status: created.status,
       affected_products: (created.affected_products ?? []).map((item) => ({
@@ -365,13 +381,13 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           <div id="complaint-field-purchase_date" className="space-y-1.5">
             <Label className="text-xs font-medium">Purchase Date *</Label>
             <Input
-              type="date"
+              type="text"
+              inputMode="numeric"
               className={fieldClass('purchase_date')}
-              value={form.purchase_date}
-              onChange={e => update('purchase_date', e.target.value)}
-              onBlur={e => {
-                if (e.target.value) update('purchase_date', e.target.value);
-              }}
+              value={purchaseDateInput}
+              onChange={(e) => syncPurchaseDate(e.target.value)}
+              onBlur={(e) => syncPurchaseDate(e.target.value)}
+              placeholder="DD/MM/YYYY"
             />
           </div>
           <div className="space-y-1.5">
