@@ -54,7 +54,7 @@ export function GlobalSearchTrigger({ className }) {
         )}
       >
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
-        <span className="truncate">Search complaints, users…</span>
+        <span className="truncate">Search complaints, tracking, users…</span>
         {!isMobile && (
           <kbd className="pointer-events-none ml-auto hidden h-5 shrink-0 items-center rounded border bg-muted px-1.5 font-mono text-[10px] sm:inline-flex">
             ⌘K
@@ -158,13 +158,13 @@ function GlobalSearchDialog({ open, onOpenChange }) {
       contentClassName="w-[calc(100%-2rem)] max-w-lg rounded-xl p-0"
     >
       <CommandInput
-        placeholder="Search complaints, users, phone, orders…"
+        placeholder="Search complaints, users, phone, orders, tracking…"
         value={query}
         onValueChange={setQuery}
       />
       <CommandList className="max-h-[300px]">
         {showIdle && (
-          <CommandEmpty>Type a ticket ID, customer, phone, order, name, or email.</CommandEmpty>
+          <CommandEmpty>Type a ticket ID, customer, phone, order, tracking number, name, or email.</CommandEmpty>
         )}
         {loading && debouncedQuery && (
           <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
@@ -190,7 +190,7 @@ function GlobalSearchDialog({ open, onOpenChange }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{complaint.ticket_id}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {[complaint.customer_name, complaint.customer_phone, complaint.order_number]
+                    {[complaint.customer_name, complaint.customer_phone, complaint.order_number, complaint.tracking_number]
                       .filter(Boolean)
                       .join(' · ')}
                   </p>

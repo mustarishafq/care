@@ -61,6 +61,8 @@ class ComplaintController extends Controller
                     ->orWhere('customer_name', 'like', $term)
                     ->orWhere('customer_phone', 'like', $term)
                     ->orWhere('order_number', 'like', $term)
+                    ->orWhere('tracking_number', 'like', $term)
+                    ->orWhere('replacement_tracking_number', 'like', $term)
                     ->orWhereHas('affectedProducts.product', function ($productQuery) use ($term) {
                         $productQuery->where('name', 'like', $term)
                             ->orWhere('sku', 'like', $term);
