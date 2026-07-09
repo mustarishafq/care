@@ -14,6 +14,7 @@ use App\Services\Marketplace\MarketplaceTokenRefreshService;
 use App\Services\TikTokShop\TikTokShopAuthService;
 use App\Services\TikTokShop\TikTokShopService;
 use App\Support\MarketplacePlatform;
+use App\Support\TikTokShopScopes;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -37,11 +38,24 @@ class TikTokShopController extends Controller
 
         $credentials = $this->platformConfig->getCredentials(MarketplacePlatform::TIKTOK_SHOP);
 
+        $connections = $this->shopService->listConnections();
+        $grantedScopes = $connections
+            ->map(fn ($connection) => is_array($connection->metadata['granted_scopes'] ?? null)
+                ? $connection->metadata['granted_scopes']
+                : [])
+            ->flatten()
+            ->unique()
+            ->values()
+            ->all();
+
         return response()->json([
             'configured' => $this->authService->isConfigured(),
             'region' => $credentials['region'],
             'callback_url' => url('/api/v1/tiktok-shop/oauth/callback'),
             'webhook_url' => url('/api/v1/webhook/marketplace/tiktok-shop'),
+            'required_scopes' => TikTokShopScopes::required(),
+            'granted_scopes' => $grantedScopes,
+            'missing_scopes' => TikTokShopScopes::missing($grantedScopes === [] ? null : $grantedScopes),
             'settings' => $credentials['settings'],
             'connections_needing_attention' => $this->tokenRefresh
                 ->connectionsNeedingAttention()

@@ -264,6 +264,21 @@ export default function TikTokShop({ embedded = false } = {}) {
               </CardContent>
             </Card>
           )}
+          {!loadingStatus && status?.missing_scopes?.length > 0 && (
+            <Card className="rounded-2xl border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
+              <CardContent className="pt-4 pb-4 text-sm text-amber-800 dark:text-amber-200 space-y-2">
+                <p>
+                  TikTok Shop is missing API scopes on the current token:
+                  {' '}<strong>{status.missing_scopes.join(', ')}</strong>.
+                </p>
+                <p>
+                  In <a href="https://partner.tiktokshop.com" target="_blank" rel="noreferrer" className="underline font-medium">Partner Center</a>,
+                  open your app → <strong>API permissions</strong>, enable the matching permissions, wait for approval if needed,
+                  then disconnect and reconnect the shop here.
+                </p>
+              </CardContent>
+            </Card>
+          )}
           <Card className="rounded-2xl">
             <CardHeader>
               <CardTitle className="text-base">Connected shops</CardTitle>
@@ -417,6 +432,25 @@ export default function TikTokShop({ embedded = false } = {}) {
                   <div className="text-xs text-muted-foreground space-y-1">
                     <p>OAuth callback: <code className="bg-muted px-1 rounded break-all">{configData?.callback_url}</code></p>
                     <p>Webhook URL: <code className="bg-muted px-1 rounded break-all">{configData?.webhook_url}</code></p>
+                  </div>
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <p className="text-sm font-medium">Required Partner Center API scopes</p>
+                    <p className="text-xs text-muted-foreground">
+                      Enable these under App &amp; Service → API permissions, then reconnect the shop.
+                    </p>
+                    <ul className="text-xs space-y-2">
+                      {(status?.required_scopes ?? []).map((item) => (
+                        <li key={item.scope} className="flex flex-col gap-0.5">
+                          <code className="bg-muted px-1 rounded w-fit">{item.scope}</code>
+                          <span className="text-muted-foreground">{item.feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    {status?.granted_scopes?.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Granted on current token: {status.granted_scopes.join(', ')}
+                      </p>
+                    )}
                   </div>
                 </>
               )}

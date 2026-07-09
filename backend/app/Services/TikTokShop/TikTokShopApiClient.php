@@ -4,6 +4,7 @@ namespace App\Services\TikTokShop;
 
 use App\Services\Marketplace\MarketplacePlatformConfigService;
 use App\Support\MarketplacePlatform;
+use App\Support\TikTokShopScopes;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -224,7 +225,13 @@ class TikTokShopApiClient
 
         $code = $json['code'] ?? -1;
         if ((int) $code !== 0) {
-            throw new RuntimeException($json['message'] ?? 'TikTok Shop API request failed.', (int) $code);
+            $message = (string) ($json['message'] ?? 'TikTok Shop API request failed.');
+
+            if (TikTokShopScopes::isScopeError($message) || (int) $code === 105005) {
+                throw new RuntimeException(TikTokShopScopes::scopeErrorGuidance($message), (int) $code);
+            }
+
+            throw new RuntimeException($message, (int) $code);
         }
 
         return is_array($json['data'] ?? null) ? $json['data'] : [];

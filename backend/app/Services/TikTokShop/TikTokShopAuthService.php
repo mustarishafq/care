@@ -6,6 +6,7 @@ use App\Models\TikTokShopConnection;
 use App\Models\User;
 use App\Services\Marketplace\MarketplacePlatformConfigService;
 use App\Support\MarketplacePlatform;
+use App\Support\TikTokShopScopes;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -64,9 +65,19 @@ class TikTokShopAuthService
         $tokenData = $this->client()->exchangeAuthCode($authCode);
         $accessToken = (string) ($tokenData['access_token'] ?? '');
         $refreshToken = (string) ($tokenData['refresh_token'] ?? '');
+        $grantedScopes = $this->normalizeGrantedScopes($tokenData['granted_scopes'] ?? null);
 
         if ($accessToken === '') {
             throw new RuntimeException('TikTok Shop did not return an access token.');
+        }
+
+        $missingScopes = TikTokShopScopes::missing($grantedScopes);
+        if ($grantedScopes !== [] && $missingScopes !== []) {
+            throw new RuntimeException(
+                'TikTok Shop authorized this connection without required API scopes: '
+                .implode(', ', $missingScopes).'. '
+                .TikTokShopScopes::scopeErrorGuidance(),
+            );
         }
 
         $shopsData = $this->client()->getAuthorizedShops($accessToken);
@@ -108,7 +119,9 @@ class TikTokShopAuthService
                     'is_active' => true,
                     'connection_error' => null,
                     'token_refresh_failed_at' => null,
-                    'metadata' => $shop,
+                    'metadata' => array_merge($shop, [
+                        'granted_scopes' => $grantedScopes,
+                    ]),
                 ],
             );
         }
@@ -151,13 +164,35 @@ class TikTokShopAuthService
         return 'tiktok_shop_oauth:'.$state;
     }
 
+    /**
+     * @return list<string>
+     */
+    private function normalizeGrantedScopes(mixed $scopes): array
+    {
+        if (! is_array($scopes)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map(
+            static fn (mixed $scope): string => is_string($scope) ? trim($scope) : '',
+            $scopes,
+        )));
+    }
+
     private function expiresAtFromSeconds(mixed $seconds): ?\Illuminate\Support\Carbon
     {
         if (! is_numeric($seconds) || (int) $seconds <= 0) {
             return null;
         }
 
-        return now()->addSeconds((int) $seconds);
+        $value = (int) $seconds;
+
+        // TikTok returns a Unix timestamp when the value is large enough.
+        if ($value > 1_000_000_000) {
+            return \Illuminate\Support\Carbon::createFromTimestamp($value);
+        }
+
+        return now()->addSeconds($value);
     }
 
     private function client(): TikTokShopApiClient
