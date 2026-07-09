@@ -28,6 +28,7 @@ import {
 import { toast } from 'sonner';
 import RoleSelectOptions from '@/components/users/RoleSelectOptions';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 import { getRoleLabel } from '@/lib/roles';
 import { usePermissions } from '@/lib/usePermissions';
 import StatCard from '@/components/dashboard/StatCard';
@@ -292,11 +293,12 @@ export default function Users() {
         ) : null}
       />
 
+      <PageContent>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Users" value={stats.total} icon={UsersIcon} color="primary" />
-        <StatCard label="Active" value={stats.active} icon={UserCheck} color="success" />
-        <StatCard label="Inactive" value={stats.inactive} icon={UserX} color="danger" />
-        <StatCard label="Pending Approval" value={stats.pending} icon={Shield} color="warning" />
+        <StatCard label="Total Users" value={stats.total} icon={UsersIcon} color="primary" index={0} />
+        <StatCard label="Active" value={stats.active} icon={UserCheck} color="success" index={1} />
+        <StatCard label="Inactive" value={stats.inactive} icon={UserX} color="danger" index={2} />
+        <StatCard label="Pending Approval" value={stats.pending} icon={Shield} color="warning" index={3} />
       </div>
 
       {stats.pending > 0 && canManage && (
@@ -518,6 +520,7 @@ export default function Users() {
           </Table>
         </CardContent>
       </Card>
+      </PageContent>
 
       <Dialog open={editUserOpen} onOpenChange={setEditUserOpen}>
         <DialogContent className="max-w-sm">

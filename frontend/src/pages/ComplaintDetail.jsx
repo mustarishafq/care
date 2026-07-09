@@ -35,6 +35,7 @@ import WhatsappNotifyCard from '@/components/complaints/WhatsappNotifyCard';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 import { getAffectedProducts, groupAffectedProductsByProduct } from '@/lib/whatsappShare';
 import ClosureProofEditor from '@/components/complaints/ClosureProofEditor';
+import PageContent from '@/components/layout/PageContent';
 
 export default function ComplaintDetail() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -201,8 +202,9 @@ export default function ComplaintDetail() {
         </div>
       </div>
 
+      <PageContent>
       {/* Status Progress */}
-      <Card>
+      <Card className="rounded-2xl">
         <CardContent className="pt-4 pb-2 overflow-x-auto">
           <StatusProgressBar currentStatus={complaint.status} />
         </CardContent>
@@ -443,6 +445,7 @@ export default function ComplaintDetail() {
           )}
         </div>
       </div>
+      </PageContent>
     </div>
   );
 }

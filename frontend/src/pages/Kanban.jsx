@@ -17,6 +17,7 @@ import ColumnOrderDialog from '@/components/kanban/ColumnOrderDialog';
 import { format } from 'date-fns';
 import { Clock, ArrowUpDown, Columns, Columns3 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { buildPriorityOrder, useComplaintStatuses, usePriorities } from '@/lib/useLookups';
 import { useSlaSettings } from '@/lib/useSlaSettings';
@@ -263,6 +264,7 @@ export default function Kanban() {
         ) : null}
       />
 
+      <PageContent>
       <ColumnOrderDialog
         open={columnOrderOpen}
         onOpenChange={setColumnOrderOpen}
@@ -361,6 +363,7 @@ export default function Kanban() {
           })}
         </div>
       </DragDropContext>
+      </PageContent>
     </div>
   );
 }

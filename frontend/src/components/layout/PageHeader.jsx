@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
+import { pageHeaderMotion } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 export default function PageHeader({
@@ -11,8 +12,7 @@ export default function PageHeader({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
+      {...pageHeaderMotion}
       className={cn(
         'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4',
         className,

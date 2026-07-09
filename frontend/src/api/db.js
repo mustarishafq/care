@@ -209,6 +209,96 @@ export const db = {
         return http.post('/webhook/test-outgoing', webhook);
       },
     },
+
+    TikTokShop: {
+      async getStatus() {
+        return http.get('/tiktok-shop/status');
+      },
+
+      async listConnections() {
+        const data = await http.get('/tiktok-shop');
+        return data.data ?? data;
+      },
+
+      async getAuthUrl() {
+        return http.get('/tiktok-shop/auth-url');
+      },
+
+      async disconnect(id) {
+        return http.delete(`/tiktok-shop/${id}`);
+      },
+
+      async refreshToken(id) {
+        return http.post(`/tiktok-shop/${id}/refresh`);
+      },
+
+      async listProducts(connectionId, params = {}) {
+        return http.get(`/tiktok-shop/${connectionId}/products`, params);
+      },
+
+      async getPlatformConfig(platform = 'tiktok_shop') {
+        return http.get(`/marketplace/platforms/${platform}`);
+      },
+
+      async updatePlatformConfig(platform, payload) {
+        return http.patch(`/marketplace/platforms/${platform}`, payload);
+      },
+    },
+
+    Shopee: {
+      async getStatus() {
+        return http.get('/shopee/status');
+      },
+
+      async listConnections() {
+        const data = await http.get('/shopee');
+        return data.data ?? data;
+      },
+
+      async getAuthUrl() {
+        return http.get('/shopee/auth-url');
+      },
+
+      async disconnect(id) {
+        return http.delete(`/shopee/${id}`);
+      },
+
+      async refreshToken(id) {
+        return http.post(`/shopee/${id}/refresh`);
+      },
+
+      async listProducts(connectionId, params = {}) {
+        return http.get(`/shopee/${connectionId}/products`, params);
+      },
+
+      async getPlatformConfig(platform = 'shopee') {
+        return http.get(`/marketplace/platforms/${platform}`);
+      },
+
+      async updatePlatformConfig(platform, payload) {
+        return http.patch(`/marketplace/platforms/${platform}`, payload);
+      },
+    },
+
+    Marketplace: {
+      async listShops(params = {}) {
+        const data = await http.get('/marketplace/shops', params);
+        return data.data ?? data;
+      },
+
+      async listReviews(params = {}) {
+        const data = await http.get('/marketplace/reviews', params);
+        return data.data ?? data;
+      },
+
+      async syncReviews(payload) {
+        return http.post('/marketplace/reviews/sync', payload);
+      },
+
+      async replyToReview(reviewId, content) {
+        return http.post(`/marketplace/reviews/${reviewId}/reply`, { content });
+      },
+    },
   },
 };
 

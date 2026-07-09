@@ -16,6 +16,7 @@ import RecentActivity from '@/components/dashboard/RecentActivity';
 import TopIssuesCard from '@/components/dashboard/TopIssuesCard';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
 import PageHeader from '@/components/layout/PageHeader';
+import AnimatedSection from '@/components/layout/AnimatedSection';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -114,6 +115,7 @@ export default function Dashboard() {
         description="Overview of complaint management performance"
       />
 
+      <AnimatedSection delay={0.05}>
       {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <StatCard label="Today's Complaints" value={todayCount} icon={FileText} color="blue" index={0} onClick={() => goToComplaints({ preset: 'today' })} />
@@ -125,17 +127,18 @@ export default function Dashboard() {
         <StatCard label="Avg Resolution (hrs)" value={avgResolution} icon={Timer} color="primary" index={6} />
         <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" index={7} onClick={() => goToComplaints()} />
       </div>
+      </AnimatedSection>
 
       {/* Charts Row — on lg+: trend chart (2 cols) + recent activity (1 col); on mobile recent activity moves to bottom */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <AnimatedSection delay={0.2} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <ComplaintTrendChart complaints={visibleComplaints} />
         <div className="hidden lg:block">
           <RecentActivity activities={visibleActivities} />
         </div>
-      </div>
+      </AnimatedSection>
 
       {/* Bottom Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <AnimatedSection delay={0.25} className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <TopIssuesCard
           title="Top Complaint Types"
           data={topTypes}
@@ -151,18 +154,20 @@ export default function Dashboard() {
           data={topCouriers}
           onItemClick={(item) => item.courierId && goToComplaints({ courier: item.courierId })}
         />
-      </div>
+      </AnimatedSection>
 
       {/* Recent Activity — visible only on mobile/tablet, hidden on lg+ */}
-      <div className="lg:hidden">
+      <AnimatedSection delay={0.3} className="lg:hidden">
         <RecentActivity activities={visibleActivities} />
-      </div>
+      </AnimatedSection>
 
       {/* Unassigned Tickets — Quick Reassign */}
+      <AnimatedSection delay={0.35}>
       <UnassignedTickets
         complaints={visibleComplaints}
         onAssign={c => setAssignTarget(c)}
       />
+      </AnimatedSection>
 
       {assignTarget && (
         <AssignAgentDialog

@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Textarea } from '@/components/ui/textarea';
 import { Plus, Pencil, Trash2, Shield, Loader2, ShieldCheck } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 import { toast } from 'sonner';
 
 export const ALL_PERMISSIONS = [
@@ -111,6 +112,7 @@ export default function RolesPermissions() {
         )}
       />
 
+      <PageContent>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {roles.map(role => (
           <Card key={role.id} className="rounded-2xl">
@@ -152,6 +154,7 @@ export default function RolesPermissions() {
           </div>
         )}
       </div>
+      </PageContent>
 
       {/* Create/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

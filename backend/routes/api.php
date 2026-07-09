@@ -18,6 +18,11 @@ use App\Http\Controllers\Api\V1\SystemConfigController;
 use App\Http\Controllers\Api\V1\TicketActivityController;
 use App\Http\Controllers\Api\V1\UnitOfMeasurementController;
 use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\MarketplacePlatformController;
+use App\Http\Controllers\Api\V1\MarketplaceReviewController;
+use App\Http\Controllers\Api\V1\MarketplaceWebhookController;
+use App\Http\Controllers\Api\V1\ShopeeController;
+use App\Http\Controllers\Api\V1\TikTokShopController;
 use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Middleware\EnsureUserIsApproved;
 use Illuminate\Support\Facades\Route;
@@ -35,6 +40,10 @@ Route::prefix('v1')->group(function () {
     Route::get('complaints/{id}', [ComplaintController::class, 'show'])->middleware('throttle:30,1');
 
     Route::post('webhook/tracking-update', [WebhookController::class, 'trackingUpdate'])->middleware('throttle:60,1');
+    Route::post('webhook/marketplace/tiktok-shop', [MarketplaceWebhookController::class, 'tiktokShop'])->middleware('throttle:60,1');
+    Route::post('webhook/marketplace/shopee', [MarketplaceWebhookController::class, 'shopee'])->middleware('throttle:60,1');
+    Route::get('tiktok-shop/oauth/callback', [TikTokShopController::class, 'oauthCallback'])->middleware('throttle:30,1');
+    Route::get('shopee/oauth/callback', [ShopeeController::class, 'oauthCallback'])->middleware('throttle:30,1');
 
     Route::get('complaint-statuses', [ComplaintStatusController::class, 'index'])->middleware('throttle:60,1');
 
@@ -75,5 +84,29 @@ Route::prefix('v1')->group(function () {
         Route::post('users/{id}/disable', [UserController::class, 'disable']);
 
         Route::post('files/upload', [FileUploadController::class, 'upload']);
+
+        Route::get('tiktok-shop/status', [TikTokShopController::class, 'status']);
+        Route::get('tiktok-shop', [TikTokShopController::class, 'index']);
+        Route::get('tiktok-shop/auth-url', [TikTokShopController::class, 'authUrl']);
+        Route::delete('tiktok-shop/{id}', [TikTokShopController::class, 'destroy']);
+        Route::post('tiktok-shop/{id}/refresh', [TikTokShopController::class, 'refresh']);
+        Route::get('tiktok-shop/{id}/products', [TikTokShopController::class, 'products']);
+        Route::get('tiktok-shop/{id}/reviews', [TikTokShopController::class, 'reviews']);
+        Route::post('tiktok-shop/{id}/reviews/sync', [TikTokShopController::class, 'syncReviews']);
+        Route::post('tiktok-shop/{id}/reviews/{reviewId}/reply', [TikTokShopController::class, 'replyToReview']);
+
+        Route::get('shopee/status', [ShopeeController::class, 'status']);
+        Route::get('shopee', [ShopeeController::class, 'index']);
+        Route::get('shopee/auth-url', [ShopeeController::class, 'authUrl']);
+        Route::delete('shopee/{id}', [ShopeeController::class, 'destroy']);
+        Route::post('shopee/{id}/refresh', [ShopeeController::class, 'refresh']);
+        Route::get('shopee/{id}/products', [ShopeeController::class, 'products']);
+
+        Route::get('marketplace/platforms/{platform}', [MarketplacePlatformController::class, 'show']);
+        Route::patch('marketplace/platforms/{platform}', [MarketplacePlatformController::class, 'update']);
+        Route::get('marketplace/shops', [MarketplaceReviewController::class, 'shops']);
+        Route::get('marketplace/reviews', [MarketplaceReviewController::class, 'index']);
+        Route::post('marketplace/reviews/sync', [MarketplaceReviewController::class, 'sync']);
+        Route::post('marketplace/reviews/{id}/reply', [MarketplaceReviewController::class, 'reply']);
     });
 });

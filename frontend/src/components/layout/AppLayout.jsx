@@ -1,13 +1,15 @@
 import { db } from '@/api/db';
 
 import React, { useState, useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 import TopBar from './TopBar';
 import BottomNav from './BottomNav';
 import ForcePasswordChange from '@/components/auth/ForcePasswordChange';
 import { usePermissions } from '@/lib/usePermissions';
 import { useNotifications } from '@/lib/useNotifications';
+import { pageTransitionMotion } from '@/lib/motion';
 
 export default function AppLayout() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -22,6 +24,7 @@ export default function AppLayout() {
   }, []);
 
   const { unreadCount } = useNotifications();
+  const location = useLocation();
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -35,9 +38,11 @@ export default function AppLayout() {
         unreadCount={unreadCount}
       />
 
-      <main className="flex-1 pb-[calc(4.75rem+env(safe-area-inset-bottom))]">
+      <main className="flex-1 pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
         <div className="max-w-[1600px] mx-auto w-full p-4 sm:p-6">
-          <Outlet />
+          <motion.div key={location.pathname} {...pageTransitionMotion}>
+            <Outlet />
+          </motion.div>
         </div>
       </main>
 

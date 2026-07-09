@@ -1,6 +1,8 @@
 # EMZI Nexus — MCP API Catalog Specification
 
-Portable standard for exposing any EMZI Nexus application to **EMZI Nexus Brain**. Use this document when implementing or integrating MCP-ready REST APIs in Analytics, Care, or any future Nexus system.
+Portable standard for exposing **any EMZI Nexus satellite application** to **EMZI Nexus Brain**. Use this document when implementing or integrating MCP-ready REST APIs in Linkly, Booking, Pulse, Analytics, Care, or any future Nexus system.
+
+> **Scope:** All satellite apps that register as **Connected Systems** MUST implement `GET /api/mcp/v1/catalog` and route all MCP traffic under `/api/mcp/v1/`. File paths in checklists use Node (Pulse) or Laravel conventions — adapt to your stack; behavior must match.
 
 ---
 
@@ -42,17 +44,130 @@ The application is **not** an AI app. It only exposes secure REST APIs. Nexus Br
 
 ---
 
+## MCP settings
+
+MCP credentials and rate limits are resolved at runtime from **environment variables** and **admin settings** (database). All valid API keys are merged into a single allowlist; any one key authenticates successfully.
+
+### Stored settings (`mcp_api`)
+
+Persisted in the application `settings` table under key `mcp_api` as JSON:
+
+```json
+{
+  "api_key": "",
+  "rate_limit": 60
+}
+```
+
+| Field | Type | Default | Rules |
+|-------|------|---------|-------|
+| `api_key` | string | `""` | Min. 32 characters when set. Never returned by the settings API after save |
+| `rate_limit` | integer | `60` | Min. 1. Max requests per client per minute |
+
+### Environment variables
+
+```env
+MCP_API_KEY=your-long-random-secret-min-32-chars
+MCP_API_KEYS=rotated-key-1,rotated-key-2   # optional comma-separated rotation keys
+MCP_RATE_LIMIT=60                           # default when no DB row exists
+```
+
+| Variable | Purpose |
+|----------|---------|
+| `MCP_API_KEY` | Primary server-to-server API key |
+| `MCP_API_KEYS` | Additional valid keys during rotation (comma-separated) |
+| `MCP_RATE_LIMIT` | Default rate limit before admin settings are saved |
+
+### Runtime resolution (`getMcpSettings`)
+
+1. Collect API keys from `MCP_API_KEY` and every non-empty entry in `MCP_API_KEYS`
+2. Start `rateLimit` from `MCP_RATE_LIMIT` (default `60`, minimum `1`)
+3. Load `mcp_api` from the database; if `api_key` is set, add it to the key allowlist
+4. If a database row exists, use its `rate_limit` (overrides the env default)
+
+Returned shape used by MCP middleware:
+
+```json
+{
+  "apiKeys": ["key-1", "key-2"],
+  "rateLimit": 60
+}
+```
+
+### Admin settings API
+
+Super-admin only (`GET` / `PATCH /api/settings`).
+
+**Read** — `mcp_api` is sanitized; the secret is never exposed:
+
+```json
+{
+  "mcp_api": {
+    "api_key_set": true,
+    "rate_limit": 60
+  }
+}
+```
+
+**Update** — partial merge; omit `api_key` to keep the existing key:
+
+```json
+{
+  "mcp_api": {
+    "api_key": "new-64-char-hex-key-from-generate",
+    "rate_limit": 60
+  }
+}
+```
+
+Validation: `api_key` must be at least 32 characters when provided; `rate_limit` is clamped to a minimum of `1`.
+
+### Admin UI (Settings → MCP API)
+
+| Field | Description |
+|-------|-------------|
+| Base URL | Application origin — register in Nexus Brain as the connected system base URL |
+| Catalog URL | `{base_url}/api/mcp/v1/catalog` |
+| X-API-Key | Paste or generate (64-char hex). Min. 32 characters. Sent on every MCP request |
+| Rate limit | Requests per client per minute (UI allows 1–1000; server enforces min. 1) |
+
+The UI shows copy fields for Base URL and Catalog URL and step-by-step Nexus Brain registration instructions.
+
+### Rate limiting
+
+Applied on every `/api/mcp/v1/*` request after authentication:
+
+- Bucket key: `mcp:{client}` where `client` is `api_key` for `X-API-Key` auth or the user email/id for Bearer
+- Window: 60 seconds
+- Limit: `rateLimit` from resolved MCP settings (default `60`)
+
+HTTP 429 with message `Too many requests. Please try again later.`
+
+### Pagination defaults (`config/mcp`)
+
+| Setting | Value |
+|---------|-------|
+| `defaultPerPage` | `50` |
+| `maxPerPage` | `200` |
+
+### API key generation
+
+Server: `crypto.randomBytes(32).toString('hex')` (64 characters).
+
+Client (admin UI): `crypto.getRandomValues` → 32 bytes as hex (64 characters).
+
+---
+
 ## Nexus Brain connection
 
 ### 1. Configure the application
 
-Set a shared API key (environment or admin settings):
+Choose one or both:
 
-```env
-MCP_API_KEY=your-long-random-secret-min-32-chars
-MCP_API_KEYS=rotated-key-1,rotated-key-2   # optional, for rotation
-MCP_RATE_LIMIT=60
-```
+- **Admin UI:** Settings → MCP API — set X-API-Key and rate limit, then save
+- **Environment:** set `MCP_API_KEY` (and optionally `MCP_API_KEYS`, `MCP_RATE_LIMIT`) for deploy-time or rotation without UI access
+
+At least one valid API key (32+ characters) must be configured before Nexus Brain can authenticate.
 
 ### 2. Register in Nexus Brain → Connected Systems
 
@@ -271,17 +386,20 @@ The application does not know about MCP tool names. Brain performs the mapping u
 
 ## Implementation checklist (new system)
 
-- [ ] `config/mcp.php` with API key(s) and rate limit
-- [ ] `routes/mcp.php` registered at prefix `api/mcp/v1`
-- [ ] `AuthenticateMcpClient` middleware (`X-API-Key` + Bearer)
-- [ ] `LogMcpRequest` middleware
-- [ ] `McpResponse` helper for standard envelope
-- [ ] Versioned controllers under `app/Http/Controllers/Mcp/V1/`
-- [ ] Form Requests under `app/Http/Requests/Mcp/V1/`
-- [ ] API Resources under `app/Http/Resources/Mcp/V1/`
-- [ ] Adapter services under `app/Services/Mcp/` (delegate to existing services)
-- [ ] Documentation class (e.g. `app/Mcp/Documentation/McpV1Endpoints.php`)
+Adapt paths to your stack (Laravel: `backend/routes/`, `backend/app/Services/Mcp/`; Node: `server/routes/mcp.js`, etc.):
+
+- [ ] MCP config — pagination defaults (`defaultPerPage`, `maxPerPage`)
+- [ ] Settings module — parse/store `mcp_api`, env key merge, `getMcpSettings()`
+- [ ] Routes registered at prefix `/api/mcp/v1`
+- [ ] `authenticateMcpClient` middleware (`X-API-Key` + Bearer)
+- [ ] Rate-limit middleware (per-client bucket from resolved settings)
+- [ ] Request logging middleware
+- [ ] Response helper for standard `{ success, data, meta }` envelope
+- [ ] Versioned routes and validation
+- [ ] Adapter services (delegate to existing business services)
+- [ ] Documentation module for catalog entries
 - [ ] `GET /api/mcp/v1/catalog` returning documented entries
+- [ ] Admin settings: `mcp_api` in `settings` table + admin PATCH API + UI section
 - [ ] Feature tests: auth, validation, success, errors, permissions
 
 ---
@@ -309,36 +427,46 @@ Requirements:
    - Error: `{ "success": false, "message": "...", "errors": [] }`
    - Pagination meta: `current_page`, `last_page`, `per_page`, `total`
 
-4. **Auth:** Middleware accepting `X-API-Key` (with key rotation support) and `Authorization: Bearer` (with permission checks for user tokens).
+4. **Auth:** Middleware accepting `X-API-Key` (env + admin settings, with key rotation via `MCP_API_KEYS`) and `Authorization: Bearer` (with permission checks for user tokens).
 
-5. **Architecture:** Thin controllers → adapter services → existing business services. No business logic in controllers. No direct DB access if a service already exists.
+5. **Settings:** `mcp_api` in admin settings (API key + rate limit) merged with env vars at runtime via `getMcpSettings()`.
 
-6. **Validation:** Dedicated Form Request classes.
+6. **Architecture:** Thin route handlers → adapter services → existing business services. No business logic in routes. No direct DB access if a service already exists.
 
-7. **Serialization:** API Resources or DTOs only.
+7. **Validation:** Dedicated validation middleware or request validators.
 
-8. **Logging:** Log every MCP request (endpoint, client, request ID, duration, status).
+8. **Serialization:** DTOs or shaped response objects only.
 
-9. **Documentation:** Every exposed endpoint documented in the catalog class.
+9. **Logging:** Log every MCP request (endpoint, client, request ID, duration, status).
 
-10. **Tests:** Auth, validation, success responses, error responses, permission checks.
+10. **Documentation:** Every exposed endpoint documented in the catalog module.
 
-11. **Inbound routes:** Keep existing `/api/inbound/*` routes if present for direct integrations; MCP v1 is the Nexus Brain standard.
+11. **Tests:** Auth, validation, success responses, error responses, permission checks.
 
-Reference implementation: EMZI Nexus Analytics (`/api/mcp/v1/catalog`, `routes/mcp.php`, `app/Mcp/`, `app/Services/Mcp/`).
+12. **Inbound routes:** Keep existing `/api/inbound/*` routes if present for direct integrations; MCP v1 is the Nexus Brain standard.
 
-Full spec: `emzi-nexus-mcp-catalog-spec.md` in the repository root.
+Reference implementations:
+
+- **Node:** EMZI Nexus Pulse — `server/routes/mcp.js`, `server/mcp/`, `server/lib/mcpSettings.js`
+- **Laravel:** adapt to `backend/routes/api.php`, `backend/app/Http/Middleware/`, `backend/app/Services/Mcp/`
+
+Full spec: `docs/emzi-nexus-mcp-catalog-spec.md`.
 
 ---
 
-## Reference: EMZI Nexus Analytics
+## Reference: EMZI Nexus Pulse
 
 | Item | Value |
 |------|-------|
 | Catalog | `GET /api/mcp/v1/catalog` |
 | Auth header | `X-API-Key` |
-| Config | `backend/config/mcp.php` |
-| Routes | `backend/routes/mcp.php` |
-| Endpoint docs | `backend/app/Mcp/Documentation/McpV1Endpoints.php` |
+| Settings storage | `settings` table, key `mcp_api` |
+| Settings module | `server/lib/mcpSettings.js` |
+| Settings API | `GET` / `PATCH /api/settings` (`mcp_api`) |
+| Settings UI | `src/components/settings/McpApiSection.jsx` |
+| Config | `server/config/mcp.js` |
+| Routes | `server/routes/mcp.js` |
+| Endpoint docs | `server/mcp/documentation/mcpV1Endpoints.js` |
+| Env vars | `MCP_API_KEY`, `MCP_API_KEYS`, `MCP_RATE_LIMIT` |
 
-Example domains exposed: metadata, analytics, customers, purchases, SSO verify.
+Example domains exposed: metadata, complaints, users, departments, audit logs.

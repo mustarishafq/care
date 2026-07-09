@@ -1,0 +1,39 @@
+---
+description: Mobile modal width — centered dialogs must keep side margins
+globs: frontend/**/*.{js,jsx,tsx,ts}
+alwaysApply: false
+---
+
+# Mobile modals must not be full-width
+
+On mobile, **centered modals/dialogs** must keep horizontal inset — never edge-to-edge.
+
+## Required width
+
+```jsx
+// ✅ GOOD — inset on mobile, capped on larger screens
+<DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-md">
+
+// ❌ BAD — stretches edge-to-edge on phones
+<DialogContent className="w-full max-w-md">
+```
+
+Base primitives (`dialog.jsx`, `alert-dialog.jsx`) already use `w-[calc(100vw-1.5rem)]`. Do not override back to `w-full` on centered dialogs.
+
+## Applies to
+
+- `Dialog` / `AlertDialog` / `CommandDialog` (search, confirm, pickers)
+- Custom `DialogPrimitive.Content` centered overlays
+
+## Exceptions (full-width is OK)
+
+- Bottom sheets (`side="bottom"`) and drawers anchored to screen edges
+- Side panels (`side="left"` / `side="right"`)
+- Full-bleed page routes (e.g. application viewers)
+
+## Also on mobile compact dialogs
+
+- Use `rounded-xl` on the panel
+- Prefer horizontal footer buttons for two-action confirms (`flex-row justify-end gap-2`)
+
+See `docs/DESIGN_TEMPLATE.md` §11.1 and §11.9.

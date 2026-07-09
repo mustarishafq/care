@@ -1,4 +1,6 @@
 import React from 'react';
+import { motion } from 'framer-motion';
+import { statCardMotion } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 const colorMap = {
@@ -15,7 +17,8 @@ export default function StatCard({ label, value, icon: Icon, trend, color = 'pri
   const clickable = typeof onClick === 'function';
 
   return (
-    <div
+    <motion.div
+      {...statCardMotion(index)}
       role={clickable ? 'button' : undefined}
       tabIndex={clickable ? 0 : undefined}
       onClick={onClick}
@@ -29,7 +32,6 @@ export default function StatCard({ label, value, icon: Icon, trend, color = 'pri
         'bg-card rounded-2xl border border-border p-4 sm:p-5 hover:shadow-lg hover:shadow-primary/5 transition-all duration-300 group',
         clickable && 'cursor-pointer hover:border-primary/30 active:scale-[0.98]',
       )}
-      style={{ animationDelay: `${index * 50}ms` }}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
@@ -51,6 +53,6 @@ export default function StatCard({ label, value, icon: Icon, trend, color = 'pri
           <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

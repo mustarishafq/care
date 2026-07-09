@@ -155,6 +155,7 @@ function GlobalSearchDialog({ open, onOpenChange }) {
       open={open}
       onOpenChange={onOpenChange}
       shouldFilter={false}
+      title="Search"
       contentClassName="w-[calc(100%-2rem)] max-w-lg rounded-xl p-0"
     >
       <CommandInput

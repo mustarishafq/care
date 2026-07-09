@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { db } from '@/api/db';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { normalizeNotification } from '@/lib/notificationVisuals';
 
 export function useNotifications() {
   const { user } = useCurrentUser();
@@ -13,7 +14,7 @@ export function useNotifications() {
   });
 
   const notifications = query.data ?? [];
-  const unread = notifications.filter(n => !n.is_read);
+  const unread = notifications.filter((n) => !normalizeNotification(n).is_read);
 
   return {
     ...query,

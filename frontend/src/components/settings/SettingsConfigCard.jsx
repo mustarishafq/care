@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Pencil } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export default function SettingsConfigCard({
   title,
@@ -14,10 +15,17 @@ export default function SettingsConfigCard({
   children = null,
   className = '',
 }) {
+  const clickable = canManage && onEdit;
+
   return (
     <Card
-      className={`group hover:border-primary/30 transition-colors ${canManage ? 'cursor-pointer' : ''} ${className}`}
-      onClick={() => canManage && onEdit?.()}
+      className={cn(
+        'rounded-2xl border border-border shadow-sm transition-all duration-300 group',
+        'hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30',
+        clickable && 'cursor-pointer',
+        className,
+      )}
+      onClick={() => clickable && onEdit()}
     >
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
@@ -43,6 +51,7 @@ export default function SettingsConfigCard({
                 className="h-7 w-7 opacity-60 group-hover:opacity-100"
                 onClick={(e) => { e.stopPropagation(); onEdit(); }}
                 disabled={!canManage}
+                aria-label={`Edit ${title}`}
               >
                 <Pencil className="w-3.5 h-3.5" />
               </Button>
@@ -53,10 +62,13 @@ export default function SettingsConfigCard({
       <CardContent className="space-y-2">
         {children}
         {rows.map((row) => (
-          <div key={row.label} className="flex justify-between items-center gap-3 py-1.5 border-b border-border last:border-0">
-            <span className="text-sm">{row.label}</span>
+          <div
+            key={row.label}
+            className="flex justify-between items-center gap-3 py-2 border-b border-border/70 last:border-0"
+          >
+            <span className="text-sm text-foreground">{row.label}</span>
             {row.badge ? (
-              <Badge variant="secondary" className="text-xs shrink-0">{row.value}</Badge>
+              <Badge variant="secondary" className="text-xs shrink-0 tabular-nums">{row.value}</Badge>
             ) : (
               <span className="text-xs text-muted-foreground text-right truncate max-w-[55%]">{row.value}</span>
             )}

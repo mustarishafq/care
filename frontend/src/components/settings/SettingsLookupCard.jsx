@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadgePreview } from '@/components/settings/StatusColorPreview';
 import { Pencil } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const PREVIEW_LIMIT = 8;
 
@@ -13,7 +14,11 @@ export default function SettingsLookupCard({ section, items = [], canManage, onE
 
   return (
     <Card
-      className="group hover:border-primary/30 transition-colors cursor-pointer"
+      className={cn(
+        'rounded-2xl border border-border shadow-sm transition-all duration-300 group',
+        'hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30',
+        canManage && 'cursor-pointer',
+      )}
       onClick={() => canManage && onEdit(section)}
     >
       <CardHeader className="pb-3">

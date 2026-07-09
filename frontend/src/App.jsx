@@ -19,6 +19,8 @@ import Settings from '@/pages/Settings';
 import Products from '@/pages/Products';
 import RolesPermissions from '@/pages/RolesPermissions';
 import Integrations from '@/pages/Integrations';
+import Marketplace from '@/pages/Marketplace';
+import MarketplaceReviews from '@/pages/MarketplaceReviews';
 import SsoNexus from '@/pages/SsoNexus';
 import TrackComplaint from '@/pages/TrackComplaint';
 import Login from '@/pages/Login';
@@ -69,6 +71,11 @@ const AppRoutes = () => (
       <Route path="/products" element={<Products />} />
       <Route path="/roles" element={<RolesPermissions />} />
       <Route path="/integrations" element={<Integrations />} />
+      <Route path="/marketplace" element={<Navigate to="/marketplace/tiktok-shop" replace />} />
+      <Route path="/marketplace/:platform" element={<Marketplace />} />
+      <Route path="/tiktok-shop" element={<Navigate to="/marketplace/tiktok-shop" replace />} />
+      <Route path="/shopee" element={<Navigate to="/marketplace/shopee" replace />} />
+      <Route path="/marketplace-reviews" element={<MarketplaceReviews />} />
       <Route path="/oms" element={<Navigate to="/integrations" replace />} />
     </Route>
     <Route path="*" element={<PageNotFound />} />

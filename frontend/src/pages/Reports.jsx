@@ -25,6 +25,7 @@ import { useCurrentUser } from '@/lib/useCurrentUser';
 import { filterVisibleComplaints } from '@/lib/complaintVisibility';
 import { CalendarDays, BarChart3 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 
 const CHART_COLORS = ['#0ea5e9', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#14b8a6'];
 
@@ -128,6 +129,7 @@ export default function Reports() {
         description={`${filtered.length} complaints · ${rangeLabel}`}
       />
 
+      <PageContent>
       <div className="flex flex-wrap items-center gap-2">
           <Select value={range} onValueChange={v => setRange(v)}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
@@ -303,6 +305,7 @@ export default function Reports() {
           </div>
         </TabsContent>
       </Tabs>
+      </PageContent>
     </div>
   );
 }

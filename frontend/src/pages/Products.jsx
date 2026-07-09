@@ -21,6 +21,7 @@ import {
   PackageCheck, PackageX, MoreHorizontal,
 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 import StatCard from '@/components/dashboard/StatCard';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
@@ -172,10 +173,11 @@ export default function Products() {
         ) : null}
       />
 
+      <PageContent>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <StatCard label="Total Products" value={stats.total} icon={Package} color="primary" />
-        <StatCard label="Active" value={stats.active} icon={PackageCheck} color="success" />
-        <StatCard label="Inactive" value={stats.inactive} icon={PackageX} color="danger" />
+        <StatCard label="Total Products" value={stats.total} icon={Package} color="primary" index={0} />
+        <StatCard label="Active" value={stats.active} icon={PackageCheck} color="success" index={1} />
+        <StatCard label="Inactive" value={stats.inactive} icon={PackageX} color="danger" index={2} />
       </div>
 
       <div className="flex flex-col lg:flex-row gap-3">
@@ -314,6 +316,7 @@ export default function Products() {
           </Table>
         </CardContent>
       </Card>
+      </PageContent>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md">

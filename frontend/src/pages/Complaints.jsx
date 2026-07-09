@@ -8,6 +8,7 @@ import { isToday, isThisMonth } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Plus, FileText } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 import ComplaintFilters from '@/components/complaints/ComplaintFilters';
 import ComplaintTable from '@/components/complaints/ComplaintTable';
 import CreateComplaintDialog from '@/components/complaints/CreateComplaintDialog';
@@ -102,9 +103,11 @@ export default function Complaints() {
         ) : null}
       />
 
+      <PageContent>
       <ComplaintFilters filters={filters} setFilters={setFilters} />
       <ComplaintTable complaints={filtered} />
       {canCreate && <CreateComplaintDialog open={createOpen} onOpenChange={setCreateOpen} />}
+      </PageContent>
     </div>
   );
 }

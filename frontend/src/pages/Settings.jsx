@@ -27,9 +27,12 @@ import { useDepartments } from '@/lib/useDepartments';
 import { useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement, useComplaintStatuses } from '@/lib/useLookups';
 import StatCard from '@/components/dashboard/StatCard';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 import LookupEditDialog from '@/components/settings/LookupEditDialog';
 import SettingsConfigCard from '@/components/settings/SettingsConfigCard';
 import SettingsLookupCard from '@/components/settings/SettingsLookupCard';
+import SettingsSectionIntro from '@/components/settings/SettingsSectionIntro';
+import SettingsSwitchRow from '@/components/settings/SettingsSwitchRow';
 import {
   AUTO_CLOSE_DEFAULT,
   formatAutoCloseDelay,
@@ -57,7 +60,7 @@ export default function Settings() {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('settings.manage');
-  const [activeTab, setActiveTab] = useState('lookups');
+  const [activeTab, setActiveTab] = useState('general');
   const [saving, setSaving] = useState(false);
   const [slaOpen, setSlaOpen] = useState(false);
   const [slaForm, setSlaForm] = useState(SLA_DEFAULT);
@@ -406,8 +409,9 @@ export default function Settings() {
         ) : null}
       />
 
+      <PageContent>
       {!canManage && (
-        <Alert>
+        <Alert className="rounded-2xl border-amber-200/80 bg-amber-50/80 dark:border-amber-800/40 dark:bg-amber-900/20">
           <Lock className="h-4 w-4" />
           <AlertTitle>Read-only access</AlertTitle>
           <AlertDescription>
@@ -416,42 +420,67 @@ export default function Settings() {
         </Alert>
       )}
 
-      <Card className="rounded-2xl">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sun className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <Label className="text-sm font-medium">Dark Mode</Label>
-                <p className="text-xs text-muted-foreground">Switch between light and dark themes</p>
-              </div>
-            </div>
-            <ThemeToggle variant="switch" />
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <div className="rounded-2xl border border-border bg-muted/30 p-1 overflow-x-auto">
+          <TabsList className="h-10 w-full min-w-max justify-start bg-transparent gap-1">
+            <TabsTrigger value="general" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Sun className="w-4 h-4" />
+              General
+            </TabsTrigger>
+            <TabsTrigger value="lookups" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Database className="w-4 h-4" />
+              Lookup Data
+            </TabsTrigger>
+            <TabsTrigger value="automation" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <GitBranch className="w-4 h-4" />
+              Automation
+            </TabsTrigger>
+            <TabsTrigger value="integrations" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Webhook className="w-4 h-4" />
+              Integrations
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+              <Bell className="w-4 h-4" />
+              Notifications
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="general" className="space-y-6 mt-0">
+          <SettingsSectionIntro
+            title="General"
+            description="Appearance and a quick overview of your workspace configuration."
+          />
+
+          <Card className="rounded-2xl border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Appearance</CardTitle>
+              <p className="text-sm text-muted-foreground">Personalize how Care looks on your device.</p>
+            </CardHeader>
+            <CardContent>
+              <SettingsSwitchRow
+                icon={Sun}
+                title="Dark Mode"
+                description="Switch between light and dark themes"
+              >
+                <ThemeToggle variant="switch" />
+              </SettingsSwitchRow>
+            </CardContent>
+          </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard label="Lookup items" value={lookupTotal} icon={Database} index={0} />
+            <StatCard label="Automation active" value={automationActive} icon={GitBranch} color="blue" index={1} />
+            <StatCard label="Routing rules" value={routingRuleCount} icon={Shield} color="purple" index={2} />
+            <StatCard label="SSO" value={sso.enabled ? 'On' : 'Off'} icon={Link2} color={sso.enabled ? 'success' : 'primary'} index={3} />
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Lookup items" value={lookupTotal} icon={Database} />
-        <StatCard label="Automation active" value={automationActive} icon={GitBranch} color="blue" />
-        <StatCard label="Routing rules" value={routingRuleCount} icon={Shield} color="purple" />
-        <StatCard label="SSO" value={sso.enabled ? 'On' : 'Off'} icon={Link2} color={sso.enabled ? 'success' : 'primary'} />
-      </div>
-
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="h-10 grid w-full grid-cols-2 lg:grid-cols-4">
-          <TabsTrigger value="lookups">Lookup Data</TabsTrigger>
-          <TabsTrigger value="automation">Automation</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="lookups" className="mt-6 space-y-4">
-          <p className="text-sm text-muted-foreground">
-            Dropdown values used across tickets, filters, and reports. Click a card to edit.
-          </p>
+        <TabsContent value="lookups" className="space-y-6 mt-0">
+          <SettingsSectionIntro
+            title="Lookup Data"
+            description="Dropdown values used across tickets, filters, and reports. Click a card to edit."
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {LOOKUP_SECTIONS.map((section) => (
               <SettingsLookupCard
@@ -481,7 +510,11 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        <TabsContent value="automation" className="mt-6 space-y-4">
+        <TabsContent value="automation" className="space-y-6 mt-0">
+          <SettingsSectionIntro
+            title="Automation"
+            description="Routing rules, SLA targets, and automatic ticket workflows."
+          />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SettingsConfigCard
               title="Complaint Routing"
@@ -602,7 +635,11 @@ export default function Settings() {
           </div>
         </TabsContent>
 
-        <TabsContent value="integrations" className="mt-6 space-y-4">
+        <TabsContent value="integrations" className="space-y-6 mt-0">
+          <SettingsSectionIntro
+            title="Integrations"
+            description="Authentication and connections to external systems."
+          />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SettingsConfigCard
               title="Nexus SSO"
@@ -618,53 +655,45 @@ export default function Settings() {
               ]}
             />
 
-            <Card className="hover:border-primary/30 transition-colors">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Webhook className="w-4 h-4" />
-                  </span>
-                  Webhooks
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Incoming tracking updates and outgoing event notifications are configured on the Integrations page.
-                </p>
-                <Button asChild variant="outline" size="sm">
-                  <Link to="/integrations">Open Integrations</Link>
-                </Button>
-              </CardContent>
-            </Card>
+            <SettingsConfigCard
+              title="Webhooks"
+              description="Incoming tracking updates and outgoing event notifications"
+              icon={Webhook}
+              canManage={canManage}
+              rows={[
+                { label: 'Configuration', value: 'Integrations page' },
+                { label: 'Incoming', value: 'Fulfillment status updates' },
+                { label: 'Outgoing', value: 'Ticket & notification events' },
+              ]}
+            >
+              <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+                <Link to="/integrations">Open Integrations</Link>
+              </Button>
+            </SettingsConfigCard>
           </div>
         </TabsContent>
 
-        <TabsContent value="notifications" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <Bell className="w-4 h-4" />
-                Notification Triggers
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                System events that generate in-app notifications for agents.
-              </p>
-            </CardHeader>
+        <TabsContent value="notifications" className="space-y-6 mt-0">
+          <SettingsSectionIntro
+            title="Notification Triggers"
+            description="System events that generate in-app notifications for agents."
+          />
+          <Card className="rounded-2xl border border-border shadow-sm overflow-hidden">
             <CardContent className="p-0">
               <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Event</TableHead>
+                <TableHeader className="bg-muted/40 sticky top-0 z-10">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="pl-6">Event</TableHead>
                     <TableHead>When it fires</TableHead>
-                    <TableHead className="w-32">Type</TableHead>
+                    <TableHead className="w-32 pr-6">Type</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {NOTIFICATION_TRIGGERS.map((trigger) => (
-                    <TableRow key={trigger.type}>
-                      <TableCell className="font-medium text-sm">{trigger.event}</TableCell>
+                    <TableRow key={trigger.type} className="hover:bg-muted/40">
+                      <TableCell className="pl-6 font-medium text-sm">{trigger.event}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{trigger.when}</TableCell>
-                      <TableCell>
+                      <TableCell className="pr-6">
                         <Badge variant="outline" className="text-[10px] font-mono">{trigger.type}</Badge>
                       </TableCell>
                     </TableRow>
@@ -675,6 +704,7 @@ export default function Settings() {
           </Card>
         </TabsContent>
       </Tabs>
+      </PageContent>
 
       <LookupEditDialog
         open={lookupOpen}

@@ -14,9 +14,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   Copy, CheckCircle, Webhook, Code2, Clock, RefreshCw, Search, Eye, EyeOff,
-  Send, Loader2, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, Activity, Plug,
+  Send, Loader2, Plus, Trash2, ArrowDownToLine, ArrowUpFromLine, Activity,
 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
+import PageContent from '@/components/layout/PageContent';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { usePermissions } from '@/lib/usePermissions';
@@ -355,11 +356,12 @@ export default function Integrations() {
   return (
     <div className="space-y-6">
       <PageHeader
-        icon={Plug}
+        icon={Webhook}
         title="Integrations"
         description="Connect fulfillment systems and external apps using incoming and outgoing webhooks"
       />
 
+      <PageContent>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="Incoming"
@@ -721,6 +723,7 @@ export default function Integrations() {
           </Card>
         </TabsContent>
       </Tabs>
+      </PageContent>
 
       <Dialog open={manualUpdateOpen} onOpenChange={setManualUpdateOpen}>
         <DialogContent className="max-w-sm">
