@@ -27,6 +27,10 @@ use App\Http\Controllers\Api\V1\WebhookController;
 use App\Http\Middleware\EnsureUserIsApproved;
 use Illuminate\Support\Facades\Route;
 
+// Legacy OAuth callback paths (register either this or the v1 path in Partner Center)
+Route::get('integrations/tiktok/callback', [TikTokShopController::class, 'oauthCallback'])->middleware('throttle:30,1');
+Route::get('integrations/shopee/callback', [ShopeeController::class, 'oauthCallback'])->middleware('throttle:30,1');
+
 Route::prefix('v1')->group(function () {
     Route::post('auth/register', [AuthController::class, 'register'])->middleware('throttle:5,1');
     Route::post('auth/login', [AuthController::class, 'login'])->middleware('throttle:10,1');
