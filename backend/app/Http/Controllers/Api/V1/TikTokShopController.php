@@ -34,7 +34,7 @@ class TikTokShopController extends Controller
 
     public function status(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'marketplace.view');
 
         $credentials = $this->platformConfig->getCredentials(MarketplacePlatform::TIKTOK_SHOP);
 
@@ -66,7 +66,7 @@ class TikTokShopController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'marketplace.view');
 
         $connections = $this->shopService->listConnections();
 
@@ -77,7 +77,7 @@ class TikTokShopController extends Controller
 
     public function authUrl(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'marketplace.manage');
 
         try {
             $auth = $this->authService->createAuthorizationUrl($request->user());
@@ -118,7 +118,7 @@ class TikTokShopController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'marketplace.manage');
 
         $connection = TikTokShopConnection::query()->findOrFail($id);
         $this->shopService->disconnect($connection);
@@ -130,7 +130,7 @@ class TikTokShopController extends Controller
 
     public function refresh(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'marketplace.manage');
 
         $connection = TikTokShopConnection::query()->findOrFail($id);
 
@@ -148,7 +148,7 @@ class TikTokShopController extends Controller
 
     public function products(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'marketplace.view');
 
         $connection = TikTokShopConnection::query()
             ->where('is_active', true)
@@ -181,7 +181,7 @@ class TikTokShopController extends Controller
 
     public function reviews(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'reviews.view');
 
         $connection = TikTokShopConnection::query()
             ->where('is_active', true)
@@ -207,7 +207,7 @@ class TikTokShopController extends Controller
 
     public function syncReviews(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'reviews.manage');
 
         $connection = TikTokShopConnection::query()
             ->where('is_active', true)
@@ -245,7 +245,7 @@ class TikTokShopController extends Controller
 
     public function replyToReview(Request $request, int $id, int $reviewId): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'reviews.manage');
 
         $connection = TikTokShopConnection::query()
             ->where('is_active', true)

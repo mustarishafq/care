@@ -20,11 +20,11 @@ class MarketplacePlatformController extends Controller
 
     public function show(Request $request, string $platform): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'marketplace.view');
         $this->assertPlatform($platform);
 
         $config = $this->platformConfig->getOrCreate($platform);
-        $canManage = $request->user()->hasPermission('oms.manage');
+        $canManage = $request->user()->hasPermission('marketplace.manage');
 
         return response()->json([
             'data' => (new MarketplacePlatformConfigResource($config))->additional([
@@ -39,7 +39,7 @@ class MarketplacePlatformController extends Controller
 
     public function update(Request $request, string $platform): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'marketplace.manage');
         $this->assertPlatform($platform);
 
         $data = $request->validate([

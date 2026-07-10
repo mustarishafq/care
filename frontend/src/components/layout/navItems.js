@@ -7,7 +7,7 @@ import {
 export const careNavItems = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', permission: null },
   { label: 'Complaints', icon: FileText, path: '/complaints', permission: 'complaints.view' },
-  { label: 'Reviews', icon: Star, path: '/marketplace-reviews', permission: 'oms.view' },
+  { label: 'Reviews', icon: Star, path: '/marketplace-reviews', permission: 'reviews.view' },
   { label: 'Kanban', icon: Columns3, path: '/kanban', permission: 'complaints.view' },
   { label: 'Reports', icon: BarChart3, path: '/reports', permission: 'reports.view' },
   { label: 'Notifications', icon: Bell, path: '/notifications', permission: null, badge: true },
@@ -15,7 +15,7 @@ export const careNavItems = [
   { label: 'Users', icon: Users, path: '/users', permission: 'users.view', admin: true },
   { label: 'Roles', icon: ShieldCheck, path: '/roles', permission: 'users.manage', admin: true },
   { label: 'Integrations', icon: Webhook, path: '/integrations', permission: 'oms.view' },
-  { label: 'Marketplace', icon: ShoppingBag, path: '/marketplace', permission: 'oms.view' },
+  { label: 'Marketplace', icon: ShoppingBag, path: '/marketplace', permission: 'marketplace.view' },
   { label: 'Settings', icon: Settings, path: '/settings', permission: 'settings.view' },
 ];
 

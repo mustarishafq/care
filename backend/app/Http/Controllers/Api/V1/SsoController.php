@@ -107,12 +107,16 @@ class SsoController extends Controller
 
         $token = $user->createToken('sso-token')->plainTextToken;
 
-        $redirectTo = SsoRedirect::sanitize($claims['redirect_to'] ?? null);
+        $user->load(['departments', 'role']);
+        $explicitRedirect = trim((string) ($claims['redirect_to'] ?? ''));
+        $redirectTo = $explicitRedirect !== ''
+            ? SsoRedirect::sanitize($explicitRedirect, $user->getDefaultPage())
+            : $user->getDefaultPage();
 
         return response()->json([
             'token' => $token,
-            'user' => new UserResource($user->load(['departments', 'role'])),
-            'redirect_to' => $redirectTo !== '/dashboard' ? $redirectTo : null,
+            'user' => new UserResource($user),
+            'redirect_to' => $redirectTo,
         ]);
     }
 

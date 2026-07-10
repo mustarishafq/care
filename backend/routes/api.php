@@ -76,6 +76,7 @@ Route::prefix('v1')->group(function () {
         Route::post('notifications/send-email', [NotificationController::class, 'sendEmail']);
         Route::apiResource('products', ProductController::class);
         Route::apiResource('product-categories', ProductCategoryController::class);
+        Route::get('roles/meta', [RoleController::class, 'meta']);
         Route::apiResource('roles', RoleController::class);
         Route::apiResource('system-configs', SystemConfigController::class);
 

@@ -36,7 +36,7 @@ function productStatus(product) {
 export default function Shopee({ embedded = false } = {}) {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
-  const canManage = hasPermission('oms.manage');
+  const canManage = hasPermission('marketplace.manage');
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState('shops');
   const [selectedShopId, setSelectedShopId] = useState('');

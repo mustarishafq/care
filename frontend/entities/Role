@@ -17,6 +17,11 @@
       },
       "description": "List of permission keys granted to this role"
     },
+    "default_page": {
+      "type": "string",
+      "description": "Default landing page path after login",
+      "default": "/dashboard"
+    },
     "is_active": {
       "type": "boolean",
       "default": true

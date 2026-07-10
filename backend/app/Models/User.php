@@ -70,6 +70,17 @@ class User extends Authenticatable
         return $this->role?->name ?? 'Viewer';
     }
 
+    public function getDefaultPage(): string
+    {
+        $page = $this->role?->default_page;
+
+        if (is_string($page) && $page !== '' && in_array($page, Permissions::defaultPagePaths(), true)) {
+            return $page;
+        }
+
+        return '/dashboard';
+    }
+
     /**
      * @return list<string>|'*'
      */

@@ -59,7 +59,7 @@ try {
 
   console.log('\n=== Starting servers ===\n');
   console.log(`Backend:  ${backendUrl}`);
-  console.log('Frontend: http://localhost:5173');
+  console.log('Frontend: http://localhost:5174');
   console.log('Admin:    admin@admin.com / password\n');
 
   const backendProc = spawn('php', ['artisan', 'serve', `--port=${getBackendPort()}`], {

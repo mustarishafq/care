@@ -3,7 +3,7 @@
 $origins = env('CORS_ALLOWED_ORIGINS');
 
 if ($origins === null || $origins === '') {
-    $origins = env('FRONTEND_URL', 'http://localhost:5173');
+    $origins = env('FRONTEND_URL', 'http://localhost:5174');
 }
 
 return [

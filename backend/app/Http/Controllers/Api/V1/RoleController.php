@@ -7,14 +7,29 @@ use App\Http\Controllers\Concerns\AuthorizesPermissions;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\RoleResource;
 use App\Models\Role;
+use App\Support\Permissions;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Validation\Rule;
 
 class RoleController extends Controller
 {
     use AppliesEntityQueries, AuthorizesPermissions;
+
+    public function meta(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasPermission('users.manage') && ! $user->hasPermission('users.invite')) {
+            $this->ensurePermission($user, 'users.manage');
+        }
+
+        return response()->json([
+            'permissions' => Permissions::catalog(),
+            'default_pages' => Permissions::defaultPages(),
+        ]);
+    }
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -42,11 +57,14 @@ class RoleController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', Rule::in(Permissions::allKeys())],
+            'default_page' => ['nullable', 'string', Rule::in(Permissions::defaultPagePaths())],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $data['is_system'] = false;
         $data['is_admin'] = false;
+        $data['default_page'] = $data['default_page'] ?? '/dashboard';
 
         return new RoleResource(Role::create($data));
     }
@@ -60,6 +78,8 @@ class RoleController extends Controller
             'name' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
             'permissions' => ['nullable', 'array'],
+            'permissions.*' => ['string', Rule::in(Permissions::allKeys())],
+            'default_page' => ['nullable', 'string', Rule::in(Permissions::defaultPagePaths())],
             'is_active' => ['nullable', 'boolean'],
         ]);
 

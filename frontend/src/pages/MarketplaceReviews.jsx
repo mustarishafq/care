@@ -114,7 +114,7 @@ function ReviewCard({ review, canManage, replyDrafts, setReplyDrafts, replyingId
 export default function MarketplaceReviews() {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
-  const canManage = hasPermission('oms.manage');
+  const canManage = hasPermission('reviews.manage');
   const [platformFilter, setPlatformFilter] = useState('all');
   const [shopFilter, setShopFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');

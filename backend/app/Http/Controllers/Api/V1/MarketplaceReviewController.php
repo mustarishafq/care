@@ -25,7 +25,7 @@ class MarketplaceReviewController extends Controller
 
     public function shops(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'reviews.view');
 
         $validated = $request->validate([
             'platform' => ['sometimes', 'nullable', 'string', 'max:32'],
@@ -45,7 +45,7 @@ class MarketplaceReviewController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'reviews.view');
 
         $validated = $request->validate([
             'platform' => ['sometimes', 'nullable', 'string', 'max:32'],
@@ -74,7 +74,7 @@ class MarketplaceReviewController extends Controller
 
     public function sync(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'reviews.manage');
 
         $validated = $request->validate([
             'shop_connection_id' => ['required', 'integer', 'exists:marketplace_shop_connections,id'],
@@ -110,7 +110,7 @@ class MarketplaceReviewController extends Controller
 
     public function reply(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'reviews.manage');
 
         $review = MarketplaceProductReview::query()->findOrFail($id);
 

@@ -44,6 +44,7 @@ export default function SsoNexus() {
       const finalRedirect = resolveSsoRedirect(
         params.get('redirect_to'),
         data.redirect_to,
+        user?.default_page,
         consumeLoginReturn(),
       );
 
@@ -102,7 +103,7 @@ export default function SsoNexus() {
           <p className="text-xs text-muted-foreground mt-0.5">{userInfo?.email}</p>
         </div>
         <p className="text-sm text-muted-foreground">
-          Redirecting you{userInfo?.redirectTo !== '/dashboard' ? ' to your requested page' : ' to the dashboard'}…
+          Redirecting you{userInfo?.redirectTo && userInfo.redirectTo !== '/dashboard' ? ' to your page' : ' to the dashboard'}…
         </p>
         <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin mx-auto" />
       </div>

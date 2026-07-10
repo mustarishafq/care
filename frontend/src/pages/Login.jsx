@@ -32,10 +32,10 @@ export default function Login() {
     e.preventDefault();
     setLoading(true);
     try {
-      await db.auth.login(email, password);
+      const user = await db.auth.login(email, password);
       await checkUserAuth();
       toast.success('Logged in successfully');
-      navigate(loginReturn || '/dashboard');
+      navigate(loginReturn || user?.default_page || '/dashboard');
     } catch (err) {
       toast.error(err.message || 'Login failed');
     } finally {

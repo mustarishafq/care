@@ -33,6 +33,7 @@ class UserResource extends JsonResource
             'must_change_password' => $this->must_change_password,
             'is_admin' => $this->resource->isAdmin(),
             'permissions' => $permissions === '*' ? Permissions::allKeys() : $permissions,
+            'default_page' => $this->resource->getDefaultPage(),
         ], $this->resource);
     }
 }

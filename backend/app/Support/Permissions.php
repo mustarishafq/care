@@ -5,18 +5,72 @@ namespace App\Support;
 class Permissions
 {
     /**
+     * @return list<array{key: string, label: string, group: string}>
+     */
+    public static function catalog(): array
+    {
+        return [
+            ['key' => 'complaints.view', 'label' => 'View Complaints', 'group' => 'Complaints'],
+            ['key' => 'complaints.create', 'label' => 'Create Complaints', 'group' => 'Complaints'],
+            ['key' => 'complaints.edit', 'label' => 'Edit Complaints', 'group' => 'Complaints'],
+            ['key' => 'complaints.delete', 'label' => 'Delete Complaints', 'group' => 'Complaints'],
+            ['key' => 'complaints.assign', 'label' => 'Assign Department/User', 'group' => 'Complaints'],
+            ['key' => 'complaints.change_status', 'label' => 'Change Status', 'group' => 'Complaints'],
+            ['key' => 'complaints.add_notes', 'label' => 'Add Internal Notes', 'group' => 'Complaints'],
+            ['key' => 'reports.view', 'label' => 'View Reports', 'group' => 'Reports'],
+            ['key' => 'reports.export', 'label' => 'Export Reports', 'group' => 'Reports'],
+            ['key' => 'users.view', 'label' => 'View Users', 'group' => 'Users'],
+            ['key' => 'users.invite', 'label' => 'Invite Users', 'group' => 'Users'],
+            ['key' => 'users.manage', 'label' => 'Manage Users & Roles', 'group' => 'Users'],
+            ['key' => 'products.view', 'label' => 'View Products', 'group' => 'Products'],
+            ['key' => 'products.manage', 'label' => 'Manage Products', 'group' => 'Products'],
+            ['key' => 'settings.view', 'label' => 'View Settings', 'group' => 'Settings'],
+            ['key' => 'settings.manage', 'label' => 'Manage Settings', 'group' => 'Settings'],
+            ['key' => 'oms.view', 'label' => 'View Integrations', 'group' => 'Integrations'],
+            ['key' => 'oms.manage', 'label' => 'Manage Integrations', 'group' => 'Integrations'],
+            ['key' => 'reviews.view', 'label' => 'View Reviews', 'group' => 'Reviews'],
+            ['key' => 'reviews.manage', 'label' => 'Manage Reviews', 'group' => 'Reviews'],
+            ['key' => 'marketplace.view', 'label' => 'View Marketplace', 'group' => 'Marketplace'],
+            ['key' => 'marketplace.manage', 'label' => 'Manage Marketplace', 'group' => 'Marketplace'],
+        ];
+    }
+
+    /**
      * @return list<string>
      */
     public static function allKeys(): array
     {
+        return array_column(self::catalog(), 'key');
+    }
+
+    /**
+     * App pages that can be set as a role's default landing page.
+     *
+     * @return list<array{path: string, label: string}>
+     */
+    public static function defaultPages(): array
+    {
         return [
-            'complaints.view', 'complaints.create', 'complaints.edit', 'complaints.delete',
-            'complaints.assign', 'complaints.change_status', 'complaints.add_notes',
-            'reports.view', 'reports.export',
-            'users.view', 'users.invite', 'users.manage',
-            'products.view', 'products.manage',
-            'settings.view', 'settings.manage',
-            'oms.view', 'oms.manage',
+            ['path' => '/dashboard', 'label' => 'Dashboard'],
+            ['path' => '/complaints', 'label' => 'Complaints'],
+            ['path' => '/marketplace-reviews', 'label' => 'Reviews'],
+            ['path' => '/kanban', 'label' => 'Kanban'],
+            ['path' => '/reports', 'label' => 'Reports'],
+            ['path' => '/notifications', 'label' => 'Notifications'],
+            ['path' => '/products', 'label' => 'Products'],
+            ['path' => '/users', 'label' => 'Users'],
+            ['path' => '/roles', 'label' => 'Roles'],
+            ['path' => '/integrations', 'label' => 'Integrations'],
+            ['path' => '/marketplace', 'label' => 'Marketplace'],
+            ['path' => '/settings', 'label' => 'Settings'],
         ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function defaultPagePaths(): array
+    {
+        return array_column(self::defaultPages(), 'path');
     }
 }

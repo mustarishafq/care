@@ -12,6 +12,7 @@ class Role extends Model
         'name',
         'description',
         'permissions',
+        'default_page',
         'is_active',
         'is_system',
         'is_admin',

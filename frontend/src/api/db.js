@@ -106,7 +106,7 @@ export const db = {
     async login(email, password) {
       const data = await http.post('/auth/login', { email, password });
       setToken(data.token);
-      return data.user;
+      return data.user?.data ?? data.user;
     },
 
     async register(payload) {

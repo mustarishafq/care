@@ -29,7 +29,7 @@ class ShopeeController extends Controller
 
     public function status(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'marketplace.view');
 
         $credentials = $this->platformConfig->getCredentials(MarketplacePlatform::SHOPEE);
 
@@ -48,7 +48,7 @@ class ShopeeController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'marketplace.view');
 
         $connections = $this->shopService->listConnections();
 
@@ -59,7 +59,7 @@ class ShopeeController extends Controller
 
     public function authUrl(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'marketplace.manage');
 
         try {
             $auth = $this->authService->createAuthorizationUrl($request->user());
@@ -105,7 +105,7 @@ class ShopeeController extends Controller
 
     public function destroy(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'marketplace.manage');
 
         $connection = ShopeeConnection::query()->findOrFail($id);
         $this->shopService->disconnect($connection);
@@ -117,7 +117,7 @@ class ShopeeController extends Controller
 
     public function refresh(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.manage');
+        $this->ensurePermission($request->user(), 'marketplace.manage');
 
         $connection = ShopeeConnection::query()->findOrFail($id);
 
@@ -135,7 +135,7 @@ class ShopeeController extends Controller
 
     public function products(Request $request, int $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'oms.view');
+        $this->ensurePermission($request->user(), 'marketplace.view');
 
         $connection = ShopeeConnection::query()
             ->where('is_active', true)

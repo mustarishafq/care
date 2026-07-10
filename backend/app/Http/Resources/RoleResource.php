@@ -18,6 +18,7 @@ class RoleResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'permissions' => $this->permissions ?? [],
+            'default_page' => $this->default_page ?: '/dashboard',
             'is_active' => $this->is_active,
             'is_system' => $this->is_system,
             'is_admin' => $this->is_admin,
