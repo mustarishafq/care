@@ -51,12 +51,19 @@ export function consumeStoredSsoRedirect() {
   return sanitizeRedirect(stored);
 }
 
+/** Explicit return URL from query params only — null when none (do not default to /dashboard). */
 export function readLoginReturnFromSearch(searchParams) {
-  return resolveSsoRedirect(
-    searchParams.get('redirect_to'),
-    searchParams.get('return_to'),
-    searchParams.get('return'),
-  );
+  for (const key of ['redirect_to', 'return_to', 'return']) {
+    const resolved = sanitizeRedirect(searchParams.get(key));
+    if (resolved) return resolved;
+  }
+
+  return null;
+}
+
+/** Post-login path: explicit return → role default page → dashboard. */
+export function resolvePostLoginPath(explicitReturn, defaultPage) {
+  return resolveSsoRedirect(explicitReturn, defaultPage);
 }
 
 export function rememberLoginReturn(value) {
@@ -64,6 +71,10 @@ export function rememberLoginReturn(value) {
   if (!resolved) return null;
   sessionStorage.setItem(LOGIN_RETURN_KEY, resolved);
   return resolved;
+}
+
+export function clearLoginReturn() {
+  sessionStorage.removeItem(LOGIN_RETURN_KEY);
 }
 
 export function consumeLoginReturn() {

@@ -9,7 +9,8 @@ import {
   extractJwtClaim,
   rememberNexusLogoutReturn,
   rememberSsoRedirect,
-  resolveSsoRedirect,
+  resolvePostLoginPath,
+  sanitizeRedirect,
 } from '@/lib/ssoRedirect';
 
 export default function SsoNexus() {
@@ -41,11 +42,10 @@ export default function SsoNexus() {
       const data = await http.post('/sso/nexus/verify', { token });
       setToken(data.token);
       const user = data.user?.data ?? data.user;
-      const finalRedirect = resolveSsoRedirect(
-        params.get('redirect_to'),
-        data.redirect_to,
-        user?.default_page,
-        consumeLoginReturn(),
+      const explicitReturn = sanitizeRedirect(params.get('redirect_to')) || consumeLoginReturn();
+      const finalRedirect = resolvePostLoginPath(
+        explicitReturn,
+        user?.default_page || data.redirect_to,
       );
 
       rememberSsoRedirect(finalRedirect);

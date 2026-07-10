@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '@/api/db';
 import { useAuth } from '@/lib/AuthContext';
-import { readLoginReturnFromSearch, rememberLoginReturn } from '@/lib/ssoRedirect';
+import { clearLoginReturn, readLoginReturnFromSearch, rememberLoginReturn, resolvePostLoginPath } from '@/lib/ssoRedirect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,6 +25,9 @@ export default function Login() {
   useEffect(() => {
     if (loginReturn) {
       rememberLoginReturn(loginReturn);
+    } else {
+      // Drop stale returns (e.g. previous bug that always stored /dashboard)
+      clearLoginReturn();
     }
   }, [loginReturn]);
 
@@ -35,7 +38,7 @@ export default function Login() {
       const user = await db.auth.login(email, password);
       await checkUserAuth();
       toast.success('Logged in successfully');
-      navigate(loginReturn || user?.default_page || '/dashboard');
+      navigate(resolvePostLoginPath(loginReturn, user?.default_page));
     } catch (err) {
       toast.error(err.message || 'Login failed');
     } finally {
