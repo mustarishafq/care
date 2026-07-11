@@ -114,7 +114,7 @@ class TikTokShopApiClient
             $query['page_token'] = $pageToken;
         }
 
-        return $this->request('POST', 'review', 'reviews/search', $accessToken, $shopCipher, $query, $body);
+        return $this->request('POST', 'product', 'reviews/search', $accessToken, $shopCipher, $query, $body);
     }
 
     /**
@@ -122,7 +122,7 @@ class TikTokShopApiClient
      */
     public function replyToReview(string $accessToken, string $shopCipher, string $reviewId, string $content): array
     {
-        return $this->request('POST', 'review', 'reviews/reply', $accessToken, $shopCipher, [], [
+        return $this->request('POST', 'product', 'reviews/reply', $accessToken, $shopCipher, [], [
             'review_id' => $reviewId,
             'content' => $content,
         ]);
@@ -220,7 +220,11 @@ class TikTokShopApiClient
         $json = $response->json();
 
         if (! is_array($json)) {
-            throw new RuntimeException('Invalid TikTok Shop API response.');
+            $snippet = substr($response->body(), 0, 300);
+
+            throw new RuntimeException(
+                "Invalid TikTok Shop API response (HTTP {$response->status()}): {$snippet}",
+            );
         }
 
         $code = $json['code'] ?? -1;
