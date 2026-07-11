@@ -105,6 +105,8 @@ Route::prefix('v1')->group(function () {
         Route::get('shopee/status', [ShopeeController::class, 'status']);
         Route::get('shopee', [ShopeeController::class, 'index']);
         Route::get('shopee/auth-url', [ShopeeController::class, 'authUrl']);
+        Route::post('shopee/cookie-shops', [ShopeeController::class, 'storeCookieShop']);
+        Route::patch('shopee/{id}/cookie', [ShopeeController::class, 'updateCookieShop']);
         Route::delete('shopee/{id}', [ShopeeController::class, 'destroy']);
         Route::post('shopee/{id}/refresh', [ShopeeController::class, 'refresh']);
         Route::get('shopee/{id}/products', [ShopeeController::class, 'products']);

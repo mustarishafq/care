@@ -7,6 +7,7 @@ use App\Models\MarketplaceShopConnection;
 use App\Models\ShopeeConnection;
 use App\Models\TikTokShopConnection;
 use App\Services\Shopee\ShopeeService;
+use App\Services\Shopee\ShopeeSellerReviewClient;
 use App\Services\TikTokShop\TikTokSellerReviewClient;
 use App\Services\TikTokShop\TikTokShopService;
 use App\Support\MarketplacePlatform;
@@ -100,6 +101,84 @@ class MarketplaceReviewSyncService
         }
 
         return TikTokShopConnection::withoutGlobalScopes()->create($payload);
+    }
+
+    /**
+     * Create or update a Shopee shop backed by a Seller Center cookie (supports multiple shops).
+     *
+     * @param  array{cookie: string, shop_name?: string|null, shop_id?: string|null, region?: string|null}  $input
+     */
+    public function upsertShopeeCookieShop(array $input, ?int $userId = null): ShopeeConnection
+    {
+        $cookie = trim((string) ($input['cookie'] ?? ''));
+        if ($cookie === '') {
+            throw new RuntimeException('Seller Center cookie is required.');
+        }
+
+        $credentials = app(MarketplacePlatformConfigService::class)
+            ->getCredentials(MarketplacePlatform::SHOPEE);
+        $region = strtoupper(trim((string) ($input['region'] ?? $credentials['region'] ?? 'MY'))) ?: 'MY';
+
+        $client = new ShopeeSellerReviewClient($cookie, $region);
+        $profile = $client->resolveShopProfile();
+
+        $shopId = trim((string) ($input['shop_id'] ?? ''));
+        if ($shopId === '') {
+            $shopId = $profile['shop_id'];
+        }
+
+        $region = strtoupper((string) ($profile['region'] ?: $region)) ?: 'MY';
+        $shopName = trim((string) ($input['shop_name'] ?? ''));
+        if ($shopName === '') {
+            $shopName = $profile['shop_name'] ?: ('Shopee Shop '.$shopId);
+        }
+
+        $connection = ShopeeConnection::withoutGlobalScopes()
+            ->where('platform', MarketplacePlatform::SHOPEE)
+            ->where('shop_id', $shopId)
+            ->where('region', $region)
+            ->first();
+
+        $metadata = array_merge(
+            is_array($connection?->metadata) ? $connection->metadata : [],
+            [
+                'auth_mode' => 'seller_cookie',
+                'seller_cookie' => ShopeeSellerReviewClient::encryptCookie($cookie),
+                'cookie_updated_at' => now()->toIso8601String(),
+            ],
+        );
+
+        $payload = [
+            'platform' => MarketplacePlatform::SHOPEE,
+            'shop_id' => $shopId,
+            'shop_cipher' => 'seller_cookie',
+            'shop_name' => $shopName,
+            'region' => $region,
+            'access_token' => 'seller_cookie',
+            'refresh_token' => null,
+            'access_token_expires_at' => null,
+            'refresh_token_expires_at' => null,
+            'is_active' => true,
+            'connection_error' => null,
+            'token_refresh_failed_at' => null,
+            'metadata' => $metadata,
+        ];
+
+        if ($userId) {
+            $payload['connected_by_user_id'] = $userId;
+        }
+
+        if ($connection) {
+            if (trim((string) ($input['shop_name'] ?? '')) === '' && $connection->shop_name) {
+                $payload['shop_name'] = $connection->shop_name;
+            }
+            $connection->fill($payload);
+            $connection->save();
+
+            return $connection->fresh();
+        }
+
+        return ShopeeConnection::withoutGlobalScopes()->create($payload);
     }
 
     /**
@@ -371,6 +450,9 @@ class MarketplaceReviewSyncService
                 $productId,
                 $minRating,
                 $maxRating,
+                $fetchAll,
+                $startAt,
+                $endAt,
             );
         }
 
@@ -407,11 +489,16 @@ class MarketplaceReviewSyncService
             /** @var ShopeeConnection $connection */
             $connection = ShopeeConnection::query()->findOrFail($review->marketplace_shop_connection_id);
 
-            $this->shopeeService->replyToComment(
-                $connection,
-                (int) $review->external_review_id,
-                $content,
-            );
+            if (ShopeeSellerReviewClient::isCookieAuth($connection)) {
+                ShopeeSellerReviewClient::fromConnection($connection)
+                    ->replyToReview((int) $review->external_review_id, $content);
+            } else {
+                $this->shopeeService->replyToComment(
+                    $connection,
+                    (int) $review->external_review_id,
+                    $content,
+                );
+            }
         } else {
             throw new RuntimeException("Replies are not supported for platform [{$review->platform}] yet.");
         }
@@ -425,7 +512,7 @@ class MarketplaceReviewSyncService
     }
 
     /**
-     * @return array{synced: int, created_complaints: int, next_page_token: string|null}
+     * @return array{synced: int, created_complaints: int, next_page_token: string|null, pages_fetched?: int}
      */
     public function syncShopeeReviews(
         ShopeeConnection $connection,
@@ -434,7 +521,24 @@ class MarketplaceReviewSyncService
         ?string $productId = null,
         ?int $minRating = null,
         ?int $maxRating = null,
+        bool $fetchAll = true,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
     ): array {
+        if (ShopeeSellerReviewClient::isCookieAuth($connection)) {
+            return $this->syncShopeeCookieReviews(
+                $connection,
+                $pageSize,
+                $pageToken,
+                $productId,
+                $minRating,
+                $maxRating,
+                $fetchAll,
+                $startAt,
+                $endAt,
+            );
+        }
+
         $query = array_filter([
             'cursor' => $pageToken ?? '',
             'page_size' => min(max($pageSize, 1), 50),
@@ -475,6 +579,136 @@ class MarketplaceReviewSyncService
     }
 
     /**
+     * @return array{synced: int, created_complaints: int, next_page_token: string|null, pages_fetched: int}
+     */
+    private function syncShopeeCookieReviews(
+        ShopeeConnection $connection,
+        int $pageSize = 20,
+        ?string $pageToken = null,
+        ?string $productId = null,
+        ?int $minRating = null,
+        ?int $maxRating = null,
+        bool $fetchAll = true,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
+    ): array {
+        $lookbackDays = (int) app(MarketplacePlatformConfigService::class)
+            ->getSetting(MarketplacePlatform::SHOPEE, 'review_lookback_days', 30);
+
+        $startAt = ($startAt ?? now()->subDays(max(1, $lookbackDays)))->copy()->startOfDay();
+        $endAt = ($endAt ?? now())->copy()->endOfDay();
+
+        $stars = null;
+        if ($minRating !== null || $maxRating !== null) {
+            $min = $minRating ?? 1;
+            $max = $maxRating ?? 5;
+            $stars = [];
+            for ($star = $min; $star <= $max; $star++) {
+                $stars[] = $star;
+            }
+        }
+
+        // Seller Center cursor pagination requires signed browser headers; day windows + page_size=50
+        // reliably cover the range without those headers.
+        $size = min(max($pageSize, 1), 50);
+        $client = ShopeeSellerReviewClient::fromConnection($connection);
+        $synced = 0;
+        $createdComplaints = 0;
+        $pagesFetched = 0;
+        $seen = [];
+
+        $windows = $fetchAll
+            ? $this->shopeeSyncWindows($startAt, $endAt)
+            : [[$startAt->timestamp, $endAt->timestamp]];
+
+        foreach ($windows as [$windowStart, $windowEnd]) {
+            $chunks = [[$windowStart, $windowEnd]];
+            $guard = 0;
+
+            while ($chunks !== [] && $guard < 64) {
+                $guard++;
+                [$chunkStart, $chunkEnd] = array_shift($chunks);
+
+                $result = $client->listReviews(1, $size, $chunkStart, $chunkEnd, $stars, 0);
+                $pagesFetched++;
+
+                foreach ($result['list'] as $item) {
+                    $externalId = (string) ($item['comment_id'] ?? '');
+                    if ($externalId !== '' && isset($seen[$externalId])) {
+                        continue;
+                    }
+                    if ($externalId !== '') {
+                        $seen[$externalId] = true;
+                    }
+
+                    if ($productId) {
+                        $itemProductId = (string) ($item['item_id'] ?? $item['product_id'] ?? '');
+                        if ($itemProductId !== '' && $itemProductId !== (string) $productId) {
+                            continue;
+                        }
+                    }
+
+                    $rating = $this->normalizeRating($item['rating_star'] ?? $item['rating'] ?? null);
+                    if ($minRating !== null && ($rating === null || $rating < $minRating)) {
+                        continue;
+                    }
+                    if ($maxRating !== null && ($rating === null || $rating > $maxRating)) {
+                        continue;
+                    }
+
+                    $review = $this->upsertShopeeReview($connection, $item);
+                    $synced++;
+
+                    if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
+                        $createdComplaints++;
+                    }
+                }
+
+                // If this window still has more than one page, split the time range and retry.
+                if ($fetchAll && $result['total'] > $size && ($chunkEnd - $chunkStart) > 3600) {
+                    $mid = intdiv($chunkStart + $chunkEnd, 2);
+                    $chunks[] = [$chunkStart, $mid];
+                    $chunks[] = [$mid + 1, $chunkEnd];
+                }
+            }
+        }
+
+        $connection->update(['last_synced_at' => now()]);
+
+        return [
+            'synced' => $synced,
+            'created_complaints' => $createdComplaints,
+            'next_page_token' => null,
+            'pages_fetched' => $pagesFetched,
+        ];
+    }
+
+    /**
+     * @return list<array{0: int, 1: int}>
+     */
+    private function shopeeSyncWindows(Carbon $startAt, Carbon $endAt): array
+    {
+        $windows = [];
+        $cursor = $startAt->copy()->startOfDay();
+        $endDay = $endAt->copy()->endOfDay();
+
+        while ($cursor->lte($endDay)) {
+            $dayStart = $cursor->copy()->startOfDay();
+            $dayEnd = $cursor->copy()->endOfDay();
+            if ($dayEnd->gt($endAt)) {
+                $dayEnd = $endAt->copy();
+            }
+            if ($dayStart->lt($startAt)) {
+                $dayStart = $startAt->copy();
+            }
+            $windows[] = [$dayStart->timestamp, $dayEnd->timestamp];
+            $cursor->addDay();
+        }
+
+        return $windows !== [] ? $windows : [[$startAt->timestamp, $endAt->timestamp]];
+    }
+
+    /**
      * @param  array<string, mixed>  $item
      */
     private function upsertShopeeReview(ShopeeConnection $connection, array $item): MarketplaceProductReview
@@ -485,9 +719,36 @@ class MarketplaceReviewSyncService
             throw new RuntimeException('Shopee review payload is missing comment_id.');
         }
 
+        $region = (string) ($connection->region ?: 'MY');
         $rating = $this->normalizeRating($item['rating_star'] ?? $item['rating'] ?? null);
-        $createdAt = $this->normalizeTimestamp($item['create_time'] ?? $item['ctime'] ?? null);
-        $reply = is_array($item['comment_reply'] ?? null) ? $item['comment_reply'] : [];
+        $createdAt = $this->normalizeTimestamp($item['create_time'] ?? $item['ctime'] ?? $item['submit_time'] ?? null);
+
+        $reply = is_array($item['reply'] ?? null)
+            ? $item['reply']
+            : (is_array($item['comment_reply'] ?? null) ? $item['comment_reply'] : []);
+
+        $replyText = $reply['comment'] ?? $reply['reply'] ?? $item['seller_reply'] ?? null;
+        if (is_string($replyText)) {
+            $replyText = trim($replyText);
+            if ($replyText === '') {
+                $replyText = null;
+            }
+        } else {
+            $replyText = null;
+        }
+
+        $replyTime = $reply['ctime'] ?? $reply['create_time'] ?? null;
+
+        $existing = MarketplaceProductReview::query()
+            ->where('platform', MarketplacePlatform::SHOPEE)
+            ->where('marketplace_shop_connection_id', $connection->id)
+            ->where('external_review_id', $externalId)
+            ->first();
+
+        if ($replyText === null && $existing && filled($existing->seller_reply)) {
+            $replyText = $existing->seller_reply;
+            $replyTime = $existing->seller_replied_at ?? $replyTime;
+        }
 
         return MarketplaceProductReview::updateOrCreate(
             [
@@ -496,14 +757,18 @@ class MarketplaceReviewSyncService
                 'external_review_id' => $externalId,
             ],
             [
-                'external_product_id' => (string) ($item['item_id'] ?? $item['order_sn'] ?? ''),
-                'product_name' => $item['item_name'] ?? $item['product_name'] ?? null,
+                'external_product_id' => (string) ($item['item_id'] ?? $item['product_id'] ?? $item['order_sn'] ?? ''),
+                'product_name' => $item['product_name'] ?? $item['item_name'] ?? null,
+                'product_image_url' => MarketplaceReviewImages::productImageUrl($item, $region),
                 'rating' => $rating,
                 'review_text' => $item['comment'] ?? $item['buyer_comment'] ?? $item['text'] ?? null,
-                'reviewer_name' => $item['buyer_username'] ?? $item['buyer_name'] ?? null,
+                'review_images' => MarketplaceReviewImages::reviewImages($item, $region),
+                'reviewer_name' => $item['user_name'] ?? $item['buyer_username'] ?? $item['buyer_name'] ?? null,
                 'review_created_at' => $createdAt,
-                'seller_reply' => $reply['comment'] ?? $item['seller_reply'] ?? null,
-                'seller_replied_at' => $this->normalizeTimestamp($reply['create_time'] ?? null),
+                'seller_reply' => $replyText,
+                'seller_replied_at' => $replyTime instanceof Carbon
+                    ? $replyTime
+                    : $this->normalizeTimestamp($replyTime),
                 'raw_metadata' => $item,
                 'synced_at' => now(),
             ],

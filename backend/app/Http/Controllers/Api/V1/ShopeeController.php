@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ShopeeConnectionResource;
 use App\Models\ShopeeConnection;
 use App\Services\Marketplace\MarketplacePlatformConfigService;
+use App\Services\Marketplace\MarketplaceReviewSyncService;
 use App\Services\Marketplace\MarketplaceTokenRefreshService;
 use App\Services\Shopee\ShopeeAuthService;
 use App\Services\Shopee\ShopeeService;
@@ -25,6 +26,7 @@ class ShopeeController extends Controller
         private ShopeeService $shopService,
         private MarketplacePlatformConfigService $platformConfig,
         private MarketplaceTokenRefreshService $tokenRefresh,
+        private MarketplaceReviewSyncService $reviewSync,
     ) {}
 
     public function status(Request $request): JsonResponse
@@ -101,6 +103,70 @@ class ShopeeController extends Controller
         } catch (RuntimeException $exception) {
             return redirect($redirectBase.'?error='.urlencode($exception->getMessage()));
         }
+    }
+
+    public function storeCookieShop(Request $request): JsonResponse
+    {
+        $this->ensurePermission($request->user(), 'marketplace.manage');
+
+        $validated = $request->validate([
+            'cookie' => ['required', 'string', 'max:65535'],
+            'shop_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'shop_id' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:8'],
+        ]);
+
+        try {
+            $connection = $this->reviewSync->upsertShopeeCookieShop($validated, $request->user()?->id);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'Shopee shop cookie saved.',
+            'data' => new ShopeeConnectionResource($connection),
+        ], 201);
+    }
+
+    public function updateCookieShop(Request $request, int $id): JsonResponse
+    {
+        $this->ensurePermission($request->user(), 'marketplace.manage');
+
+        $connection = ShopeeConnection::query()->findOrFail($id);
+
+        $validated = $request->validate([
+            'cookie' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            'shop_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:8'],
+        ]);
+
+        try {
+            if (! empty($validated['cookie'])) {
+                $connection = $this->reviewSync->upsertShopeeCookieShop([
+                    'cookie' => $validated['cookie'],
+                    'shop_name' => $validated['shop_name'] ?? $connection->shop_name,
+                    'shop_id' => $connection->shop_id,
+                    'region' => $validated['region'] ?? $connection->region,
+                ], $request->user()?->id);
+            } else {
+                $updates = array_filter([
+                    'shop_name' => $validated['shop_name'] ?? null,
+                    'region' => isset($validated['region']) ? strtoupper($validated['region']) : null,
+                ], fn ($value) => $value !== null && $value !== '');
+
+                if ($updates !== []) {
+                    $connection->update($updates);
+                }
+                $connection = $connection->fresh();
+            }
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'Shopee shop updated.',
+            'data' => new ShopeeConnectionResource($connection),
+        ]);
     }
 
     public function destroy(Request $request, int $id): JsonResponse

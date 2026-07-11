@@ -279,6 +279,14 @@ export const db = {
         return http.get(`/shopee/${connectionId}/products`, params);
       },
 
+      async addCookieShop(payload) {
+        return http.post('/shopee/cookie-shops', payload);
+      },
+
+      async updateCookieShop(id, payload) {
+        return http.patch(`/shopee/${id}/cookie`, payload);
+      },
+
       async getPlatformConfig(platform = 'shopee') {
         return http.get(`/marketplace/platforms/${platform}`);
       },

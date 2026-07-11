@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import {
   Store, Link2, Loader2, Package, RefreshCw, Unplug, AlertCircle, Settings2,
 } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import PageHeader from '@/components/layout/PageHeader';
 import AnimatedSection from '@/components/layout/AnimatedSection';
 import StatCard from '@/components/dashboard/StatCard';
@@ -45,6 +46,14 @@ export default function Shopee({ embedded = false } = {}) {
   const [disconnectingId, setDisconnectingId] = useState(null);
   const [refreshingId, setRefreshingId] = useState(null);
   const [savingSettings, setSavingSettings] = useState(false);
+  const [savingCookieShop, setSavingCookieShop] = useState(false);
+  const [cookieShopForm, setCookieShopForm] = useState({
+    shop_name: '',
+    shop_id: '',
+    region: 'MY',
+    cookie: '',
+  });
+  const [cookieDrafts, setCookieDrafts] = useState({});
   const [settingsForm, setSettingsForm] = useState({
     app_key: '',
     app_secret: '',
@@ -110,6 +119,7 @@ export default function Shopee({ embedded = false } = {}) {
         : '',
       webhook_secret: '',
     }));
+    setCookieShopForm((prev) => ({ ...prev, region: data.region ?? 'MY' }));
   }, [platformConfig]);
 
   const selectedShop = useMemo(
@@ -167,6 +177,50 @@ export default function Shopee({ embedded = false } = {}) {
     }
   };
 
+  const addCookieShop = async () => {
+    if (!cookieShopForm.cookie.trim()) {
+      toast.error('Paste a Seller Center cookie');
+      return;
+    }
+    setSavingCookieShop(true);
+    try {
+      await db.integrations.Shopee.addCookieShop({
+        cookie: cookieShopForm.cookie.trim(),
+        shop_name: cookieShopForm.shop_name.trim() || undefined,
+        shop_id: cookieShopForm.shop_id.trim() || undefined,
+        region: cookieShopForm.region.trim() || 'MY',
+      });
+      setCookieShopForm((prev) => ({ ...prev, shop_name: '', shop_id: '', cookie: '' }));
+      await refetchConnections();
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
+      toast.success('Shop cookie saved');
+    } catch (error) {
+      toast.error(error.message || 'Failed to save shop cookie');
+    } finally {
+      setSavingCookieShop(false);
+    }
+  };
+
+  const updateShopCookie = async (id) => {
+    const cookie = (cookieDrafts[id] || '').trim();
+    if (!cookie) {
+      toast.error('Paste a new cookie for this shop');
+      return;
+    }
+    setSavingCookieShop(true);
+    try {
+      await db.integrations.Shopee.updateCookieShop(id, { cookie });
+      setCookieDrafts((prev) => ({ ...prev, [id]: '' }));
+      await refetchConnections();
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
+      toast.success('Shop cookie updated');
+    } catch (error) {
+      toast.error(error.message || 'Failed to update shop cookie');
+    } finally {
+      setSavingCookieShop(false);
+    }
+  };
+
   const saveSettings = async () => {
     setSavingSettings(true);
     try {
@@ -212,10 +266,10 @@ export default function Shopee({ embedded = false } = {}) {
     </Select>
   );
 
-  const connectAction = canManage && activeTab !== 'settings' && (
+  const connectAction = canManage && activeTab !== 'settings' && activeTab !== 'shops' && (
     <Button onClick={connectShop} disabled={connecting || !status?.configured}>
       {connecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Link2 className="w-4 h-4 mr-2" />}
-      Connect shop
+      Connect via OAuth
     </Button>
   );
 
@@ -225,7 +279,7 @@ export default function Shopee({ embedded = false } = {}) {
         <PageHeader
           icon={Store}
           title="Shopee"
-          description="Connect MY seller accounts and manage Shopee products"
+          description="Cookie review sync + optional OAuth product catalog"
           actions={connectAction}
         />
       ) : connectAction ? (
@@ -248,48 +302,141 @@ export default function Shopee({ embedded = false } = {}) {
         </TabsList>
 
         <TabsContent value="shops" className="space-y-4 mt-4">
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle className="text-base">Add shop via Seller Center cookie</CardTitle>
+              <CardDescription>
+                One cookie per shop. Used for review sync + reply (same flow as TikTok Shop).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3 text-xs text-amber-800 dark:text-amber-200 space-y-1">
+                <p>1. Log into <code className="bg-muted px-1 rounded">seller.shopee.com.my</code> for the shop you want.</p>
+                <p>2. Open Shop Rating → DevTools → Network → <code className="bg-muted px-1 rounded">search_shop_rating_comments_new</code> → copy Cookie.</p>
+                <p>3. Paste below. Shop ID / name are auto-detected from the session (override if needed).</p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Shop name (optional)</Label>
+                  <Input
+                    placeholder="e.g. Emzi Care Official"
+                    value={cookieShopForm.shop_name}
+                    onChange={(e) => setCookieShopForm((prev) => ({ ...prev, shop_name: e.target.value }))}
+                    disabled={!canManage}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Shop ID (optional)</Label>
+                  <Input
+                    placeholder="Auto from cookie"
+                    value={cookieShopForm.shop_id}
+                    onChange={(e) => setCookieShopForm((prev) => ({ ...prev, shop_id: e.target.value }))}
+                    disabled={!canManage}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Region</Label>
+                  <Input
+                    value={cookieShopForm.region}
+                    onChange={(e) => setCookieShopForm((prev) => ({ ...prev, region: e.target.value }))}
+                    disabled={!canManage}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Cookie header</Label>
+                <Textarea
+                  className="min-h-[100px] font-mono text-xs"
+                  placeholder="Paste full Cookie header value…"
+                  value={cookieShopForm.cookie}
+                  onChange={(e) => setCookieShopForm((prev) => ({ ...prev, cookie: e.target.value }))}
+                  disabled={!canManage}
+                />
+              </div>
+              {canManage && (
+                <Button onClick={addCookieShop} disabled={savingCookieShop}>
+                  {savingCookieShop ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Add / update shop cookie
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+
           {!loadingStatus && !status?.configured && (
             <Card className="rounded-2xl border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
               <CardContent className="pt-4 pb-4 text-sm text-amber-800 dark:text-amber-200">
-                Add partner credentials in the <strong>Settings</strong> tab to connect shops.
+                Partner credentials in <strong>Settings</strong> are only needed for OAuth product sync — cookie shops work for reviews without them.
               </CardContent>
             </Card>
           )}
+
           <Card className="rounded-2xl">
-            <CardHeader>
-              <CardTitle className="text-base">Connected shops</CardTitle>
-              <CardDescription>Platform: <Badge variant="outline">shopee</Badge></CardDescription>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <CardTitle className="text-base">Shops</CardTitle>
+                <CardDescription>Cookie shops for reviews · OAuth shops for products (optional)</CardDescription>
+              </div>
+              {canManage && status?.configured && (
+                <Button size="sm" variant="outline" onClick={connectShop} disabled={connecting}>
+                  {connecting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : <Link2 className="w-3.5 h-3.5 mr-2" />}
+                  Connect via OAuth
+                </Button>
+              )}
             </CardHeader>
             <CardContent>
               {loadingConnections ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Loading…</div>
               ) : connections.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No shops connected yet.</p>
+                <p className="text-sm text-muted-foreground">No shops yet. Add a Seller Center cookie above.</p>
               ) : (
                 <div className="space-y-3">
                   {connections.map((shop) => (
-                    <div key={shop.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-lg border p-3">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-medium">{shop.shop_name || `Shop ${shop.shop_id}`}</p>
-                          <Badge variant="outline">{shop.region}</Badge>
-                          {shop.connection_error && <Badge variant="destructive">Token issue</Badge>}
+                    <div key={shop.id} className="rounded-lg border p-3 space-y-3">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium">{shop.shop_name || `Shop ${shop.shop_id}`}</p>
+                            <Badge variant="outline">{shop.region}</Badge>
+                            <Badge variant="secondary">
+                              {shop.auth_mode === 'seller_cookie' ? 'Cookie' : 'OAuth'}
+                            </Badge>
+                            {shop.has_seller_cookie && <Badge variant="outline" className="text-emerald-700">Cookie OK</Badge>}
+                            {shop.connection_error && <Badge variant="destructive">Issue</Badge>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ID {shop.shop_id}
+                            {shop.last_synced_at && ` · Last sync ${format(new Date(shop.last_synced_at), 'dd MMM yyyy HH:mm')}`}
+                            {shop.cookie_updated_at && ` · Cookie ${format(new Date(shop.cookie_updated_at), 'dd MMM yyyy HH:mm')}`}
+                          </p>
+                          {shop.connection_error && (
+                            <p className="text-xs text-destructive mt-1">{shop.connection_error}</p>
+                          )}
                         </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          ID {shop.shop_id}
-                          {shop.last_synced_at && ` · Last sync ${format(new Date(shop.last_synced_at), 'dd MMM yyyy HH:mm')}`}
-                        </p>
-                        {shop.connection_error && (
-                          <p className="text-xs text-destructive mt-1">{shop.connection_error}</p>
+                        {canManage && (
+                          <div className="flex items-center gap-2">
+                            {shop.auth_mode !== 'seller_cookie' && (
+                              <Button size="sm" variant="outline" onClick={() => refreshShopToken(shop.id)} disabled={refreshingId === shop.id}>
+                                {refreshingId === shop.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                              </Button>
+                            )}
+                            <Button size="sm" variant="outline" onClick={() => disconnectShop(shop.id)} disabled={disconnectingId === shop.id}>
+                              {disconnectingId === shop.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
+                            </Button>
+                          </div>
                         )}
                       </div>
-                      {canManage && (
-                        <div className="flex items-center gap-2">
-                          <Button size="sm" variant="outline" onClick={() => refreshShopToken(shop.id)} disabled={refreshingId === shop.id}>
-                            {refreshingId === shop.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={() => disconnectShop(shop.id)} disabled={disconnectingId === shop.id}>
-                            {disconnectingId === shop.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unplug className="w-3.5 h-3.5" />}
+                      {canManage && shop.auth_mode === 'seller_cookie' && (
+                        <div className="space-y-2">
+                          <Label className="text-xs">Refresh cookie for this shop</Label>
+                          <Textarea
+                            className="min-h-[72px] font-mono text-xs"
+                            placeholder="Paste a fresh Cookie header…"
+                            value={cookieDrafts[shop.id] || ''}
+                            onChange={(e) => setCookieDrafts((prev) => ({ ...prev, [shop.id]: e.target.value }))}
+                          />
+                          <Button size="sm" variant="outline" onClick={() => updateShopCookie(shop.id)} disabled={savingCookieShop}>
+                            {savingCookieShop ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-2" /> : null}
+                            Update cookie
                           </Button>
                         </div>
                       )}

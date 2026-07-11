@@ -11,11 +11,15 @@ class MarketplaceProductReviewResource extends JsonResource
     public function toArray(Request $request): array
     {
         $metadata = is_array($this->raw_metadata) ? $this->raw_metadata : [];
+        $region = 'MY';
+        if ($this->relationLoaded('shopConnection') && $this->shopConnection?->region) {
+            $region = (string) $this->shopConnection->region;
+        }
         $reviewImages = is_array($this->review_images) && $this->review_images !== []
             ? $this->review_images
-            : MarketplaceReviewImages::reviewImages($metadata);
+            : MarketplaceReviewImages::reviewImages($metadata, $region);
         $productImageUrl = $this->product_image_url
-            ?: MarketplaceReviewImages::productImageUrl($metadata);
+            ?: MarketplaceReviewImages::productImageUrl($metadata, $region);
 
         return [
             'id' => (string) $this->id,
