@@ -11,6 +11,7 @@ use App\Services\TikTokShop\TikTokShopService;
 use App\Support\MarketplacePlatform;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 class MarketplaceReviewSyncService
@@ -44,6 +45,13 @@ class MarketplaceReviewSyncService
             $pageSize,
             $pageToken,
         );
+
+        Log::debug('tiktok_shop.reviews.search.raw_response', [
+            'connection_id' => $connection->id,
+            'shop_id' => $connection->shop_id,
+            'response_keys' => array_keys($result),
+            'response' => $result,
+        ]);
 
         $reviews = $this->extractReviewItems($result);
         $synced = 0;
