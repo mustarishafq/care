@@ -13,6 +13,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import {
   Star, Loader2, RefreshCw, MessageSquare, ExternalLink, Store,
   ChevronDown, SlidersHorizontal, CalendarDays, ChevronLeft, ChevronRight,
 } from 'lucide-react';
@@ -261,8 +264,8 @@ function SyncFields({
   className,
 }) {
   return (
-    <div className={cn('grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3', className)}>
-      <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
+    <div className={cn('grid grid-cols-1 sm:grid-cols-2 gap-3', className)}>
+      <div className="space-y-1.5 sm:col-span-2">
         <Label className="text-xs text-muted-foreground">Shop</Label>
         <Select value={syncShopId || 'none'} onValueChange={(v) => setSyncShopId(v === 'none' ? '' : v)}>
           <SelectTrigger className="h-10">
@@ -296,7 +299,7 @@ function SyncFields({
           onChange={(e) => setSyncEndDate(e.target.value)}
         />
       </div>
-      <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
+      <div className="space-y-1.5 sm:col-span-2">
         <Label className="text-xs text-muted-foreground">Stars</Label>
         <Select value={syncRating} onValueChange={setSyncRating}>
           <SelectTrigger className="h-10">
@@ -336,7 +339,7 @@ export default function MarketplaceReviews() {
   const [replyingId, setReplyingId] = useState(null);
   const [replyOpenId, setReplyOpenId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [syncOpen, setSyncOpen] = useState(true);
+  const [syncModalOpen, setSyncModalOpen] = useState(false);
   const [page, setPage] = useState(1);
   const perPage = 20;
 
@@ -440,6 +443,7 @@ export default function MarketplaceReviews() {
       await refetchReviews();
       const created = result.sync?.created_complaints ?? 0;
       toast.success(`${result.message}${created ? ` · ${created} complaint(s) auto-created` : ''}`);
+      setSyncModalOpen(false);
     } catch (error) {
       toast.error(error.message || 'Failed to sync reviews');
     } finally {
@@ -536,6 +540,12 @@ export default function MarketplaceReviews() {
         icon={Star}
         title="Reviews"
         description="Sync and reply to product reviews across TikTok Shop and Shopee"
+        actions={canManage ? (
+          <Button onClick={() => setSyncModalOpen(true)} className="w-full sm:w-auto">
+            <RefreshCw className="w-4 h-4 mr-2" />
+            Resync
+          </Button>
+        ) : null}
       />
 
       <PageContent className="space-y-4 md:space-y-6">
@@ -545,93 +555,6 @@ export default function MarketplaceReviews() {
           <StatCard label="Replied" value={loadingReviews ? '…' : stats.replied} icon={MessageSquare} color="success" index={2} />
           <StatCard label="Low (≤3★)" value={loadingReviews ? '…' : stats.low} icon={Store} color="purple" index={3} />
         </div>
-
-        {canManage && (
-          <Collapsible open={syncOpen} onOpenChange={setSyncOpen} className="md:hidden">
-            <Card className="rounded-xl border shadow-sm overflow-hidden">
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className="flex w-full items-start justify-between gap-3 p-3.5 text-left min-h-11"
-                >
-                  <div className="min-w-0 space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <RefreshCw className="h-4 w-4 shrink-0 text-muted-foreground" />
-                      <span className="text-sm font-semibold">Sync from platform</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground pl-6">
-                      Pull matching reviews for a shop & date range
-                    </p>
-                  </div>
-                  <ChevronDown className={cn(
-                    'h-4 w-4 shrink-0 text-muted-foreground transition-transform mt-1',
-                    syncOpen && 'rotate-180',
-                  )} />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent>
-                <CardContent className="pt-0 pb-3.5 px-3.5 space-y-3 border-t">
-                  <SyncFields
-                    shops={shops}
-                    syncShopId={syncShopId}
-                    setSyncShopId={setSyncShopId}
-                    syncStartDate={syncStartDate}
-                    setSyncStartDate={setSyncStartDate}
-                    syncEndDate={syncEndDate}
-                    setSyncEndDate={setSyncEndDate}
-                    syncRating={syncRating}
-                    setSyncRating={setSyncRating}
-                  />
-                  <Button
-                    onClick={syncReviews}
-                    disabled={syncing || !syncShopId}
-                    className="w-full h-10"
-                  >
-                    {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                    {syncing ? 'Syncing…' : 'Sync reviews'}
-                  </Button>
-                </CardContent>
-              </CollapsibleContent>
-            </Card>
-          </Collapsible>
-        )}
-
-        {canManage && (
-          <Card className="rounded-2xl border shadow-sm hidden md:block">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Sync from platform</CardTitle>
-              <CardDescription>
-                Pulls every matching review in the date range (all pages). Existing reviews are updated, not duplicated.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <SyncFields
-                shops={shops}
-                syncShopId={syncShopId}
-                setSyncShopId={setSyncShopId}
-                syncStartDate={syncStartDate}
-                setSyncStartDate={setSyncStartDate}
-                syncEndDate={syncEndDate}
-                setSyncEndDate={setSyncEndDate}
-                syncRating={syncRating}
-                setSyncRating={setSyncRating}
-              />
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
-                <p className="text-xs text-muted-foreground">
-                  Defaults to last 7 days so replies on older reviews are refreshed.
-                </p>
-                <Button
-                  onClick={syncReviews}
-                  disabled={syncing || !syncShopId}
-                  className="w-full sm:w-auto h-10 shrink-0"
-                >
-                  {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                  {syncing ? 'Syncing all pages…' : 'Sync all matching'}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <div ref={listTopRef} className="scroll-mt-20 md:scroll-mt-24" />
 
@@ -690,7 +613,7 @@ export default function MarketplaceReviews() {
               <div className="py-10 text-center space-y-2 px-2 sm:px-4">
                 <p className="text-sm font-medium">No reviews match these filters</p>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                  Add a shop cookie under Marketplace → TikTok Shop, then sync with a date range.
+                  Add a shop cookie under Marketplace → TikTok Shop or Shopee, then tap Resync.
                 </p>
               </div>
             ) : (
@@ -747,6 +670,51 @@ export default function MarketplaceReviews() {
           </CardContent>
         </Card>
       </PageContent>
+
+      {canManage && (
+        <Dialog open={syncModalOpen} onOpenChange={(open) => !syncing && setSyncModalOpen(open)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Sync from platform</DialogTitle>
+              <DialogDescription>
+                Pulls every matching review in the date range (all pages). Existing reviews are updated, not duplicated.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <SyncFields
+                shops={shops}
+                syncShopId={syncShopId}
+                setSyncShopId={setSyncShopId}
+                syncStartDate={syncStartDate}
+                setSyncStartDate={setSyncStartDate}
+                syncEndDate={syncEndDate}
+                setSyncEndDate={setSyncEndDate}
+                syncRating={syncRating}
+                setSyncRating={setSyncRating}
+              />
+              <p className="text-xs text-muted-foreground">
+                Defaults to last 7 days so replies on older reviews are refreshed.
+              </p>
+            </div>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                onClick={() => setSyncModalOpen(false)}
+                disabled={syncing}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={syncReviews}
+                disabled={syncing || !syncShopId}
+              >
+                {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                {syncing ? 'Syncing…' : 'Sync all matching'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }
