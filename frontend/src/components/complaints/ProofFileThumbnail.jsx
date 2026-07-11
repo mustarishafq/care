@@ -11,6 +11,7 @@ export default function ProofFileThumbnail({ url, name, className, kind: kindPro
         src={url}
         alt={name || 'Proof file'}
         className={cn('w-full h-full object-cover', className)}
+        referrerPolicy="no-referrer"
       />
     );
   }

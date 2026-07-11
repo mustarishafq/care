@@ -7,9 +7,13 @@ use App\Models\MarketplaceShopConnection;
 use App\Models\ShopeeConnection;
 use App\Models\TikTokShopConnection;
 use App\Services\Shopee\ShopeeService;
+use App\Services\TikTokShop\TikTokSellerReviewClient;
 use App\Services\TikTokShop\TikTokShopService;
 use App\Support\MarketplacePlatform;
+use App\Support\MarketplaceReviewImages;
 use Carbon\Carbon;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -23,76 +27,306 @@ class MarketplaceReviewSyncService
     ) {}
 
     /**
-     * @return array{synced: int, created_complaints: int, next_page_token: string|null}
+     * Create or update a TikTok shop backed by a Seller Center cookie (supports multiple shops).
+     *
+     * @param  array{cookie: string, shop_name?: string|null, seller_id?: string|null, region?: string|null}  $input
      */
+    public function upsertTikTokCookieShop(array $input, ?int $userId = null): TikTokShopConnection
+    {
+        $cookie = trim((string) ($input['cookie'] ?? ''));
+        if ($cookie === '') {
+            throw new RuntimeException('Seller Center cookie is required.');
+        }
+
+        $credentials = app(MarketplacePlatformConfigService::class)
+            ->getCredentials(MarketplacePlatform::TIKTOK_SHOP);
+        $region = strtoupper(trim((string) ($input['region'] ?? $credentials['region'] ?? 'MY'))) ?: 'MY';
+        $sellerId = trim((string) ($input['seller_id'] ?? ''));
+        if ($sellerId === '') {
+            $sellerId = TikTokSellerReviewClient::extractSellerIdFromCookie($cookie);
+        }
+
+        $fp = TikTokSellerReviewClient::cookieValue($cookie, 's_v_web_id');
+        $shopName = trim((string) ($input['shop_name'] ?? ''));
+        if ($shopName === '') {
+            $shopName = 'TikTok Shop '.$sellerId;
+        }
+
+        $connection = TikTokShopConnection::withoutGlobalScopes()
+            ->where('platform', MarketplacePlatform::TIKTOK_SHOP)
+            ->where('shop_id', $sellerId)
+            ->where('region', $region)
+            ->first();
+
+        $metadata = array_merge(
+            is_array($connection?->metadata) ? $connection->metadata : [],
+            [
+                'auth_mode' => 'seller_cookie',
+                'seller_cookie' => TikTokSellerReviewClient::encryptCookie($cookie),
+                'seller_fp' => $fp !== '' ? $fp : null,
+                'cookie_updated_at' => now()->toIso8601String(),
+            ],
+        );
+
+        $payload = [
+            'platform' => MarketplacePlatform::TIKTOK_SHOP,
+            'shop_id' => $sellerId,
+            'shop_cipher' => 'seller_cookie',
+            'shop_name' => $shopName,
+            'region' => $region,
+            'access_token' => 'seller_cookie',
+            'refresh_token' => null,
+            'access_token_expires_at' => null,
+            'refresh_token_expires_at' => null,
+            'is_active' => true,
+            'connection_error' => null,
+            'token_refresh_failed_at' => null,
+            'metadata' => $metadata,
+        ];
+
+        if ($userId) {
+            $payload['connected_by_user_id'] = $userId;
+        }
+
+        if ($connection) {
+            // Keep existing display name unless a new one was provided.
+            if (trim((string) ($input['shop_name'] ?? '')) === '' && $connection->shop_name) {
+                $payload['shop_name'] = $connection->shop_name;
+            }
+            $connection->fill($payload);
+            $connection->save();
+
+            return $connection->fresh();
+        }
+
+        return TikTokShopConnection::withoutGlobalScopes()->create($payload);
+    }
+
+    /**
+     * @deprecated Use upsertTikTokCookieShop() — kept for legacy single-cookie callers.
+     */
+    public function ensureTikTokCookieConnection(?int $userId = null): TikTokShopConnection
+    {
+        $credentials = app(MarketplacePlatformConfigService::class)
+            ->getCredentials(MarketplacePlatform::TIKTOK_SHOP);
+        $settings = $credentials['settings'];
+        $cookie = TikTokSellerReviewClient::decryptCookie($settings['seller_cookie'] ?? null);
+
+        if ($cookie === '') {
+            $existing = TikTokShopConnection::query()
+                ->where('is_active', true)
+                ->get()
+                ->first(function (TikTokShopConnection $connection) {
+                    $metadata = is_array($connection->metadata) ? $connection->metadata : [];
+
+                    return ($metadata['auth_mode'] ?? null) === 'seller_cookie'
+                        && TikTokSellerReviewClient::decryptCookie($metadata['seller_cookie'] ?? null) !== '';
+                });
+
+            if ($existing) {
+                return $existing;
+            }
+
+            throw new RuntimeException(
+                'No TikTok shop cookie configured. Add a shop under Marketplace → TikTok Shop.',
+            );
+        }
+
+        return $this->upsertTikTokCookieShop([
+            'cookie' => $cookie,
+            'seller_id' => $settings['seller_id'] ?? null,
+            'region' => $credentials['region'] ?? 'MY',
+            'shop_name' => 'TikTok Shop ('.strtoupper((string) ($credentials['region'] ?: 'MY')).')',
+        ], $userId);
+    }
+
     public function syncTikTokShopReviews(
         TikTokShopConnection $connection,
-        int $pageSize = 20,
+        int $pageSize = 50,
         ?string $pageToken = null,
         ?string $productId = null,
         ?int $minRating = null,
         ?int $maxRating = null,
+        bool $fetchAll = true,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
     ): array {
-        $body = array_filter([
-            'product_id' => $productId,
-            'min_rating' => $minRating,
-            'max_rating' => $maxRating,
-        ], fn ($value) => $value !== null && $value !== '');
+        $lookbackDays = (int) app(MarketplacePlatformConfigService::class)
+            ->getSetting(MarketplacePlatform::TIKTOK_SHOP, 'review_lookback_days', 30);
 
-        $result = $this->shopService->searchReviews(
-            $connection,
-            $body,
-            $pageSize,
-            $pageToken,
-        );
+        $startTs = $startAt?->copy()->startOfDay()->timestamp;
+        $endTs = $endAt?->copy()->endOfDay()->timestamp;
 
-        Log::debug('tiktok_shop.reviews.search.raw_response', [
-            'connection_id' => $connection->id,
-            'shop_id' => $connection->shop_id,
-            'response_keys' => array_keys($result),
-            'response' => $result,
-        ]);
-
-        $reviews = $this->extractReviewItems($result);
+        $page = max(1, (int) ($pageToken ?: 1));
+        $pageSize = min(max($pageSize, 1), 50);
         $synced = 0;
+        $created = 0;
+        $updated = 0;
         $createdComplaints = 0;
+        $pagesFetched = 0;
+        $maxPages = $fetchAll ? 200 : 1;
+        $nextPageToken = null;
 
-        foreach ($reviews as $item) {
-            $review = $this->upsertTikTokReview($connection, $item);
-            $synced++;
+        do {
+            $result = $this->shopService->searchReviews(
+                $connection,
+                $pageSize,
+                (string) $page,
+                $lookbackDays,
+                $startTs,
+                $endTs,
+            );
 
-            if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
-                $createdComplaints++;
+            $pagesFetched++;
+
+            Log::debug('tiktok_shop.reviews.seller_cookie.raw_response', [
+                'connection_id' => $connection->id,
+                'shop_id' => $connection->shop_id,
+                'page' => $result['page'] ?? null,
+                'total' => $result['total'] ?? null,
+                'list_count' => count($result['list'] ?? []),
+            ]);
+
+            foreach ($this->extractReviewItems($result) as $item) {
+                $productInfo = is_array($item['product_info'] ?? null) ? $item['product_info'] : [];
+                $itemProductId = (string) ($productInfo['product_id'] ?? $item['product_id'] ?? '');
+
+                if ($productId !== null && $productId !== '' && $itemProductId !== $productId) {
+                    continue;
+                }
+
+                $rating = $this->normalizeRating($item['star_level'] ?? $item['rating'] ?? null);
+
+                if ($minRating !== null && ($rating === null || $rating < $minRating)) {
+                    continue;
+                }
+
+                if ($maxRating !== null && ($rating === null || $rating > $maxRating)) {
+                    continue;
+                }
+
+                $reviewData = is_array($item['review'] ?? null) ? $item['review'] : $item;
+                $externalId = (string) (
+                    $reviewData['main_review_id']
+                    ?? $reviewData['review_id']
+                    ?? $reviewData['id']
+                    ?? $item['main_review_id']
+                    ?? $item['review_id']
+                    ?? ''
+                );
+
+                if ($externalId === '') {
+                    continue;
+                }
+
+                $existed = MarketplaceProductReview::query()
+                    ->where('platform', MarketplacePlatform::TIKTOK_SHOP)
+                    ->where('marketplace_shop_connection_id', $connection->id)
+                    ->where('external_review_id', $externalId)
+                    ->exists();
+
+                $review = $this->upsertTikTokReview($connection, $item);
+                $synced++;
+
+                if ($existed) {
+                    $updated++;
+                } else {
+                    $created++;
+                }
+
+                if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
+                    $createdComplaints++;
+                }
             }
-        }
+
+            $nextPageToken = isset($result['next_page']) && $result['next_page'] !== null
+                ? (string) $result['next_page']
+                : null;
+            $page = $nextPageToken !== null ? (int) $nextPageToken : null;
+        } while ($fetchAll && $page !== null && $pagesFetched < $maxPages);
 
         return [
             'synced' => $synced,
+            'created' => $created,
+            'updated' => $updated,
             'created_complaints' => $createdComplaints,
-            'next_page_token' => $result['next_page_token'] ?? null,
+            'pages_fetched' => $pagesFetched,
+            'next_page_token' => $fetchAll ? null : $nextPageToken,
         ];
     }
 
     /**
-     * @return Collection<int, MarketplaceProductReview>
+     * @return LengthAwarePaginator<int, MarketplaceProductReview>
      */
     public function listAllReviews(
         ?string $platform = null,
         ?int $connectionId = null,
         ?int $minRating = null,
         ?int $maxRating = null,
-        int $limit = 200,
-    ): Collection {
-        return MarketplaceProductReview::query()
+        int $perPage = 20,
+        ?string $replyStatus = null,
+        int $page = 1,
+    ): LengthAwarePaginator {
+        return $this->filteredReviewsQuery($platform, $connectionId, $minRating, $maxRating, $replyStatus)
             ->with('shopConnection')
+            ->orderByDesc('review_created_at')
+            ->orderByDesc('id')
+            ->paginate(
+                perPage: min(max($perPage, 1), 100),
+                page: max(1, $page),
+            );
+    }
+
+    /**
+     * Aggregate counts for the same filters as the review list (all matching rows, not just the page).
+     *
+     * @return array{total: int, unreplied: int, replied: int, low: int}
+     */
+    public function reviewStats(
+        ?string $platform = null,
+        ?int $connectionId = null,
+        ?int $minRating = null,
+        ?int $maxRating = null,
+        ?string $replyStatus = null,
+    ): array {
+        $row = $this->filteredReviewsQuery($platform, $connectionId, $minRating, $maxRating, $replyStatus)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw("SUM(CASE WHEN seller_reply IS NOT NULL AND seller_reply != '' THEN 1 ELSE 0 END) as replied")
+            ->selectRaw("SUM(CASE WHEN seller_reply IS NULL OR seller_reply = '' THEN 1 ELSE 0 END) as unreplied")
+            ->selectRaw('SUM(CASE WHEN rating IS NOT NULL AND rating <= 3 THEN 1 ELSE 0 END) as low')
+            ->first();
+
+        return [
+            'total' => (int) ($row->total ?? 0),
+            'replied' => (int) ($row->replied ?? 0),
+            'unreplied' => (int) ($row->unreplied ?? 0),
+            'low' => (int) ($row->low ?? 0),
+        ];
+    }
+
+    /**
+     * @return Builder<MarketplaceProductReview>
+     */
+    private function filteredReviewsQuery(
+        ?string $platform = null,
+        ?int $connectionId = null,
+        ?int $minRating = null,
+        ?int $maxRating = null,
+        ?string $replyStatus = null,
+    ): Builder {
+        return MarketplaceProductReview::query()
             ->when($platform, fn ($query) => $query->where('platform', $platform))
             ->when($connectionId, fn ($query) => $query->where('marketplace_shop_connection_id', $connectionId))
             ->when($minRating, fn ($query) => $query->where('rating', '>=', $minRating))
             ->when($maxRating, fn ($query) => $query->where('rating', '<=', $maxRating))
-            ->orderByDesc('review_created_at')
-            ->orderByDesc('id')
-            ->limit($limit)
-            ->get();
+            ->when($replyStatus === 'replied', function ($query) {
+                $query->whereNotNull('seller_reply')->where('seller_reply', '!=', '');
+            })
+            ->when($replyStatus === 'unreplied', function ($query) {
+                $query->where(function ($inner) {
+                    $inner->whereNull('seller_reply')->orWhere('seller_reply', '');
+                });
+            });
     }
 
     /**
@@ -100,11 +334,14 @@ class MarketplaceReviewSyncService
      */
     public function syncConnection(
         MarketplaceShopConnection $connection,
-        int $pageSize = 20,
+        int $pageSize = 50,
         ?string $pageToken = null,
         ?string $productId = null,
         ?int $minRating = null,
         ?int $maxRating = null,
+        bool $fetchAll = true,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
     ): array {
         if ($connection->platform === MarketplacePlatform::TIKTOK_SHOP) {
             /** @var TikTokShopConnection $tiktokConnection */
@@ -117,6 +354,9 @@ class MarketplaceReviewSyncService
                 $productId,
                 $minRating,
                 $maxRating,
+                $fetchAll,
+                $startAt,
+                $endAt,
             );
         }
 
@@ -276,14 +516,56 @@ class MarketplaceReviewSyncService
     private function upsertTikTokReview(TikTokShopConnection $connection, array $item): MarketplaceProductReview
     {
         $reviewData = is_array($item['review'] ?? null) ? $item['review'] : $item;
-        $externalId = (string) ($reviewData['review_id'] ?? $reviewData['id'] ?? $item['review_id'] ?? '');
+        $productInfo = is_array($reviewData['product_info'] ?? null)
+            ? $reviewData['product_info']
+            : (is_array($item['product_info'] ?? null) ? $item['product_info'] : []);
+
+        $externalId = (string) (
+            $reviewData['main_review_id']
+            ?? $reviewData['review_id']
+            ?? $reviewData['id']
+            ?? $item['main_review_id']
+            ?? $item['review_id']
+            ?? ''
+        );
 
         if ($externalId === '') {
             throw new RuntimeException('TikTok review payload is missing review_id.');
         }
 
-        $rating = $this->normalizeRating($reviewData['rating'] ?? $reviewData['review_rating'] ?? null);
-        $createdAt = $this->normalizeTimestamp($reviewData['create_time'] ?? $reviewData['created_at'] ?? null);
+        $replyText = $reviewData['reply_text'] ?? $reviewData['seller_reply'] ?? null;
+        if (is_string($replyText)) {
+            $replyText = trim($replyText);
+            if ($replyText === '') {
+                $replyText = null;
+            }
+        } else {
+            $replyText = null;
+        }
+
+        $replyTime = $reviewData['reply_time'] ?? $reviewData['seller_reply_time'] ?? null;
+        if (is_numeric($replyTime) && (int) $replyTime === 0) {
+            $replyTime = null;
+        }
+
+        $rating = $this->normalizeRating(
+            $reviewData['star_level'] ?? $reviewData['rating'] ?? $reviewData['review_rating'] ?? null,
+        );
+        $createdAt = $this->normalizeTimestamp(
+            $reviewData['review_time'] ?? $reviewData['create_time'] ?? $reviewData['created_at'] ?? null,
+        );
+
+        $existing = MarketplaceProductReview::query()
+            ->where('platform', MarketplacePlatform::TIKTOK_SHOP)
+            ->where('marketplace_shop_connection_id', $connection->id)
+            ->where('external_review_id', $externalId)
+            ->first();
+
+        // Never wipe a stored reply if this page payload omitted / emptied reply_text.
+        if ($replyText === null && $existing && filled($existing->seller_reply)) {
+            $replyText = $existing->seller_reply;
+            $replyTime = $existing->seller_replied_at ?? $replyTime;
+        }
 
         return MarketplaceProductReview::updateOrCreate(
             [
@@ -292,14 +574,21 @@ class MarketplaceReviewSyncService
                 'external_review_id' => $externalId,
             ],
             [
-                'external_product_id' => (string) ($reviewData['product_id'] ?? $item['product_id'] ?? ''),
-                'product_name' => $reviewData['product_name'] ?? $item['product_name'] ?? null,
+                'external_product_id' => (string) ($productInfo['product_id'] ?? $reviewData['product_id'] ?? $item['product_id'] ?? ''),
+                'product_name' => $productInfo['product_name'] ?? $reviewData['product_name'] ?? $item['product_name'] ?? null,
+                'product_image_url' => MarketplaceReviewImages::productImageUrl($item)
+                    ?? MarketplaceReviewImages::productImageUrl($reviewData),
                 'rating' => $rating,
                 'review_text' => $reviewData['review_text'] ?? $reviewData['text'] ?? $reviewData['content'] ?? null,
-                'reviewer_name' => $reviewData['display_name'] ?? $reviewData['buyer_name'] ?? $reviewData['user_name'] ?? null,
+                'review_images' => MarketplaceReviewImages::reviewImages($reviewData) !== []
+                    ? MarketplaceReviewImages::reviewImages($reviewData)
+                    : MarketplaceReviewImages::reviewImages($item),
+                'reviewer_name' => $reviewData['user_name'] ?? $reviewData['display_name'] ?? $reviewData['buyer_name'] ?? null,
                 'review_created_at' => $createdAt,
-                'seller_reply' => $reviewData['seller_reply'] ?? $reviewData['reply_text'] ?? null,
-                'seller_replied_at' => $this->normalizeTimestamp($reviewData['seller_reply_time'] ?? null),
+                'seller_reply' => $replyText,
+                'seller_replied_at' => $replyTime instanceof Carbon
+                    ? $replyTime
+                    : $this->normalizeTimestamp($replyTime),
                 'raw_metadata' => $item,
                 'synced_at' => now(),
             ],
@@ -312,7 +601,7 @@ class MarketplaceReviewSyncService
      */
     private function extractReviewItems(array $result): array
     {
-        foreach (['reviews', 'review_list', 'review_items', 'items'] as $key) {
+        foreach (['list', 'reviews', 'review_list', 'review_items', 'items'] as $key) {
             if (isset($result[$key]) && is_array($result[$key])) {
                 return $result[$key];
             }

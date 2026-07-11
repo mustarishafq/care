@@ -93,6 +93,8 @@ Route::prefix('v1')->group(function () {
         Route::get('tiktok-shop/status', [TikTokShopController::class, 'status']);
         Route::get('tiktok-shop', [TikTokShopController::class, 'index']);
         Route::get('tiktok-shop/auth-url', [TikTokShopController::class, 'authUrl']);
+        Route::post('tiktok-shop/cookie-shops', [TikTokShopController::class, 'storeCookieShop']);
+        Route::patch('tiktok-shop/{id}/cookie', [TikTokShopController::class, 'updateCookieShop']);
         Route::delete('tiktok-shop/{id}', [TikTokShopController::class, 'destroy']);
         Route::post('tiktok-shop/{id}/refresh', [TikTokShopController::class, 'refresh']);
         Route::get('tiktok-shop/{id}/products', [TikTokShopController::class, 'products']);

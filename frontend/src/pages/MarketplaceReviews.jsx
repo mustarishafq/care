@@ -1,19 +1,25 @@
 import { db } from '@/api/db';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Star, Loader2, RefreshCw, MessageSquare, ExternalLink, Store, ChevronDown, SlidersHorizontal } from 'lucide-react';
+import {
+  Star, Loader2, RefreshCw, MessageSquare, ExternalLink, Store,
+  ChevronDown, SlidersHorizontal, CalendarDays, ChevronLeft, ChevronRight,
+} from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
 import StatCard from '@/components/dashboard/StatCard';
+import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import { toast } from 'sonner';
 import { usePermissions } from '@/lib/usePermissions';
 import { format } from 'date-fns';
@@ -28,85 +34,285 @@ function platformLabel(platform) {
   return PLATFORM_LABELS[platform] ?? platform;
 }
 
-function Stars({ rating }) {
-  if (!rating) return <span className="text-muted-foreground">—</span>;
+function todayIso() {
+  return format(new Date(), 'yyyy-MM-dd');
+}
+
+function daysAgoIso(days) {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return format(d, 'yyyy-MM-dd');
+}
+
+function Stars({ rating, size = 'sm' }) {
+  const value = Number(rating) || 0;
+  const iconClass = size === 'md' ? 'w-4 h-4' : 'w-3.5 h-3.5';
+
   return (
-    <span className="inline-flex items-center gap-1 text-amber-600">
-      <Star className="w-3.5 h-3.5 fill-current" />
-      {rating}/5
+    <span className="inline-flex items-center gap-0.5" aria-label={`${value} out of 5 stars`}>
+      {[1, 2, 3, 4, 5].map((n) => (
+        <Star
+          key={n}
+          className={cn(
+            iconClass,
+            n <= value ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/30',
+          )}
+        />
+      ))}
+      <span className="ml-1.5 text-xs font-medium text-muted-foreground tabular-nums">{value || '—'}/5</span>
     </span>
   );
 }
 
-function activeFilterCount(platformFilter, shopFilter, ratingFilter) {
-  return [platformFilter, shopFilter, ratingFilter].filter((v) => v !== 'all').length;
+function activeFilterCount(filters) {
+  return Object.values(filters).filter((v) => v && v !== 'all').length;
 }
 
-function ReviewCard({ review, canManage, replyDrafts, setReplyDrafts, replyingId, onSubmitReply }) {
+function hasReply(review) {
+  if (typeof review?.has_seller_reply === 'boolean') {
+    return review.has_seller_reply;
+  }
+  if (Number(review?.reply_count) > 0) {
+    return true;
+  }
+  return Boolean(review?.seller_reply && String(review.seller_reply).trim());
+}
+
+function reviewGalleryItems(review) {
+  return (review.review_images || []).flatMap((img, index) => {
+    const url = img.url || img.thumb_url;
+    if (!url) return [];
+    return [{
+      url,
+      path: `review-${review.id}-${index}`,
+      name: `Review photo ${index + 1}`,
+      isImage: true,
+    }];
+  });
+}
+
+function ReviewCard({
+  review,
+  canManage,
+  replyOpen,
+  onToggleReply,
+  replyDrafts,
+  setReplyDrafts,
+  replyingId,
+  onSubmitReply,
+}) {
+  const replied = hasReply(review);
+  const canReply = canManage && !replied && ['tiktok_shop', 'shopee'].includes(review.platform);
+  const galleryItems = reviewGalleryItems(review);
+  const reviewPhotoCount = (review.review_images || []).length;
+  const reviewedAt = review.review_created_at ? new Date(review.review_created_at) : null;
+
   return (
-    <div className="rounded-xl border p-3 sm:p-4 space-y-2.5 sm:space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 min-w-0">
-          <Stars rating={review.rating} />
-          <Badge variant="outline" className="text-[10px] sm:text-xs">{platformLabel(review.platform)}</Badge>
-          {review.shop_name && (
-            <Badge variant="secondary" className="max-w-[140px] truncate text-[10px] sm:text-xs sm:max-w-none">
-              {review.shop_name}
+    <article className="rounded-xl sm:rounded-2xl border bg-card/50 p-3.5 sm:p-5 space-y-3 transition-colors hover:bg-card">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-2 min-w-0 flex-1">
+          <Stars rating={review.rating} size="md" />
+          <div className="flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className="text-[10px] sm:text-xs font-normal">
+              {platformLabel(review.platform)}
             </Badge>
-          )}
-          {review.complaint_id && (
-            <Link
-              to={`/complaints/${review.complaint_id}`}
-              className="text-[10px] sm:text-xs text-primary inline-flex items-center gap-1 hover:underline"
+            {review.shop_name && (
+              <Badge variant="secondary" className="max-w-[140px] sm:max-w-[200px] truncate text-[10px] sm:text-xs font-normal">
+                {review.shop_name}
+              </Badge>
+            )}
+            <Badge
+              variant={replied ? 'secondary' : 'outline'}
+              className={cn(
+                'text-[10px] sm:text-xs font-normal',
+                replied
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
+                  : 'text-amber-700 border-amber-200 dark:text-amber-300 dark:border-amber-800',
+              )}
             >
-              Linked <ExternalLink className="w-3 h-3 shrink-0" />
-            </Link>
-          )}
+              {replied ? 'Replied' : 'Needs reply'}
+            </Badge>
+            {reviewPhotoCount > 0 && (
+              <Badge variant="outline" className="text-[10px] sm:text-xs font-normal">
+                {reviewPhotoCount} photo{reviewPhotoCount === 1 ? '' : 's'}
+              </Badge>
+            )}
+            {review.complaint_id && (
+              <Link
+                to={`/complaints/${review.complaint_id}`}
+                className="text-[10px] sm:text-xs text-primary inline-flex items-center gap-1 hover:underline py-0.5"
+              >
+                Ticket <ExternalLink className="w-3 h-3 shrink-0" />
+              </Link>
+            )}
+          </div>
         </div>
-        {review.review_created_at && (
-          <span className="text-[10px] sm:text-xs text-muted-foreground shrink-0">
-            {format(new Date(review.review_created_at), 'dd MMM yyyy')}
-          </span>
+        {reviewedAt && (
+          <time className="text-[11px] sm:text-xs text-muted-foreground shrink-0 inline-flex items-center gap-1 pt-0.5 text-right">
+            <CalendarDays className="w-3.5 h-3.5 hidden sm:inline" />
+            <span className="sm:hidden">{format(reviewedAt, 'dd MMM')}</span>
+            <span className="hidden sm:inline md:hidden">{format(reviewedAt, 'dd MMM yyyy')}</span>
+            <span className="hidden md:inline">{format(reviewedAt, 'dd MMM yyyy · HH:mm')}</span>
+          </time>
         )}
       </div>
 
-      <p className="font-medium text-sm leading-snug line-clamp-2">
-        {review.product_name || review.external_product_id}
-      </p>
-      <p className="text-sm text-muted-foreground leading-relaxed break-words">
-        {review.review_text || '—'}
-      </p>
-      {review.reviewer_name && (
-        <p className="text-xs text-muted-foreground">— {review.reviewer_name}</p>
+      <div className="space-y-1.5">
+        <h3 className="font-medium text-sm leading-snug line-clamp-2 sm:line-clamp-none">
+          {review.product_name || review.external_product_id || 'Untitled product'}
+        </h3>
+        <p className="text-sm leading-relaxed text-foreground/80 break-words whitespace-pre-wrap">
+          {review.review_text?.trim() ? review.review_text : (
+            <span className="text-muted-foreground italic">No written review (rating only)</span>
+          )}
+        </p>
+        {review.reviewer_name && (
+          <p className="text-xs text-muted-foreground">Buyer · {review.reviewer_name}</p>
+        )}
+      </div>
+
+      {galleryItems.length > 0 && (
+        <ProofImageGallery
+          items={galleryItems}
+          className="grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 max-w-none sm:max-w-md md:max-w-lg"
+        />
       )}
 
-      {review.seller_reply && (
-        <div className="rounded-lg bg-muted p-2.5 sm:p-3 text-sm">
-          <p className="text-xs font-medium mb-1 flex items-center gap-1">
-            <MessageSquare className="w-3 h-3 shrink-0" /> Seller reply
+      {replied && (
+        <div className="rounded-xl border border-emerald-200/70 bg-emerald-50/60 dark:bg-emerald-950/20 dark:border-emerald-900 p-3 space-y-1.5">
+          <p className="text-xs font-medium text-emerald-800 dark:text-emerald-300 inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            <span className="inline-flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" />
+              Your reply
+            </span>
+            {review.seller_replied_at && (
+              <span className="font-normal text-emerald-700/70 dark:text-emerald-400/70">
+                · {format(new Date(review.seller_replied_at), 'dd MMM yyyy')}
+              </span>
+            )}
           </p>
-          <p className="break-words">{review.seller_reply}</p>
+          <p className="text-sm leading-relaxed break-words whitespace-pre-wrap text-foreground/90">
+            {review.seller_reply?.trim()
+              ? review.seller_reply
+              : 'Reply exists on TikTok (text not available in this sync).'}
+          </p>
         </div>
       )}
 
-      {canManage && !review.seller_reply && ['tiktok_shop', 'shopee'].includes(review.platform) && (
-        <div className="flex flex-col sm:flex-row gap-2 pt-1">
+      {canReply && !replyOpen && (
+        <div className="pt-0.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => onToggleReply(review.id)}
+            className="w-full sm:w-auto h-10 sm:h-9"
+          >
+            <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
+            Write reply
+          </Button>
+        </div>
+      )}
+
+      {canReply && replyOpen && (
+        <div className="rounded-xl border bg-muted/30 p-3 space-y-2.5">
           <Textarea
             placeholder="Write a seller reply…"
             value={replyDrafts[review.id] || ''}
             onChange={(e) => setReplyDrafts((prev) => ({ ...prev, [review.id]: e.target.value }))}
-            className="min-h-[72px] sm:min-h-[60px] flex-1 text-sm"
+            className="min-h-[96px] sm:min-h-[88px] text-sm bg-background"
+            autoFocus
           />
-          <Button
-            size="sm"
-            className="w-full sm:w-auto shrink-0"
-            onClick={() => onSubmitReply(review.id)}
-            disabled={replyingId === review.id}
-          >
-            {replyingId === review.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Reply'}
-          </Button>
+          <div className="grid grid-cols-2 sm:flex sm:flex-row gap-2 sm:justify-end">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onToggleReply(null)}
+              disabled={replyingId === review.id}
+              className="h-10 sm:h-9"
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => onSubmitReply(review.id)}
+              disabled={replyingId === review.id}
+              className="h-10 sm:h-9"
+            >
+              {replyingId === review.id ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Post reply
+            </Button>
+          </div>
         </div>
       )}
+    </article>
+  );
+}
+
+function SyncFields({
+  shops,
+  syncShopId,
+  setSyncShopId,
+  syncStartDate,
+  setSyncStartDate,
+  syncEndDate,
+  setSyncEndDate,
+  syncRating,
+  setSyncRating,
+  className,
+}) {
+  return (
+    <div className={cn('grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3', className)}>
+      <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
+        <Label className="text-xs text-muted-foreground">Shop</Label>
+        <Select value={syncShopId || 'none'} onValueChange={(v) => setSyncShopId(v === 'none' ? '' : v)}>
+          <SelectTrigger className="h-10">
+            <SelectValue placeholder="Shop to sync" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">Select shop</SelectItem>
+            {shops.map((shop) => (
+              <SelectItem key={shop.id} value={String(shop.id)}>
+                {platformLabel(shop.platform)} — {shop.shop_name || shop.shop_id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">From</Label>
+        <Input
+          type="date"
+          className="h-10"
+          value={syncStartDate}
+          onChange={(e) => setSyncStartDate(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs text-muted-foreground">To</Label>
+        <Input
+          type="date"
+          className="h-10"
+          value={syncEndDate}
+          onChange={(e) => setSyncEndDate(e.target.value)}
+        />
+      </div>
+      <div className="space-y-1.5 sm:col-span-2 xl:col-span-1">
+        <Label className="text-xs text-muted-foreground">Stars</Label>
+        <Select value={syncRating} onValueChange={setSyncRating}>
+          <SelectTrigger className="h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All ratings</SelectItem>
+            <SelectItem value="low">Low (≤3★)</SelectItem>
+            <SelectItem value="5">5★ only</SelectItem>
+            <SelectItem value="4">4★ only</SelectItem>
+            <SelectItem value="3">3★ only</SelectItem>
+            <SelectItem value="2">2★ only</SelectItem>
+            <SelectItem value="1">1★ only</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
@@ -115,17 +321,27 @@ export default function MarketplaceReviews() {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('reviews.manage');
+  const listTopRef = useRef(null);
+
   const [platformFilter, setPlatformFilter] = useState('all');
   const [shopFilter, setShopFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
+  const [replyFilter, setReplyFilter] = useState('all');
   const [syncShopId, setSyncShopId] = useState('');
+  const [syncStartDate, setSyncStartDate] = useState(() => daysAgoIso(7));
+  const [syncEndDate, setSyncEndDate] = useState(todayIso);
+  const [syncRating, setSyncRating] = useState('all');
   const [syncing, setSyncing] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState({});
   const [replyingId, setReplyingId] = useState(null);
+  const [replyOpenId, setReplyOpenId] = useState(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(true);
+  const [page, setPage] = useState(1);
+  const perPage = 20;
 
   const reviewParams = useMemo(() => {
-    const params = { limit: 200 };
+    const params = { page, per_page: perPage };
     if (platformFilter !== 'all') params.platform = platformFilter;
     if (shopFilter !== 'all') params.shop_connection_id = Number(shopFilter);
     if (ratingFilter === 'low') {
@@ -134,25 +350,40 @@ export default function MarketplaceReviews() {
       params.min_rating = Number(ratingFilter);
       params.max_rating = Number(ratingFilter);
     }
+    if (replyFilter === 'replied' || replyFilter === 'unreplied') {
+      params.reply_status = replyFilter;
+    }
     return params;
-  }, [platformFilter, shopFilter, ratingFilter]);
+  }, [platformFilter, shopFilter, ratingFilter, replyFilter, page]);
 
   const { data: shops = [], isLoading: loadingShops } = useQuery({
     queryKey: ['marketplace-shops'],
     queryFn: () => db.integrations.Marketplace.listShops(),
   });
 
-  const { data: reviews = [], isLoading: loadingReviews, refetch: refetchReviews } = useQuery({
+  const { data: reviewsResponse, isLoading: loadingReviews, refetch: refetchReviews } = useQuery({
     queryKey: ['marketplace-reviews', reviewParams],
     queryFn: () => db.integrations.Marketplace.listReviews(reviewParams),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
-  const stats = useMemo(() => ({
+  const reviews = reviewsResponse?.data ?? [];
+  const meta = reviewsResponse?.meta ?? {
+    current_page: page,
+    last_page: 1,
+    per_page: perPage,
     total: reviews.length,
-    low: reviews.filter((r) => r.rating && r.rating <= 3).length,
-    linked: reviews.filter((r) => r.complaint_id).length,
-    platforms: new Set(reviews.map((r) => r.platform)).size,
-  }), [reviews]);
+    from: reviews.length ? 1 : null,
+    to: reviews.length || null,
+  };
+
+  const stats = reviewsResponse?.stats ?? {
+    total: meta.total ?? reviews.length,
+    unreplied: 0,
+    replied: 0,
+    low: 0,
+  };
 
   const filteredShops = useMemo(() => (
     platformFilter === 'all'
@@ -160,23 +391,55 @@ export default function MarketplaceReviews() {
       : shops.filter((shop) => shop.platform === platformFilter)
   ), [shops, platformFilter]);
 
-  const filterCount = activeFilterCount(platformFilter, shopFilter, ratingFilter);
+  const filterCount = activeFilterCount({
+    platformFilter,
+    shopFilter,
+    ratingFilter,
+    replyFilter,
+  });
+
+  const resetToFirstPage = () => setPage(1);
+
+  useEffect(() => {
+    if (page <= 1) return;
+    listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [page]);
 
   const syncReviews = async () => {
     if (!syncShopId) {
       toast.error('Select a shop to sync');
       return;
     }
+    if (syncStartDate && syncEndDate && syncStartDate > syncEndDate) {
+      toast.error('Start date must be before end date');
+      return;
+    }
+
+    const payload = {
+      shop_connection_id: Number(syncShopId),
+      page_size: 50,
+      fetch_all: true,
+    };
+
+    if (syncStartDate) payload.start_date = syncStartDate;
+    if (syncEndDate) payload.end_date = syncEndDate;
+
+    if (syncRating === 'low') {
+      payload.min_rating = 1;
+      payload.max_rating = 3;
+    } else if (syncRating !== 'all') {
+      payload.min_rating = Number(syncRating);
+      payload.max_rating = Number(syncRating);
+    }
+
     setSyncing(true);
     try {
-      const result = await db.integrations.Marketplace.syncReviews({
-        shop_connection_id: Number(syncShopId),
-        page_size: 50,
-      });
+      const result = await db.integrations.Marketplace.syncReviews(payload);
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-reviews'] });
       await refetchReviews();
       const created = result.sync?.created_complaints ?? 0;
-      toast.success(`${result.message}${created ? ` (${created} complaint(s) auto-created)` : ''}`);
-      queryClient.invalidateQueries({ queryKey: ['marketplace-reviews'] });
+      toast.success(`${result.message}${created ? ` · ${created} complaint(s) auto-created` : ''}`);
     } catch (error) {
       toast.error(error.message || 'Failed to sync reviews');
     } finally {
@@ -194,6 +457,7 @@ export default function MarketplaceReviews() {
     try {
       await db.integrations.Marketplace.replyToReview(reviewId, content);
       setReplyDrafts((prev) => ({ ...prev, [reviewId]: '' }));
+      setReplyOpenId(null);
       await refetchReviews();
       toast.success('Reply posted');
     } catch (error) {
@@ -204,9 +468,9 @@ export default function MarketplaceReviews() {
   };
 
   const filterControls = (
-    <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
-      <Select value={platformFilter} onValueChange={(v) => { setPlatformFilter(v); setShopFilter('all'); }}>
-        <SelectTrigger className="w-full sm:w-[160px] h-9">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+      <Select value={platformFilter} onValueChange={(v) => { setPlatformFilter(v); setShopFilter('all'); resetToFirstPage(); }}>
+        <SelectTrigger className="w-full h-10 sm:h-9">
           <SelectValue placeholder="Platform" />
         </SelectTrigger>
         <SelectContent>
@@ -215,8 +479,8 @@ export default function MarketplaceReviews() {
           <SelectItem value="shopee">Shopee</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={shopFilter} onValueChange={setShopFilter}>
-        <SelectTrigger className="w-full sm:w-[200px] h-9">
+      <Select value={shopFilter} onValueChange={(v) => { setShopFilter(v); resetToFirstPage(); }}>
+        <SelectTrigger className="w-full h-10 sm:h-9">
           <SelectValue placeholder="Shop" />
         </SelectTrigger>
         <SelectContent>
@@ -228,8 +492,8 @@ export default function MarketplaceReviews() {
           ))}
         </SelectContent>
       </Select>
-      <Select value={ratingFilter} onValueChange={setRatingFilter}>
-        <SelectTrigger className="w-full sm:w-[160px] h-9">
+      <Select value={ratingFilter} onValueChange={(v) => { setRatingFilter(v); resetToFirstPage(); }}>
+        <SelectTrigger className="w-full h-10 sm:h-9">
           <SelectValue placeholder="Rating" />
         </SelectTrigger>
         <SelectContent>
@@ -242,73 +506,141 @@ export default function MarketplaceReviews() {
           <SelectItem value="1">1★ only</SelectItem>
         </SelectContent>
       </Select>
+      <Select value={replyFilter} onValueChange={(v) => { setReplyFilter(v); resetToFirstPage(); }}>
+        <SelectTrigger className="w-full h-10 sm:h-9">
+          <SelectValue placeholder="Reply status" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All replies</SelectItem>
+          <SelectItem value="unreplied">Needs reply</SelectItem>
+          <SelectItem value="replied">Already replied</SelectItem>
+        </SelectContent>
+      </Select>
       <Button
         size="sm"
         variant="outline"
         onClick={() => refetchReviews()}
         disabled={loadingReviews}
-        className="w-full sm:w-9 sm:px-0 h-9"
+        className="w-full lg:w-10 lg:px-0 h-10 sm:h-9 sm:col-span-2 lg:col-span-1"
         aria-label="Refresh reviews"
       >
         {loadingReviews ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-        <span className="sm:hidden ml-2">Refresh</span>
+        <span className="lg:hidden ml-2">Refresh</span>
       </Button>
     </div>
   );
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader
         icon={Star}
         title="Reviews"
-        description="Product reviews from TikTok Shop, Shopee, and connected platforms"
+        description="Sync and reply to product reviews across TikTok Shop and Shopee"
       />
 
-      <PageContent className="space-y-4 sm:space-y-6">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <StatCard label="Reviews" value={loadingReviews ? '…' : stats.total} icon={Star} color="blue" index={0} />
-          <StatCard label="Low (≤3★)" value={loadingReviews ? '…' : stats.low} icon={Star} color="warning" index={1} />
-          <StatCard label="Linked" value={loadingReviews ? '…' : stats.linked} icon={MessageSquare} color="purple" index={2} />
-          <StatCard label="Platforms" value={loadingReviews ? '…' : stats.platforms} icon={Store} color="success" index={3} />
+      <PageContent className="space-y-4 md:space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3 md:gap-4">
+          <StatCard label="Total" value={loadingReviews ? '…' : stats.total} icon={Star} color="blue" index={0} />
+          <StatCard label="Needs reply" value={loadingReviews ? '…' : stats.unreplied} icon={MessageSquare} color="warning" index={1} />
+          <StatCard label="Replied" value={loadingReviews ? '…' : stats.replied} icon={MessageSquare} color="success" index={2} />
+          <StatCard label="Low (≤3★)" value={loadingReviews ? '…' : stats.low} icon={Store} color="purple" index={3} />
         </div>
 
         {canManage && (
-          <Card className="rounded-2xl border shadow-sm">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <Select value={syncShopId || 'none'} onValueChange={(v) => setSyncShopId(v === 'none' ? '' : v)}>
-                  <SelectTrigger className="w-full sm:flex-1 h-10">
-                    <SelectValue placeholder="Shop to sync" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">Select shop to sync</SelectItem>
-                    {shops.map((shop) => (
-                      <SelectItem key={shop.id} value={String(shop.id)}>
-                        {platformLabel(shop.platform)} — {shop.shop_name || shop.shop_id}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+          <Collapsible open={syncOpen} onOpenChange={setSyncOpen} className="md:hidden">
+            <Card className="rounded-xl border shadow-sm overflow-hidden">
+              <CollapsibleTrigger asChild>
+                <button
+                  type="button"
+                  className="flex w-full items-start justify-between gap-3 p-3.5 text-left min-h-11"
+                >
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <span className="text-sm font-semibold">Sync from platform</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-6">
+                      Pull matching reviews for a shop & date range
+                    </p>
+                  </div>
+                  <ChevronDown className={cn(
+                    'h-4 w-4 shrink-0 text-muted-foreground transition-transform mt-1',
+                    syncOpen && 'rotate-180',
+                  )} />
+                </button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <CardContent className="pt-0 pb-3.5 px-3.5 space-y-3 border-t">
+                  <SyncFields
+                    shops={shops}
+                    syncShopId={syncShopId}
+                    setSyncShopId={setSyncShopId}
+                    syncStartDate={syncStartDate}
+                    setSyncStartDate={setSyncStartDate}
+                    syncEndDate={syncEndDate}
+                    setSyncEndDate={setSyncEndDate}
+                    syncRating={syncRating}
+                    setSyncRating={setSyncRating}
+                  />
+                  <Button
+                    onClick={syncReviews}
+                    disabled={syncing || !syncShopId}
+                    className="w-full h-10"
+                  >
+                    {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                    {syncing ? 'Syncing…' : 'Sync reviews'}
+                  </Button>
+                </CardContent>
+              </CollapsibleContent>
+            </Card>
+          </Collapsible>
+        )}
+
+        {canManage && (
+          <Card className="rounded-2xl border shadow-sm hidden md:block">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Sync from platform</CardTitle>
+              <CardDescription>
+                Pulls every matching review in the date range (all pages). Existing reviews are updated, not duplicated.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <SyncFields
+                shops={shops}
+                syncShopId={syncShopId}
+                setSyncShopId={setSyncShopId}
+                syncStartDate={syncStartDate}
+                setSyncStartDate={setSyncStartDate}
+                syncEndDate={syncEndDate}
+                setSyncEndDate={setSyncEndDate}
+                syncRating={syncRating}
+                setSyncRating={setSyncRating}
+              />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:justify-between">
+                <p className="text-xs text-muted-foreground">
+                  Defaults to last 7 days so replies on older reviews are refreshed.
+                </p>
                 <Button
                   onClick={syncReviews}
                   disabled={syncing || !syncShopId}
                   className="w-full sm:w-auto h-10 shrink-0"
                 >
                   {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                  Sync from platform
+                  {syncing ? 'Syncing all pages…' : 'Sync all matching'}
                 </Button>
               </div>
             </CardContent>
           </Card>
         )}
 
-        {/* Mobile — collapsible filters */}
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} className="sm:hidden">
-          <Card className="rounded-2xl border shadow-sm">
+        <div ref={listTopRef} className="scroll-mt-20 md:scroll-mt-24" />
+
+        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} className="md:hidden">
+          <Card className="rounded-xl border shadow-sm">
             <CollapsibleTrigger asChild>
               <button
                 type="button"
-                className="flex w-full items-center justify-between gap-3 p-3 text-left"
+                className="flex w-full items-center justify-between gap-3 p-3.5 text-left min-h-11"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -321,53 +653,96 @@ export default function MarketplaceReviews() {
               </button>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <CardContent className="pt-0 pb-3 px-3">
+              <CardContent className="pt-0 pb-3.5 px-3.5">
                 {filterControls}
               </CardContent>
             </CollapsibleContent>
           </Card>
         </Collapsible>
 
-        {/* Tablet/desktop — always-visible filters */}
-        <Card className="rounded-2xl border shadow-sm hidden sm:block">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Filters</CardTitle>
-            <CardDescription>TikTok Shop and Shopee reviews in one place</CardDescription>
+        <Card className="rounded-xl sm:rounded-2xl border shadow-sm hidden md:block">
+          <CardHeader className="pb-3 px-5 pt-5">
+            <CardTitle className="text-base">Browse filters</CardTitle>
+            <CardDescription>Filter the stored review list (independent from sync)</CardDescription>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 px-5 pb-5">
             {filterControls}
           </CardContent>
         </Card>
 
-        <Card className="rounded-2xl border shadow-sm">
-          <CardHeader className="pb-3 sm:pb-6">
-            <CardTitle className="text-base">
-              {loadingReviews ? 'Loading…' : `${reviews.length} review${reviews.length === 1 ? '' : 's'}`}
-            </CardTitle>
+        <Card className="rounded-xl sm:rounded-2xl border shadow-sm overflow-hidden">
+          <CardHeader className="pb-3 px-3.5 sm:px-5 pt-3.5 sm:pt-5">
+            <div className="flex items-baseline justify-between gap-2">
+              <CardTitle className="text-sm sm:text-base">
+                {loadingReviews
+                  ? 'Loading…'
+                  : `${meta.from ?? 0}–${meta.to ?? 0} of ${meta.total ?? 0}`}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground shrink-0">reviews</p>
+            </div>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 px-3.5 sm:px-5 pb-3.5 sm:pb-5 space-y-3 sm:space-y-4">
             {loadingReviews || loadingShops ? (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground py-10 justify-center">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading reviews…
               </div>
             ) : reviews.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center px-2">
-                No reviews yet. Connect a shop under Marketplace, then sync reviews here.
-              </p>
-            ) : (
-              <div className="space-y-3 sm:space-y-4">
-                {reviews.map((review) => (
-                  <ReviewCard
-                    key={review.id}
-                    review={review}
-                    canManage={canManage}
-                    replyDrafts={replyDrafts}
-                    setReplyDrafts={setReplyDrafts}
-                    replyingId={replyingId}
-                    onSubmitReply={submitReply}
-                  />
-                ))}
+              <div className="py-10 text-center space-y-2 px-2 sm:px-4">
+                <p className="text-sm font-medium">No reviews match these filters</p>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  Add a shop cookie under Marketplace → TikTok Shop, then sync with a date range.
+                </p>
               </div>
+            ) : (
+              <>
+                <div className="space-y-2.5 sm:space-y-3">
+                  {reviews.map((review) => (
+                    <ReviewCard
+                      key={review.id}
+                      review={review}
+                      canManage={canManage}
+                      replyOpen={replyOpenId === review.id}
+                      onToggleReply={(id) => setReplyOpenId(id)}
+                      replyDrafts={replyDrafts}
+                      setReplyDrafts={setReplyDrafts}
+                      replyingId={replyingId}
+                      onSubmitReply={submitReply}
+                    />
+                  ))}
+                </div>
+
+                {meta.last_page > 1 && (
+                  <div className="sticky bottom-0 -mx-3.5 sm:-mx-5 px-3.5 sm:px-5 pt-3 pb-1 sm:pb-0 sm:static sm:border-0 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:bg-transparent sm:backdrop-blur-none">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 sm:gap-3">
+                      <p className="text-xs text-muted-foreground text-center sm:text-left order-2 sm:order-1">
+                        Page {meta.current_page} of {meta.last_page}
+                      </p>
+                      <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 order-1 sm:order-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={meta.current_page <= 1 || loadingReviews}
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          className="h-10 sm:h-9"
+                        >
+                          <ChevronLeft className="w-4 h-4 mr-1" />
+                          Previous
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          disabled={meta.current_page >= meta.last_page || loadingReviews}
+                          onClick={() => setPage((p) => p + 1)}
+                          className="h-10 sm:h-9"
+                        >
+                          Next
+                          <ChevronRight className="w-4 h-4 ml-1" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>

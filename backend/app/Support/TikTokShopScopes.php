@@ -24,7 +24,7 @@ class TikTokShopScopes
             ],
             [
                 'scope' => 'seller.product.write',
-                'feature' => 'Reply to product reviews',
+                'feature' => 'Reply to product reviews (Open API)',
                 'partner_center_hint' => 'Product / Product write',
             ],
         ];

@@ -116,6 +116,70 @@ class TikTokShopController extends Controller
         }
     }
 
+    public function storeCookieShop(Request $request): JsonResponse
+    {
+        $this->ensurePermission($request->user(), 'marketplace.manage');
+
+        $validated = $request->validate([
+            'cookie' => ['required', 'string', 'max:65535'],
+            'shop_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'seller_id' => ['sometimes', 'nullable', 'string', 'max:64'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:8'],
+        ]);
+
+        try {
+            $connection = $this->reviewSync->upsertTikTokCookieShop($validated, $request->user()?->id);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'TikTok shop cookie saved.',
+            'data' => new TikTokShopConnectionResource($connection),
+        ], 201);
+    }
+
+    public function updateCookieShop(Request $request, int $id): JsonResponse
+    {
+        $this->ensurePermission($request->user(), 'marketplace.manage');
+
+        $connection = TikTokShopConnection::query()->findOrFail($id);
+
+        $validated = $request->validate([
+            'cookie' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            'shop_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'region' => ['sometimes', 'nullable', 'string', 'max:8'],
+        ]);
+
+        try {
+            if (! empty($validated['cookie'])) {
+                $connection = $this->reviewSync->upsertTikTokCookieShop([
+                    'cookie' => $validated['cookie'],
+                    'shop_name' => $validated['shop_name'] ?? $connection->shop_name,
+                    'seller_id' => $connection->shop_id,
+                    'region' => $validated['region'] ?? $connection->region,
+                ], $request->user()?->id);
+            } else {
+                $updates = array_filter([
+                    'shop_name' => $validated['shop_name'] ?? null,
+                    'region' => isset($validated['region']) ? strtoupper($validated['region']) : null,
+                ], fn ($value) => $value !== null && $value !== '');
+
+                if ($updates !== []) {
+                    $connection->update($updates);
+                }
+                $connection = $connection->fresh();
+            }
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
+
+        return response()->json([
+            'message' => 'TikTok shop updated.',
+            'data' => new TikTokShopConnectionResource($connection),
+        ]);
+    }
+
     public function destroy(Request $request, int $id): JsonResponse
     {
         $this->ensurePermission($request->user(), 'marketplace.manage');
@@ -219,16 +283,29 @@ class TikTokShopController extends Controller
             'product_id' => ['sometimes', 'nullable', 'string', 'max:64'],
             'min_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'max_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'fetch_all' => ['sometimes', 'boolean'],
+            'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'end_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
         ]);
 
         try {
+            $startAt = ! empty($validated['start_date'])
+                ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['start_date'])
+                : null;
+            $endAt = ! empty($validated['end_date'])
+                ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['end_date'])
+                : null;
+
             $result = $this->reviewSync->syncTikTokShopReviews(
                 $connection,
-                $validated['page_size'] ?? 20,
+                $validated['page_size'] ?? 50,
                 $validated['page_token'] ?? null,
                 $validated['product_id'] ?? null,
                 $validated['min_rating'] ?? null,
                 $validated['max_rating'] ?? null,
+                array_key_exists('fetch_all', $validated) ? (bool) $validated['fetch_all'] : true,
+                $startAt,
+                $endAt,
             );
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);

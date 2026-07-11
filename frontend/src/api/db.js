@@ -243,6 +243,14 @@ export const db = {
       async updatePlatformConfig(platform, payload) {
         return http.patch(`/marketplace/platforms/${platform}`, payload);
       },
+
+      async addCookieShop(payload) {
+        return http.post('/tiktok-shop/cookie-shops', payload);
+      },
+
+      async updateCookieShop(id, payload) {
+        return http.patch(`/tiktok-shop/${id}/cookie`, payload);
+      },
     },
 
     Shopee: {
@@ -287,8 +295,7 @@ export const db = {
       },
 
       async listReviews(params = {}) {
-        const data = await http.get('/marketplace/reviews', params);
-        return data.data ?? data;
+        return http.get('/marketplace/reviews', params);
       },
 
       async syncReviews(payload) {

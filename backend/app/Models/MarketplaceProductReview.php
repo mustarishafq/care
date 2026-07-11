@@ -13,8 +13,10 @@ class MarketplaceProductReview extends Model
         'external_review_id',
         'external_product_id',
         'product_name',
+        'product_image_url',
         'rating',
         'review_text',
+        'review_images',
         'reviewer_name',
         'review_created_at',
         'seller_reply',
@@ -31,6 +33,7 @@ class MarketplaceProductReview extends Model
             'seller_replied_at' => 'datetime',
             'synced_at' => 'datetime',
             'raw_metadata' => 'array',
+            'review_images' => 'array',
         ];
     }
 

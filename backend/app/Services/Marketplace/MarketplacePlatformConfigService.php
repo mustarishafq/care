@@ -13,6 +13,11 @@ class MarketplacePlatformConfigService
         'auto_complaint_max_rating' => 3,
         'auto_complaint_type_id' => null,
         'webhook_secret' => null,
+        'seller_cookie' => null,
+        'seller_fp' => null,
+        'seller_oec_bsid' => null,
+        'seller_id' => null,
+        'review_lookback_days' => 30,
     ];
 
     public function getOrCreate(string $platform): MarketplacePlatformConfig
@@ -117,7 +122,43 @@ class MarketplacePlatformConfigService
         }
 
         if (isset($payload['settings']) && is_array($payload['settings'])) {
-            $updates['settings'] = array_merge(self::DEFAULT_SETTINGS, $config->settings ?? [], $payload['settings']);
+            $incoming = $payload['settings'];
+
+            // Keep existing secret cookie unless a non-empty replacement is provided.
+            if (! array_key_exists('seller_cookie', $incoming) || $incoming['seller_cookie'] === null || $incoming['seller_cookie'] === '') {
+                unset($incoming['seller_cookie']);
+            } else {
+                $incoming['seller_cookie'] = \App\Services\TikTokShop\TikTokSellerReviewClient::encryptCookie(
+                    (string) $incoming['seller_cookie'],
+                );
+
+                if (! array_key_exists('seller_fp', $incoming) || $incoming['seller_fp'] === null || $incoming['seller_fp'] === '') {
+                    $plain = \App\Services\TikTokShop\TikTokSellerReviewClient::decryptCookie($incoming['seller_cookie']);
+                    if (preg_match('/(?:^|;\s*)s_v_web_id=([^;]+)/', $plain, $matches)) {
+                        $incoming['seller_fp'] = trim(urldecode($matches[1]));
+                    }
+                }
+
+                foreach ([
+                    'oec_seller_id_unified_seller_env',
+                    'global_seller_id_unified_seller_env',
+                ] as $cookieName) {
+                    if (! empty($incoming['seller_id'])) {
+                        break;
+                    }
+                    $plain = \App\Services\TikTokShop\TikTokSellerReviewClient::decryptCookie($incoming['seller_cookie']);
+                    $sellerId = \App\Services\TikTokShop\TikTokSellerReviewClient::cookieValue($plain, $cookieName);
+                    if ($sellerId !== '') {
+                        $incoming['seller_id'] = $sellerId;
+                    }
+                }
+            }
+
+            if (! array_key_exists('webhook_secret', $incoming) || $incoming['webhook_secret'] === null || $incoming['webhook_secret'] === '') {
+                unset($incoming['webhook_secret']);
+            }
+
+            $updates['settings'] = array_merge(self::DEFAULT_SETTINGS, $config->settings ?? [], $incoming);
         }
 
         if ($userId) {

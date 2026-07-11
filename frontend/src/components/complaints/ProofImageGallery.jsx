@@ -33,6 +33,7 @@ function ViewerSlide({ item }) {
         src={item.url}
         alt=""
         className="max-h-[85vh] max-w-[min(100vw-2rem,56rem)] object-contain rounded-lg shadow-2xl"
+        referrerPolicy="no-referrer"
       />
     );
   }

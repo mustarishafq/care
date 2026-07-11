@@ -59,23 +59,30 @@ class TikTokShopService
     }
 
     /**
-     * @param  array<string, mixed>  $body
-     * @return array<string, mixed>
+     * Pull product reviews via Seller Center cookie session (no official review list API).
+     *
+     * @return array{list: list<array<string, mixed>>, total: int, next_page: int|null, page: int, size: int}
      */
     public function searchReviews(
         TikTokShopConnection $connection,
-        array $body = [],
         int $pageSize = 20,
         ?string $pageToken = null,
+        ?int $lookbackDays = null,
+        ?int $reviewStartTime = null,
+        ?int $reviewEndTime = null,
     ): array {
-        $connection = $this->ensureFreshToken($connection);
+        $page = max(1, (int) ($pageToken ?: 1));
+        $days = max(1, min($lookbackDays ?? 30, 365));
 
-        $result = $this->client()->searchReviews(
-            $connection->access_token,
-            $connection->shop_cipher,
-            $body,
+        $start = $reviewStartTime ?? now()->subDays($days)->startOfDay()->timestamp;
+        $end = $reviewEndTime ?? now()->endOfDay()->timestamp;
+
+        $result = TikTokSellerReviewClient::fromConnection($connection)->listReviews(
+            (string) $connection->shop_id,
+            $page,
             min(max($pageSize, 1), 50),
-            $pageToken,
+            $start,
+            $end,
         );
 
         $connection->update(['last_synced_at' => now()]);
@@ -85,6 +92,16 @@ class TikTokShopService
 
     public function replyToReview(TikTokShopConnection $connection, string $reviewId, string $content): array
     {
+        $authMode = $connection->metadata['auth_mode'] ?? null;
+
+        if ($authMode === 'seller_cookie' || $connection->shop_cipher === 'seller_cookie') {
+            return TikTokSellerReviewClient::fromConnection($connection)->replyToReview(
+                (string) $connection->shop_id,
+                $reviewId,
+                $content,
+            );
+        }
+
         $connection = $this->ensureFreshToken($connection);
 
         return $this->client()->replyToReview(

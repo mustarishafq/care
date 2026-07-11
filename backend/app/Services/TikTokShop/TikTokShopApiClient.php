@@ -98,26 +98,6 @@ class TikTokShopApiClient
     }
 
     /**
-     * @param  array<string, mixed>  $body
-     * @return array<string, mixed>
-     */
-    public function searchReviews(
-        string $accessToken,
-        string $shopCipher,
-        array $body = [],
-        int $pageSize = 20,
-        ?string $pageToken = null,
-    ): array {
-        $query = ['page_size' => $pageSize];
-
-        if ($pageToken) {
-            $query['page_token'] = $pageToken;
-        }
-
-        return $this->request('POST', 'product', 'reviews/search', $accessToken, $shopCipher, $query, $body);
-    }
-
-    /**
      * @return array<string, mixed>
      */
     public function replyToReview(string $accessToken, string $shopCipher, string $reviewId, string $content): array

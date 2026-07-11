@@ -54,6 +54,10 @@ class MarketplacePlatformController extends Controller
             'settings.auto_complaint_type_id' => ['sometimes', 'nullable', 'integer', 'exists:complaint_types,id'],
             'settings.webhook_secret' => ['sometimes', 'nullable', 'string', 'max:255'],
             'settings.use_sandbox' => ['sometimes', 'boolean'],
+            'settings.seller_cookie' => ['sometimes', 'nullable', 'string', 'max:65535'],
+            'settings.seller_fp' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'settings.seller_oec_bsid' => ['sometimes', 'nullable', 'string', 'max:2048'],
+            'settings.review_lookback_days' => ['sometimes', 'integer', 'min:1', 'max:365'],
         ]);
 
         $config = $this->platformConfig->update($platform, $data, $request->user()->id);
