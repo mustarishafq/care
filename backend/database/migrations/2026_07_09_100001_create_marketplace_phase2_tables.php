@@ -36,8 +36,8 @@ return new class extends Migration
                 $table->string('region', 8)->default('MY');
                 $table->text('access_token');
                 $table->text('refresh_token')->nullable();
-                $table->timestamp('access_token_expires_at')->nullable();
-                $table->timestamp('refresh_token_expires_at')->nullable();
+                $table->dateTime('access_token_expires_at')->nullable();
+                $table->dateTime('refresh_token_expires_at')->nullable();
                 $table->boolean('is_active')->default(true);
                 $table->timestamp('last_synced_at')->nullable();
                 $table->json('metadata')->nullable();
