@@ -50,6 +50,7 @@ class NotificationPayload
             'status_changed' => ['severity' => 'info', 'category' => 'task'],
             'mention' => ['severity' => 'info', 'category' => 'task'],
             'sla_warning' => ['severity' => 'warning', 'category' => 'system'],
+            'low_rating_review' => ['severity' => 'warning', 'category' => 'system'],
             'overdue' => ['severity' => 'critical', 'category' => 'system'],
             'approval' => ['severity' => 'info', 'category' => 'approval'],
             'announcement' => ['severity' => 'info', 'category' => 'announcement'],

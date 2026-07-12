@@ -352,6 +352,8 @@ class MarketplaceReviewSyncService
                     if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
                         $createdComplaints++;
                     }
+
+                    $this->notifyLowRatingIfNeeded($review);
                 }
 
                 $nextPage = $result['next_page'] ?? null;
@@ -641,6 +643,8 @@ class MarketplaceReviewSyncService
             if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
                 $createdComplaints++;
             }
+
+            $this->notifyLowRatingIfNeeded($review);
         }
 
         return [
@@ -736,6 +740,8 @@ class MarketplaceReviewSyncService
                     if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
                         $createdComplaints++;
                     }
+
+                    $this->notifyLowRatingIfNeeded($review);
                 }
 
                 // If this window still has more than one page, split the time range and retry.
@@ -962,6 +968,11 @@ class MarketplaceReviewSyncService
         }
 
         return [];
+    }
+
+    private function notifyLowRatingIfNeeded(MarketplaceProductReview $review): void
+    {
+        app(LowRatingReviewAlertService::class)->notifyForReview($review);
     }
 
     private function normalizeRating(mixed $rating): ?int

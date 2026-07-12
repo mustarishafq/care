@@ -11,3 +11,5 @@ Artisan::command('inspire', function () {
 Schedule::command('complaints:auto-close-delivered')->hourly();
 Schedule::command('complaints:stale-alerts')->hourly();
 Schedule::command('marketplace:refresh-tokens')->everyTenMinutes();
+Schedule::command('marketplace:low-rating-alerts')->dailyAt('08:00');
+
