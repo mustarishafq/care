@@ -25,6 +25,7 @@ export const chartTooltipLabelStyle = {
 
 export const chartTooltipItemStyle = {
   fontSize: '12px',
+  color: 'hsl(var(--popover-foreground))',
 };
 
 /** Spread onto Recharts <Tooltip /> for theme-safe hover panels */
