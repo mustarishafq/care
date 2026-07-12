@@ -12,7 +12,7 @@
 | **Satellite apps** (Linkly, Booking, …) | Same tokens, shadcn/ui, auth template, overlays, forms, loading/error states, mobile dock **visual spec**. Define your own routes in `navItems.js`; omit hub-only features (e.g. People grid) if not in scope. |
 | **New systems** | Copy the reference stack (§2), implement §28 pre-ship checklist before production. |
 
-Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) (dock detail), [nexus-sso-setup.md](./nexus-sso-setup.md), [event-webhook-setup.md](./event-webhook-setup.md), [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md).
+Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) (dock detail), [DISPLAY_FORMAT_REQUIREMENTS.md](./DISPLAY_FORMAT_REQUIREMENTS.md) (number / money / date formats), [nexus-sso-setup.md](./nexus-sso-setup.md), [event-webhook-setup.md](./event-webhook-setup.md), [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md).
 
 ---
 
@@ -29,7 +29,7 @@ Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NA
 9. [Auth page template](#9-auth-page-template)
 10. [UI components (shadcn/ui)](#10-ui-components-shadcnui)
 11. [Overlays: dialog, sheet, drawer, dropdown](#11-overlays-dialog-sheet-drawer-dropdown)
-12. [Forms & inputs](#12-forms--inputs)
+12. [Forms & inputs](#12-forms--inputs) (includes [§12.7 Display formats](#127-display-formats-numbers-money-dates))
 13. [Profile, people & dashboard patterns](#13-profile-people--dashboard-patterns)
 14. [Widgets](#14-widgets)
 15. [Notifications & broadcasts](#15-notifications--broadcasts)
@@ -60,6 +60,7 @@ Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NA
 | **Accessible** | Semantic HTML, `aria-label` on icon-only buttons, focus via `ring-ring`, contrast in both themes. |
 | **Subtle motion** | Framer Motion entrances; hover ≤ 300ms. Never block interaction with animation. |
 | **Token-first** | Use `bg-card`, `text-foreground`, etc. Never raw `slate-*` or `bg-white` in app pages (see §25 for exceptions). |
+| **Shared display formats** | Numbers (`1,000`), money (`1,000.00`), and dates come from workspace Settings → General — never hard-code locale/`toLocaleString`/`dd/MM/yyyy` in feature screens (§12.7). |
 
 ---
 
@@ -93,14 +94,18 @@ Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NA
 ```jsx
 // App.jsx root
 <ThemeProvider>
-  <QueryClientProvider>
-    <AuthProvider>
-      <RouterProvider />
-      <Toaster />
-    </AuthProvider>
-  </QueryClientProvider>
+  <AuthProvider>
+    <QueryClientProvider>
+      <DisplayFormatProvider>
+        <RouterProvider />
+        <Toaster />
+      </DisplayFormatProvider>
+    </QueryClientProvider>
+  </AuthProvider>
 </ThemeProvider>
 ```
+
+`DisplayFormatProvider` loads workspace `display_format` settings and supplies `formatNumber` / `formatMoney` / `formatDate` / `formatDateTime` (§12.7). Theme stays device-local; display formats are workspace-wide.
 
 ---
 
@@ -1103,6 +1108,49 @@ Tags: `Badge secondary text-xs`; inner input: `h-7 min-w-[8rem] border-0 shadow-
 | Settings / profile | `space-y-6` |
 | Dialog form | field groups `space-y-4` |
 
+### 12.7 Display formats (numbers, money, dates)
+
+**Full contract:** [DISPLAY_FORMAT_REQUIREMENTS.md](./DISPLAY_FORMAT_REQUIREMENTS.md) — required on every satellite app.
+
+Workspace-wide formatting is configured under **Settings → General → Display & format** and stored as `system_configs` key `display_format`.
+
+| Kind | Example | Helper |
+|------|---------|--------|
+| Number | `12,139` | `formatNumber(value)` |
+| Money | `RM 1,000.00` | `formatMoney(value)` |
+| Date | `12/07/2026` (configurable) | `formatDate(value)` |
+| Date-time | `12/07/2026 13:05` | `formatDateTime(value)` |
+
+#### Rules
+
+| Rule | Detail |
+|------|--------|
+| One source | Use `useDisplayFormat()` / shared formatters — never hard-code `toLocaleString()`, `en-GB`, or `dd/MM/yyyy` in feature pages |
+| Stat cards | `StatCard` auto-formats numeric values (`format="auto"`); use `format="money"` for amounts, `format="none"` for labels like `On` / `Off` |
+| Pagination | “Showing 1–20 of 12,139” must use `formatNumber` (§19.4) |
+| Date inputs | Store / submit **ISO `yyyy-MM-dd`**; only **labels** use `date_format` (`DatePicker`, `DateRangePicker`) |
+| Theme vs format | Dark mode = this device; display format = whole workspace |
+| After save | Invalidate `system_configs` so open screens refresh formatting |
+
+#### Defaults (Care / MY)
+
+| Field | Default |
+|-------|---------|
+| `locale` | `en-MY` |
+| `currency_code` | `MYR` |
+| `currency_decimals` | `2` |
+| `date_format` | `dd/MM/yyyy` |
+| `datetime_format` | `dd/MM/yyyy HH:mm` |
+
+#### Reference files
+
+| Piece | Path |
+|-------|------|
+| Formatters | `frontend/src/lib/displayFormat.js` |
+| Provider / hook | `frontend/src/lib/DisplayFormatProvider.jsx` |
+| Stat card | `frontend/src/components/dashboard/StatCard.jsx` |
+| Date pickers | `frontend/src/components/ui/date-picker.jsx`, `date-range-picker.jsx` |
+
 ---
 
 ## 13. Profile, people & dashboard patterns
@@ -1157,6 +1205,8 @@ Action row: `mt-auto flex gap-2 pt-4`; buttons `h-8 flex-1 text-xs`
 `grid grid-cols-1 xl:grid-cols-12 gap-6` with mobile reorder via `order-N xl:order-none`
 
 Motion on grid: `initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}`
+
+**StatCard:** KPI values that are numbers MUST render via display format (§12.7) — e.g. `12139` → `12,139`. Prefer shared `StatCard` so formatting stays consistent.
 
 ---
 
@@ -1705,6 +1755,8 @@ sm:flex-row sm:items-center sm:justify-between
 
 "Showing {start}-{end} of {total}" + `Button outline sm` prev/next + "Page X of Y" `text-sm text-muted-foreground`
 
+`start`, `end`, and `total` MUST use `formatNumber` from §12.7 (e.g. `1–20 of 12,139`).
+
 shadcn `Pagination` exists but is rarely used.
 
 ---
@@ -1981,9 +2033,23 @@ Tabs sit in a **pill rail** above tab content (not mixed with page header).
 
 | Block | Spec |
 |-------|------|
-| Section intro | `SettingsSectionIntro` — `text-base font-semibold` title + `text-sm text-muted-foreground` description |
-| Appearance card | `Card rounded-2xl border shadow-sm`; `CardHeader` title “Appearance”; body uses `SettingsSwitchRow` + `ThemeToggle variant="switch"` (§12.2) |
-| Overview stats | `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4` of `StatCard` with `index` for entrance stagger |
+| Section intro | `SettingsSectionIntro` — `text-base font-semibold` title + `text-sm text-muted-foreground` description (mention appearance **and** display formats) |
+| Appearance card | `Card rounded-2xl border shadow-sm`; `CardHeader` title “Appearance”; body uses `SettingsSwitchRow` + `ThemeToggle variant="switch"` (§12.2). **Device-local** theme only. |
+| Display & format card | Required — see below |
+| Overview stats | `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4` of `StatCard` with `index` for entrance stagger; numeric values use §12.7 |
+
+##### Display & format card (required)
+
+Workspace-wide number / money / date settings. Full schema: [DISPLAY_FORMAT_REQUIREMENTS.md](./DISPLAY_FORMAT_REQUIREMENTS.md).
+
+| Element | Spec |
+|---------|------|
+| Card | `Card rounded-2xl border shadow-sm` |
+| Header | Title “Display & format” with `CalendarDays` icon; description: workspace-wide (not this device); Save button when `settings.manage` and form dirty |
+| Controls | Locale preset · Currency · Money decimals (0–4) · Date format · Date-time format — `Select` + `Label text-xs text-muted-foreground`, grid `grid-cols-1 sm:grid-cols-2 gap-4` |
+| Preview | `rounded-xl border bg-muted/30 p-3 grid grid-cols-2 lg:grid-cols-4 gap-3` showing live Number / Money / Date / Date-time samples |
+| Persist | `system_configs` key `display_format`; invalidate query on save |
+| Contrast | Do **not** put theme toggle in this card — Appearance stays separate |
 
 #### Lookup Data tab
 
@@ -2033,7 +2099,8 @@ Read-only table of system trigger types — **not** the user Notification Center
   </div>
   <TabsContent value="general" className="space-y-6 mt-0">
     <SettingsSectionIntro title="General" description="…" />
-    <Card className="rounded-2xl">{/* SettingsSwitchRow */}</Card>
+    <Card className="rounded-2xl">{/* Appearance · SettingsSwitchRow */}</Card>
+    <Card className="rounded-2xl">{/* Display & format · locale / currency / date presets + preview */}</Card>
   </TabsContent>
 </Tabs>
 ```
@@ -2092,6 +2159,17 @@ Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back a
 ### Typography & headers
 - [ ] Page title: icon + title + description (§4.3)
 - [ ] Correct type scale for mobile vs desktop
+
+### Display formats (§12.7)
+- [ ] `DisplayFormatProvider` wrapped in App root
+- [ ] Settings → General has **Display & format** card (locale, currency, date, datetime + preview)
+- [ ] Saved as `system_configs.display_format`
+- [ ] StatCard / KPI numbers use `formatNumber` (e.g. `12,139`)
+- [ ] Money fields use `formatMoney` (e.g. `RM 1,000.00`)
+- [ ] Dates / date-times use `formatDate` / `formatDateTime` (no hard-coded `dd/MM/yyyy`)
+- [ ] Pagination counts use `formatNumber`
+- [ ] Date pickers store ISO; display labels follow workspace `date_format`
+- [ ] No leftover `toLocaleString()` / hard-coded locale in feature screens
 
 ### Components
 - [ ] shadcn/ui components from `@/components/ui/*`
@@ -2155,6 +2233,9 @@ Paths below use the monorepo convention `frontend/src/`. Every EMZI app should h
 | Glass styles | `frontend/src/components/layout/glassStyles.js` |
 | Back navigation | `frontend/src/hooks/useGoBack.js`, `frontend/src/lib/navigationFallbacks.js`, `frontend/src/components/ui/BackButton.jsx` |
 | Theme | `frontend/src/components/theme/ThemeProvider.jsx`, `ThemeToggle.jsx` |
+| Display format | `frontend/src/lib/displayFormat.js`, `frontend/src/lib/DisplayFormatProvider.jsx` |
+| Stat card | `frontend/src/components/dashboard/StatCard.jsx` |
+| Date pickers | `frontend/src/components/ui/date-picker.jsx`, `date-range-picker.jsx` |
 | Toaster | `frontend/src/components/ui/sonner.jsx` |
 | Confirm dialog | `frontend/src/components/ui/confirm-dialog.jsx` |
 | Auth pages | `frontend/src/pages/Login.jsx`, `Register.jsx`, `ForgotPassword.jsx` |

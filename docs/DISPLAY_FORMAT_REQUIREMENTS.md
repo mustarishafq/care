@@ -4,6 +4,8 @@ Portable requirements for **every EMZI Nexus satellite app**. Implement once und
 
 Care (this repo) is a reference implementation. Copy this contract when building or auditing other systems.
 
+**Also in the design system:** [DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md) §12.7 (UI rules), §26.3 General tab, and §28 pre-ship checklist.
+
 ---
 
 ## Goal
