@@ -63,6 +63,8 @@ class MarketplaceReviewController extends Controller
             'min_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'max_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'reply_status' => ['sometimes', 'nullable', 'string', 'in:replied,unreplied'],
+            'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'end_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
             'page' => ['sometimes', 'integer', 'min:1'],
             'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
             'limit' => ['sometimes', 'integer', 'min:1', 'max:100'],
@@ -72,30 +74,33 @@ class MarketplaceReviewController extends Controller
             return response()->json(['message' => 'Unsupported platform.'], 422);
         }
 
-        $filters = [
+        $startAt = ! empty($validated['start_date'])
+            ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['start_date'])
+            : null;
+        $endAt = ! empty($validated['end_date'])
+            ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['end_date'])
+            : null;
+
+        $paginator = $this->reviewSync->listAllReviews(
+            $validated['platform'] ?? null,
+            $validated['shop_connection_id'] ?? null,
+            $validated['min_rating'] ?? null,
+            $validated['max_rating'] ?? null,
+            $validated['per_page'] ?? $validated['limit'] ?? 20,
+            $validated['reply_status'] ?? null,
+            $validated['page'] ?? 1,
+            $startAt,
+            $endAt,
+        );
+
+        $stats = $this->reviewSync->reviewStats(
             $validated['platform'] ?? null,
             $validated['shop_connection_id'] ?? null,
             $validated['min_rating'] ?? null,
             $validated['max_rating'] ?? null,
             $validated['reply_status'] ?? null,
-        ];
-
-        $paginator = $this->reviewSync->listAllReviews(
-            $filters[0],
-            $filters[1],
-            $filters[2],
-            $filters[3],
-            $validated['per_page'] ?? $validated['limit'] ?? 20,
-            $filters[4],
-            $validated['page'] ?? 1,
-        );
-
-        $stats = $this->reviewSync->reviewStats(
-            $filters[0],
-            $filters[1],
-            $filters[2],
-            $filters[3],
-            $filters[4],
+            $startAt,
+            $endAt,
         );
 
         return response()->json([

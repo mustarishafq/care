@@ -345,8 +345,18 @@ class MarketplaceReviewSyncService
         int $perPage = 20,
         ?string $replyStatus = null,
         int $page = 1,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
     ): LengthAwarePaginator {
-        return $this->filteredReviewsQuery($platform, $connectionId, $minRating, $maxRating, $replyStatus)
+        return $this->filteredReviewsQuery(
+            $platform,
+            $connectionId,
+            $minRating,
+            $maxRating,
+            $replyStatus,
+            $startAt,
+            $endAt,
+        )
             ->with('shopConnection')
             ->orderByDesc('review_created_at')
             ->orderByDesc('id')
@@ -367,8 +377,18 @@ class MarketplaceReviewSyncService
         ?int $minRating = null,
         ?int $maxRating = null,
         ?string $replyStatus = null,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
     ): array {
-        $row = $this->filteredReviewsQuery($platform, $connectionId, $minRating, $maxRating, $replyStatus)
+        $row = $this->filteredReviewsQuery(
+            $platform,
+            $connectionId,
+            $minRating,
+            $maxRating,
+            $replyStatus,
+            $startAt,
+            $endAt,
+        )
             ->selectRaw('COUNT(*) as total')
             ->selectRaw("SUM(CASE WHEN seller_reply IS NOT NULL AND seller_reply != '' THEN 1 ELSE 0 END) as replied")
             ->selectRaw("SUM(CASE WHEN seller_reply IS NULL OR seller_reply = '' THEN 1 ELSE 0 END) as unreplied")
@@ -392,12 +412,16 @@ class MarketplaceReviewSyncService
         ?int $minRating = null,
         ?int $maxRating = null,
         ?string $replyStatus = null,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
     ): Builder {
         return MarketplaceProductReview::query()
             ->when($platform, fn ($query) => $query->where('platform', $platform))
             ->when($connectionId, fn ($query) => $query->where('marketplace_shop_connection_id', $connectionId))
             ->when($minRating, fn ($query) => $query->where('rating', '>=', $minRating))
             ->when($maxRating, fn ($query) => $query->where('rating', '<=', $maxRating))
+            ->when($startAt, fn ($query) => $query->where('review_created_at', '>=', $startAt->copy()->startOfDay()))
+            ->when($endAt, fn ($query) => $query->where('review_created_at', '<=', $endAt->copy()->endOfDay()))
             ->when($replyStatus === 'replied', function ($query) {
                 $query->whereNotNull('seller_reply')->where('seller_reply', '!=', '');
             })

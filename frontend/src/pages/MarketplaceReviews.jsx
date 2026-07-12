@@ -330,6 +330,8 @@ export default function MarketplaceReviews() {
   const [shopFilter, setShopFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [replyFilter, setReplyFilter] = useState('all');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const [syncShopId, setSyncShopId] = useState('');
   const [syncStartDate, setSyncStartDate] = useState(() => daysAgoIso(7));
   const [syncEndDate, setSyncEndDate] = useState(todayIso);
@@ -356,8 +358,10 @@ export default function MarketplaceReviews() {
     if (replyFilter === 'replied' || replyFilter === 'unreplied') {
       params.reply_status = replyFilter;
     }
+    if (fromDate) params.start_date = fromDate;
+    if (toDate) params.end_date = toDate;
     return params;
-  }, [platformFilter, shopFilter, ratingFilter, replyFilter, page]);
+  }, [platformFilter, shopFilter, ratingFilter, replyFilter, fromDate, toDate, page]);
 
   const { data: shops = [], isLoading: loadingShops } = useQuery({
     queryKey: ['marketplace-shops'],
@@ -399,6 +403,8 @@ export default function MarketplaceReviews() {
     shopFilter,
     ratingFilter,
     replyFilter,
+    fromDate,
+    toDate,
   });
 
   const resetToFirstPage = () => setPage(1);
@@ -472,7 +478,7 @@ export default function MarketplaceReviews() {
   };
 
   const filterControls = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
       <Select value={platformFilter} onValueChange={(v) => { setPlatformFilter(v); setShopFilter('all'); resetToFirstPage(); }}>
         <SelectTrigger className="w-full h-10 sm:h-9">
           <SelectValue placeholder="Platform" />
@@ -520,16 +526,38 @@ export default function MarketplaceReviews() {
           <SelectItem value="replied">Already replied</SelectItem>
         </SelectContent>
       </Select>
+      <div className="space-y-1">
+        <Label className="text-[10px] text-muted-foreground">From</Label>
+        <Input
+          type="date"
+          className="h-10 sm:h-9"
+          value={fromDate}
+          max={toDate || undefined}
+          onChange={(e) => { setFromDate(e.target.value); resetToFirstPage(); }}
+          aria-label="From date"
+        />
+      </div>
+      <div className="space-y-1">
+        <Label className="text-[10px] text-muted-foreground">To</Label>
+        <Input
+          type="date"
+          className="h-10 sm:h-9"
+          value={toDate}
+          min={fromDate || undefined}
+          onChange={(e) => { setToDate(e.target.value); resetToFirstPage(); }}
+          aria-label="To date"
+        />
+      </div>
       <Button
         size="sm"
         variant="outline"
         onClick={() => refetchReviews()}
         disabled={loadingReviews}
-        className="w-full lg:w-10 lg:px-0 h-10 sm:h-9 sm:col-span-2 lg:col-span-1"
+        className="w-full 2xl:w-10 2xl:px-0 h-10 sm:h-9 sm:col-span-2 xl:col-span-1 2xl:col-span-1"
         aria-label="Refresh reviews"
       >
         {loadingReviews ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-        <span className="lg:hidden ml-2">Refresh</span>
+        <span className="2xl:hidden ml-2">Refresh</span>
       </Button>
     </div>
   );
