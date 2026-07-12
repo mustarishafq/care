@@ -16,6 +16,21 @@ function actionUrlForComplaint(complaintId) {
   return `${window.location.origin}/complaints/${complaintId}`;
 }
 
+/** Turn absolute same-origin action URLs into SPA paths; leave external URLs intact. */
+export function resolveNotificationPath(url) {
+  if (!url) return null;
+  if (url.startsWith('/')) return url;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    if (parsed.origin === window.location.origin) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    }
+  } catch {
+    // Fall through and return the original value.
+  }
+  return url;
+}
+
 function normalizeNotificationPayload({ type, complaint_id, severity, category, action_url, ...rest }) {
   const defaults = DEFAULTS[type] ?? DEFAULTS.general;
 

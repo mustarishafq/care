@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import NotificationList from '@/components/notifications/NotificationList';
 import { glassPanelStyles } from '@/components/layout/glassStyles';
 import { useNotifications } from '@/lib/useNotifications';
-import { invalidateNotificationQueries } from '@/lib/notifications';
+import { invalidateNotificationQueries, resolveNotificationPath } from '@/lib/notifications';
 import { isCriticalNotification, normalizeNotification } from '@/lib/notificationVisuals';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -55,11 +55,13 @@ export default function NotificationPanel({ open, onClose }) {
 
   const handleActivate = (url) => {
     onClose();
-    if (url.startsWith('http')) {
-      window.location.href = url;
+    const path = resolveNotificationPath(url);
+    if (!path) return;
+    if (path.startsWith('http')) {
+      window.location.href = path;
       return;
     }
-    navigate(url);
+    navigate(path);
   };
 
   if (typeof document === 'undefined') return null;

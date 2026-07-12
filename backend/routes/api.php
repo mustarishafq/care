@@ -115,6 +115,7 @@ Route::prefix('v1')->group(function () {
         Route::patch('marketplace/platforms/{platform}', [MarketplacePlatformController::class, 'update']);
         Route::get('marketplace/shops', [MarketplaceReviewController::class, 'shops']);
         Route::get('marketplace/reviews', [MarketplaceReviewController::class, 'index']);
+        Route::get('marketplace/reviews/{id}', [MarketplaceReviewController::class, 'show']);
         Route::post('marketplace/reviews/sync', [MarketplaceReviewController::class, 'sync']);
         Route::post('marketplace/reviews/{id}/reply', [MarketplaceReviewController::class, 'reply']);
     });

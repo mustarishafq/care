@@ -306,6 +306,11 @@ export const db = {
         return http.get('/marketplace/reviews', params);
       },
 
+      async getReview(id) {
+        const data = await http.get(`/marketplace/reviews/${id}`);
+        return data.data ?? data;
+      },
+
       async syncReviews(payload) {
         return http.post('/marketplace/reviews/sync', payload);
       },

@@ -60,6 +60,7 @@ class MarketplaceReviewController extends Controller
         $validated = $request->validate([
             'platform' => ['sometimes', 'nullable', 'string', 'max:32'],
             'shop_connection_id' => ['sometimes', 'nullable', 'integer'],
+            'product_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'min_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'max_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'reply_status' => ['sometimes', 'nullable', 'string', 'in:replied,unreplied'],
@@ -81,6 +82,13 @@ class MarketplaceReviewController extends Controller
             ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['end_date'])
             : null;
 
+        $productName = isset($validated['product_name'])
+            ? trim((string) $validated['product_name'])
+            : null;
+        if ($productName === '') {
+            $productName = null;
+        }
+
         $paginator = $this->reviewSync->listAllReviews(
             $validated['platform'] ?? null,
             $validated['shop_connection_id'] ?? null,
@@ -91,6 +99,7 @@ class MarketplaceReviewController extends Controller
             $validated['page'] ?? 1,
             $startAt,
             $endAt,
+            $productName,
         );
 
         $stats = $this->reviewSync->reviewStats(
@@ -101,6 +110,7 @@ class MarketplaceReviewController extends Controller
             $validated['reply_status'] ?? null,
             $startAt,
             $endAt,
+            $productName,
         );
 
         return response()->json([
@@ -114,6 +124,19 @@ class MarketplaceReviewController extends Controller
                 'to' => $paginator->lastItem(),
             ],
             'stats' => $stats,
+        ]);
+    }
+
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $this->ensurePermission($request->user(), 'reviews.view');
+
+        $review = MarketplaceProductReview::query()
+            ->with('shopConnection')
+            ->findOrFail($id);
+
+        return response()->json([
+            'data' => new MarketplaceProductReviewResource($review),
         ]);
     }
 

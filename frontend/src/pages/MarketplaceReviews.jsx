@@ -2,7 +2,7 @@ import { db } from '@/api/db';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -103,6 +103,8 @@ function ReviewCard({
   setReplyDrafts,
   replyingId,
   onSubmitReply,
+  highlighted = false,
+  cardRef = null,
 }) {
   const replied = hasReply(review);
   const canReply = canManage && !replied && ['tiktok_shop', 'shopee'].includes(review.platform);
@@ -112,7 +114,16 @@ function ReviewCard({
   const { formatDate, formatDateTime, formatNumber } = useDisplayFormat();
 
   return (
-    <article className="rounded-xl sm:rounded-2xl border bg-card/50 p-3.5 sm:p-5 space-y-3 transition-colors hover:bg-card">
+    <article
+      ref={cardRef}
+      id={`review-${review.id}`}
+      className={cn(
+        'rounded-xl sm:rounded-2xl border bg-card/50 p-3.5 sm:p-5 space-y-3 transition-all duration-500 scroll-mt-24',
+        highlighted
+          ? 'border-amber-400 bg-amber-50/70 ring-2 ring-amber-400/60 dark:bg-amber-950/30 dark:border-amber-500 dark:ring-amber-500/40'
+          : 'hover:bg-card',
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-2 min-w-0 flex-1">
           <Stars rating={review.rating} size="md" />
@@ -317,13 +328,19 @@ function SyncFields({
 
 export default function MarketplaceReviews() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = usePermissions();
   const { formatNumber } = useDisplayFormat();
   const canManage = hasPermission('reviews.manage');
   const listTopRef = useRef(null);
+  const focusedCardRef = useRef(null);
+
+  const focusReviewId = searchParams.get('review') || '';
+  const [highlightFocused, setHighlightFocused] = useState(Boolean(focusReviewId));
 
   const [platformFilter, setPlatformFilter] = useState('all');
   const [shopFilter, setShopFilter] = useState('all');
+  const [productFilter, setProductFilter] = useState('all');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [replyFilter, setReplyFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
@@ -341,10 +358,19 @@ export default function MarketplaceReviews() {
   const [page, setPage] = useState(1);
   const perPage = 20;
 
+  const { data: products = [] } = useQuery({
+    queryKey: ['products', 'active'],
+    queryFn: () => db.entities.Product.filter({ is_active: true }, 'name', 200),
+  });
+
   const reviewParams = useMemo(() => {
     const params = { page, per_page: perPage };
     if (platformFilter !== 'all') params.platform = platformFilter;
     if (shopFilter !== 'all') params.shop_connection_id = Number(shopFilter);
+    if (productFilter !== 'all') {
+      const product = products.find((p) => String(p.id) === String(productFilter));
+      if (product?.name) params.product_name = product.name;
+    }
     if (ratingFilter === 'low') {
       params.max_rating = 3;
     } else if (ratingFilter !== 'all') {
@@ -357,7 +383,7 @@ export default function MarketplaceReviews() {
     if (fromDate) params.start_date = fromDate;
     if (toDate) params.end_date = toDate;
     return params;
-  }, [platformFilter, shopFilter, ratingFilter, replyFilter, fromDate, toDate, page]);
+  }, [platformFilter, shopFilter, productFilter, products, ratingFilter, replyFilter, fromDate, toDate, page]);
 
   const { data: shops = [], isLoading: loadingShops } = useQuery({
     queryKey: ['marketplace-shops'],
@@ -369,6 +395,17 @@ export default function MarketplaceReviews() {
     queryFn: () => db.integrations.Marketplace.listReviews(reviewParams),
     refetchOnMount: 'always',
     staleTime: 0,
+  });
+
+  const {
+    data: focusedReview,
+    isLoading: loadingFocused,
+    isError: focusedMissing,
+  } = useQuery({
+    queryKey: ['marketplace-review', focusReviewId],
+    queryFn: () => db.integrations.Marketplace.getReview(focusReviewId),
+    enabled: Boolean(focusReviewId),
+    retry: false,
   });
 
   const reviews = reviewsResponse?.data ?? [];
@@ -388,6 +425,35 @@ export default function MarketplaceReviews() {
     low: 0,
   };
 
+  const listReviews = useMemo(() => {
+    if (!focusedReview?.id) return reviews;
+    return reviews.filter((review) => String(review.id) !== String(focusedReview.id));
+  }, [reviews, focusedReview]);
+
+  const clearFocusedReview = () => {
+    setHighlightFocused(false);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('review');
+      return next;
+    }, { replace: true });
+  };
+
+  useEffect(() => {
+    if (!focusReviewId) {
+      setHighlightFocused(false);
+      return;
+    }
+    setHighlightFocused(true);
+  }, [focusReviewId]);
+
+  useEffect(() => {
+    if (!focusedReview?.id || !focusedCardRef.current) return;
+    focusedCardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = window.setTimeout(() => setHighlightFocused(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [focusedReview?.id]);
+
   const filteredShops = useMemo(() => (
     platformFilter === 'all'
       ? shops
@@ -397,6 +463,7 @@ export default function MarketplaceReviews() {
   const filterCount = activeFilterCount({
     platformFilter,
     shopFilter,
+    productFilter,
     ratingFilter,
     replyFilter,
     dateRange: fromDate || toDate,
@@ -463,7 +530,10 @@ export default function MarketplaceReviews() {
       await db.integrations.Marketplace.replyToReview(reviewId, content);
       setReplyDrafts((prev) => ({ ...prev, [reviewId]: '' }));
       setReplyOpenId(null);
-      await refetchReviews();
+      await Promise.all([
+        refetchReviews(),
+        queryClient.invalidateQueries({ queryKey: ['marketplace-review', String(reviewId)] }),
+      ]);
       toast.success('Reply posted');
     } catch (error) {
       toast.error(error.message || 'Failed to post reply');
@@ -475,6 +545,7 @@ export default function MarketplaceReviews() {
   const clearBrowseFilters = () => {
     setPlatformFilter('all');
     setShopFilter('all');
+    setProductFilter('all');
     setRatingFilter('all');
     setReplyFilter('all');
     setFromDate('');
@@ -509,6 +580,22 @@ export default function MarketplaceReviews() {
               {filteredShops.map((shop) => (
                 <SelectItem key={shop.id} value={String(shop.id)}>
                   {shop.shop_name || shop.shop_id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Product</Label>
+          <Select value={productFilter} onValueChange={(v) => { setProductFilter(v); resetToFirstPage(); }}>
+            <SelectTrigger className="w-full h-10">
+              <SelectValue placeholder="Product" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All products</SelectItem>
+              {products.map((product) => (
+                <SelectItem key={product.id} value={String(product.id)}>
+                  {product.name}{product.sku ? ` (${product.sku})` : ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -643,11 +730,52 @@ export default function MarketplaceReviews() {
             </div>
           </CardHeader>
           <CardContent className="pt-0 px-3.5 sm:px-5 pb-3.5 sm:pb-5 space-y-3 sm:space-y-4">
+            {focusReviewId && (
+              <div className="space-y-2.5 sm:space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+                    Review from notification
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 px-2 text-muted-foreground"
+                    onClick={clearFocusedReview}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                {loadingFocused ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground py-6 justify-center">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading review…
+                  </div>
+                ) : focusedMissing || !focusedReview ? (
+                  <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground text-center">
+                    That review could not be found. It may have been removed.
+                  </div>
+                ) : (
+                  <ReviewCard
+                    review={focusedReview}
+                    canManage={canManage}
+                    replyOpen={replyOpenId === focusedReview.id}
+                    onToggleReply={(id) => setReplyOpenId(id)}
+                    replyDrafts={replyDrafts}
+                    setReplyDrafts={setReplyDrafts}
+                    replyingId={replyingId}
+                    onSubmitReply={submitReply}
+                    highlighted={highlightFocused}
+                    cardRef={focusedCardRef}
+                  />
+                )}
+              </div>
+            )}
+
             {loadingReviews || loadingShops ? (
               <div className="flex items-center gap-2 text-sm text-muted-foreground py-10 justify-center">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading reviews…
               </div>
-            ) : reviews.length === 0 ? (
+            ) : listReviews.length === 0 && !focusedReview ? (
               <div className="py-10 text-center space-y-2 px-2 sm:px-4">
                 <p className="text-sm font-medium">No reviews match these filters</p>
                 <p className="text-sm text-muted-foreground max-w-md mx-auto">
@@ -656,21 +784,26 @@ export default function MarketplaceReviews() {
               </div>
             ) : (
               <>
-                <div className="space-y-2.5 sm:space-y-3">
-                  {reviews.map((review) => (
-                    <ReviewCard
-                      key={review.id}
-                      review={review}
-                      canManage={canManage}
-                      replyOpen={replyOpenId === review.id}
-                      onToggleReply={(id) => setReplyOpenId(id)}
-                      replyDrafts={replyDrafts}
-                      setReplyDrafts={setReplyDrafts}
-                      replyingId={replyingId}
-                      onSubmitReply={submitReply}
-                    />
-                  ))}
-                </div>
+                {listReviews.length > 0 && (
+                  <div className="space-y-2.5 sm:space-y-3">
+                    {focusReviewId && (
+                      <p className="text-xs text-muted-foreground pt-1">All reviews</p>
+                    )}
+                    {listReviews.map((review) => (
+                      <ReviewCard
+                        key={review.id}
+                        review={review}
+                        canManage={canManage}
+                        replyOpen={replyOpenId === review.id}
+                        onToggleReply={(id) => setReplyOpenId(id)}
+                        replyDrafts={replyDrafts}
+                        setReplyDrafts={setReplyDrafts}
+                        replyingId={replyingId}
+                        onSubmitReply={submitReply}
+                      />
+                    ))}
+                  </div>
+                )}
 
                 {meta.last_page > 1 && (
                   <div className="sticky bottom-0 -mx-3.5 sm:-mx-5 px-3.5 sm:px-5 pt-3 pb-1 sm:pb-0 sm:static sm:border-0 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:bg-transparent sm:backdrop-blur-none">

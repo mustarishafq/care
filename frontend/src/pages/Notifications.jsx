@@ -6,7 +6,7 @@ import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 import { useNotifications } from '@/lib/useNotifications';
-import { invalidateNotificationQueries } from '@/lib/notifications';
+import { invalidateNotificationQueries, resolveNotificationPath } from '@/lib/notifications';
 import { filterNotifications } from '@/lib/notificationFilters';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
@@ -97,7 +97,15 @@ export default function Notifications() {
         <NotificationList
           notifications={filtered}
           onMarkRead={markRead}
-          onActivate={(url) => navigate(url)}
+          onActivate={(url) => {
+            const path = resolveNotificationPath(url);
+            if (!path) return;
+            if (path.startsWith('http')) {
+              window.location.href = path;
+              return;
+            }
+            navigate(path);
+          }}
         />
       </PageContent>
     </div>
