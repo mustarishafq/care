@@ -177,6 +177,39 @@ Tailwind: `bg-sidebar`, `text-sidebar-foreground`, etc.
 
 `--chart-1` through `--chart-5` — mapped to `chart.1` … `chart.5` in Tailwind. Use for Recharts / chart components.
 
+#### Recharts hover tooltips (required)
+
+Default Recharts tooltips use a hard-coded white panel. In dark mode the label inherits light chart text and becomes unreadable. **Never** leave `<Tooltip />` unstyled.
+
+Use the shared helper:
+
+**File:** `frontend/src/lib/chartTooltip.js`
+
+```jsx
+import { chartTooltipProps } from '@/lib/chartTooltip';
+
+<Tooltip {...chartTooltipProps} />
+<Tooltip {...chartTooltipProps} formatter={(v) => [v, 'Cases']} />
+```
+
+| Prop | Token / value | Purpose |
+|------|---------------|---------|
+| `contentStyle.backgroundColor` | `hsl(var(--popover))` | Panel surface (light + dark) |
+| `contentStyle.color` | `hsl(var(--popover-foreground))` | Default text |
+| `contentStyle.border` | `1px solid hsl(var(--border))` | Theme border |
+| `labelStyle.color` | `hsl(var(--foreground))` | Category / axis label (e.g. agent name) |
+| `cursor.fill` | `hsl(var(--muted) / 0.55)` | Hover band behind bars |
+
+**Also theme chart chrome** with the same tokens:
+
+- Grid: `stroke="hsl(var(--border))"`
+- Axis ticks: `tick={{ fill: 'hsl(var(--muted-foreground))' }}`
+- Prefer `ChartTooltip` / `ChartTooltipContent` from `@/components/ui/chart` when using `ChartContainer` (already token-based: `bg-background`, `border-border`, `text-foreground`)
+
+**Do not:** hard-code `bg-white`, `hsl(220, 13%, 91%)`, or light-only borders on tooltip `contentStyle`.
+
+When using shadcn `ChartContainer`, prefer `ChartTooltip` + `ChartTooltipContent` instead of raw Recharts `Tooltip` styles.
+
 ### 3.6 Brand panel (auth pages only)
 
 Fixed deep blue — **not** theme tokens:
@@ -1149,6 +1182,7 @@ Workspace-wide formatting is configured under **Settings → General → Display
 | Formatters | `frontend/src/lib/displayFormat.js` |
 | Provider / hook | `frontend/src/lib/DisplayFormatProvider.jsx` |
 | Stat card | `frontend/src/components/dashboard/StatCard.jsx` |
+| Chart tooltips | `frontend/src/lib/chartTooltip.js` |
 | Date pickers | `frontend/src/components/ui/date-picker.jsx`, `date-range-picker.jsx` |
 
 ---
@@ -1821,6 +1855,7 @@ See §16.1 for full spring spec.
 - Auth warning/success banners: always include `dark:` variants
 - Glass panels: separate dark shadows (§7.0)
 - Mobile auth card uses `bg-card` ( adapts to theme), not hardcoded white
+- **Charts:** Recharts hover tooltips must use `chartTooltipProps` (§3.5) — default white tooltips fail contrast in dark mode (label text becomes invisible). Verify every new chart in both themes.
 
 ---
 
@@ -2178,6 +2213,7 @@ Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back a
 - [ ] Forms: Label above Input; focus rings present
 - [ ] Avatars: square `rounded-lg` in chrome, correct fallback colors
 - [ ] Icons: Lucide only, sizes per §27
+- [ ] Recharts `<Tooltip />` uses `chartTooltipProps` from `@/lib/chartTooltip` (§3.5) — verified in light + dark
 
 ### Navigation
 - [ ] New routes added to `navItems.js` if needed
@@ -2235,6 +2271,7 @@ Paths below use the monorepo convention `frontend/src/`. Every EMZI app should h
 | Theme | `frontend/src/components/theme/ThemeProvider.jsx`, `ThemeToggle.jsx` |
 | Display format | `frontend/src/lib/displayFormat.js`, `frontend/src/lib/DisplayFormatProvider.jsx` |
 | Stat card | `frontend/src/components/dashboard/StatCard.jsx` |
+| Chart tooltips | `frontend/src/lib/chartTooltip.js` |
 | Date pickers | `frontend/src/components/ui/date-picker.jsx`, `date-range-picker.jsx` |
 | Toaster | `frontend/src/components/ui/sonner.jsx` |
 | Confirm dialog | `frontend/src/components/ui/confirm-dialog.jsx` |

@@ -4,6 +4,7 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { format, eachDayOfInterval, parseISO, startOfDay } from 'date-fns';
+import { chartTooltipProps } from '@/lib/chartTooltip';
 
 export default function CasesOverTimeChart({ complaints, dateFrom, dateTo }) {
   const days = eachDayOfInterval({ start: dateFrom, end: dateTo });
@@ -48,10 +49,21 @@ export default function CasesOverTimeChart({ complaints, dateFrom, dateTo }) {
                   <stop offset="95%" stopColor="hsl(199,89%,48%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => [v, 'Cases']} />
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="label"
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                interval="preserveStartEnd"
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={false}
+              />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={false}
+                tickLine={false}
+              />
+              <Tooltip {...chartTooltipProps} formatter={(v) => [v, 'Cases']} />
               <Area
                 type="monotone"
                 dataKey="count"

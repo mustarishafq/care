@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, FileText, Columns3, BarChart3,
+  LayoutDashboard, FileText, Columns3, BarChart3, LineChart,
   Bell, Package, Users, ShieldCheck, Webhook, Settings, Plus, ShoppingBag, Star, Grip,
 } from 'lucide-react';
 
@@ -9,6 +9,7 @@ export const careNavItems = [
   { label: 'Complaints', icon: FileText, path: '/complaints', permission: 'complaints.view' },
   { label: 'Reviews', icon: Star, path: '/marketplace-reviews', permission: 'reviews.view' },
   { label: 'Kanban', icon: Columns3, path: '/kanban', permission: 'complaints.view' },
+  { label: 'Analytics', icon: LineChart, path: '/analytics', permission: 'reports.view' },
   { label: 'Reports', icon: BarChart3, path: '/reports', permission: 'reports.view' },
   { label: 'Notifications', icon: Bell, path: '/notifications', permission: null, badge: true },
   { label: 'Products', icon: Package, path: '/products', permission: 'products.view' },
@@ -37,7 +38,7 @@ export const addComplaintNavAction = {
 
 const centerOrbFallbacks = [
   careNavItems[3], // Kanban
-  careNavItems[4], // Reports
+  careNavItems[4], // Analytics
 ];
 
 /** Bottom dock on desktop/tablet — workflow first, then integrations, Settings, admin last */
@@ -46,13 +47,14 @@ export const desktopBottomNavItems = [
   careNavItems[1],  // Complaints
   careNavItems[2],  // Reviews
   careNavItems[3],  // Kanban
-  careNavItems[4],  // Reports
-  careNavItems[6],  // Products
-  careNavItems[9],  // Integrations
-  careNavItems[10], // Marketplace
-  careNavItems[11], // Settings
-  careNavItems[7],  // Users
-  careNavItems[8],  // Roles
+  careNavItems[4],  // Analytics
+  careNavItems[5],  // Reports
+  careNavItems[7],  // Products
+  careNavItems[10], // Integrations
+  careNavItems[11], // Marketplace
+  careNavItems[12], // Settings
+  careNavItems[8],  // Users
+  careNavItems[9],  // Roles
 ];
 
 export function isNavActive(pathname, itemPath) {

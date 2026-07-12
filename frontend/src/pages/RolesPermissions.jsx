@@ -26,7 +26,7 @@ export const ALL_PERMISSIONS = [
   { key: 'complaints.assign', label: 'Assign Department/User', group: 'Complaints' },
   { key: 'complaints.change_status', label: 'Change Status', group: 'Complaints' },
   { key: 'complaints.add_notes', label: 'Add Internal Notes', group: 'Complaints' },
-  { key: 'reports.view', label: 'View Reports', group: 'Reports' },
+  { key: 'reports.view', label: 'View Reports & Analytics', group: 'Reports' },
   { key: 'reports.export', label: 'Export Reports', group: 'Reports' },
   { key: 'users.view', label: 'View Users', group: 'Users' },
   { key: 'users.invite', label: 'Invite Users', group: 'Users' },

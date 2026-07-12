@@ -6,14 +6,17 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   LayoutDashboard, FileText, AlertCircle, CheckCircle2, Clock,
-  Package, Truck, Timer, TrendingUp, UserCheck
+  Package, Truck, Timer, TrendingUp, UserCheck, Star, MessageSquare, Store,
 } from 'lucide-react';
 import { isToday, isThisMonth, differenceInHours } from 'date-fns';
 import { useSlaSettings } from '@/lib/useSlaSettings';
 import StatCard from '@/components/dashboard/StatCard';
 import ComplaintTrendChart from '@/components/dashboard/ComplaintTrendChart';
 import RecentActivity from '@/components/dashboard/RecentActivity';
+import RecentReviewsCard from '@/components/dashboard/RecentReviewsCard';
 import TopIssuesCard from '@/components/dashboard/TopIssuesCard';
+import SectionLabel from '@/components/dashboard/SectionLabel';
+import AnalyticsSnapshot from '@/components/dashboard/AnalyticsSnapshot';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
 import PageHeader from '@/components/layout/PageHeader';
 import AnimatedSection from '@/components/layout/AnimatedSection';
@@ -22,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import { useCurrentUser } from '@/lib/useCurrentUser';
+import { usePermissions } from '@/lib/usePermissions';
 import { filterVisibleComplaints, filterVisibleActivities } from '@/lib/complaintVisibility';
 import { hasAssignedAgents } from '@/lib/assignedAgents';
 import { buildComplaintsUrl } from '@/lib/complaintFilterParams';
@@ -31,8 +35,11 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const [assignTarget, setAssignTarget] = useState(null);
   const { user } = useCurrentUser();
+  const { hasPermission } = usePermissions();
+  const canViewReviews = hasPermission('reviews.view');
 
   const goToComplaints = (filters) => navigate(buildComplaintsUrl(filters));
+  const goToReviews = () => navigate('/marketplace-reviews');
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
@@ -53,6 +60,31 @@ export default function Dashboard() {
     () => filterVisibleActivities(user, activities, complaints).slice(0, 20),
     [user, activities, complaints],
   );
+
+  const { data: reviewStatsResponse, isLoading: loadingReviewStats } = useQuery({
+    queryKey: ['marketplace-reviews-dashboard-stats'],
+    queryFn: () => db.integrations.Marketplace.listReviews({ page: 1, per_page: 1 }),
+    enabled: canViewReviews,
+  });
+
+  const { data: attentionReviewsResponse, isLoading: loadingAttentionReviews } = useQuery({
+    queryKey: ['marketplace-reviews-dashboard-attention'],
+    queryFn: () => db.integrations.Marketplace.listReviews({
+      page: 1,
+      per_page: 8,
+      max_rating: 3,
+      reply_status: 'unreplied',
+    }),
+    enabled: canViewReviews,
+  });
+
+  const reviewStats = reviewStatsResponse?.stats ?? {
+    total: 0,
+    unreplied: 0,
+    replied: 0,
+    low: 0,
+  };
+  const attentionReviews = attentionReviewsResponse?.data ?? [];
 
   const { resolvedStatusNames } = useSlaSettings();
 
@@ -112,61 +144,142 @@ export default function Dashboard() {
       <PageHeader
         icon={LayoutDashboard}
         title="Dashboard"
-        description="Overview of complaint management performance"
+        description="Operations overview, reviews, and management analytics"
       />
 
-      <AnimatedSection delay={0.05}>
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label="Today's Complaints" value={todayCount} icon={FileText} color="blue" index={0} onClick={() => goToComplaints({ preset: 'today' })} />
-        <StatCard label="This Month" value={monthCount} icon={TrendingUp} color="purple" index={1} onClick={() => goToComplaints({ preset: 'month' })} />
-        <StatCard label="Open Tickets" value={openCount} icon={AlertCircle} color="warning" index={2} onClick={() => goToComplaints({ preset: 'open' })} />
-        <StatCard label="Closed" value={closedCount} icon={CheckCircle2} color="success" index={3} onClick={() => goToComplaints({ status: 'Closed' })} />
-        <StatCard label="Pending Fulfillment" value={pendingFulfillment} icon={Package} color="purple" index={4} onClick={() => goToComplaints({ preset: 'pending-fulfillment' })} />
-        <StatCard label="Pending Courier" value={pendingLogistics} icon={Truck} color="blue" index={5} onClick={() => goToComplaints({ status: 'Ready to Ship' })} />
-        <StatCard label="Avg Resolution (hrs)" value={avgResolution} icon={Timer} color="primary" index={6} />
-        <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" index={7} onClick={() => goToComplaints()} />
-      </div>
-      </AnimatedSection>
-
-      {/* Charts Row — on lg+: trend chart (2 cols) + recent activity (1 col); on mobile recent activity moves to bottom */}
-      <AnimatedSection delay={0.2} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <ComplaintTrendChart complaints={visibleComplaints} />
-        <div className="hidden lg:block">
-          <RecentActivity activities={visibleActivities} />
+      <AnimatedSection delay={0.05} className="space-y-3">
+        <SectionLabel
+          title="Complaints"
+          description="Ticket volume and resolution"
+        />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <StatCard label="Today's Complaints" value={todayCount} icon={FileText} color="blue" index={0} onClick={() => goToComplaints({ preset: 'today' })} />
+          <StatCard label="This Month" value={monthCount} icon={TrendingUp} color="purple" index={1} onClick={() => goToComplaints({ preset: 'month' })} />
+          <StatCard label="Open Tickets" value={openCount} icon={AlertCircle} color="warning" index={2} onClick={() => goToComplaints({ preset: 'open' })} />
+          <StatCard label="Closed" value={closedCount} icon={CheckCircle2} color="success" index={3} onClick={() => goToComplaints({ status: 'Closed' })} />
+          <StatCard label="Pending Fulfillment" value={pendingFulfillment} icon={Package} color="purple" index={4} onClick={() => goToComplaints({ preset: 'pending-fulfillment' })} />
+          <StatCard label="Pending Courier" value={pendingLogistics} icon={Truck} color="blue" index={5} onClick={() => goToComplaints({ status: 'Ready to Ship' })} />
+          <StatCard label="Avg Resolution (hrs)" value={avgResolution} icon={Timer} color="primary" index={6} />
+          <StatCard label="Total Complaints" value={visibleComplaints.length} icon={Clock} color="danger" index={7} onClick={() => goToComplaints()} />
         </div>
       </AnimatedSection>
 
-      {/* Bottom Row */}
-      <AnimatedSection delay={0.25} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <TopIssuesCard
-          title="Top Complaint Types"
-          data={topTypes}
-          onItemClick={(item) => item.typeId && goToComplaints({ type: item.typeId })}
-        />
-        <TopIssuesCard
-          title="Most Problematic Products"
-          data={topProducts}
-          onItemClick={(item) => goToComplaints({ search: item.name })}
-        />
-        <TopIssuesCard
-          title="Most Problematic Couriers"
-          data={topCouriers}
-          onItemClick={(item) => item.courierId && goToComplaints({ courier: item.courierId })}
-        />
+      {canViewReviews && (
+        <AnimatedSection delay={0.12} className="space-y-3">
+          <SectionLabel
+            title="Marketplace Reviews"
+            description="Ratings across TikTok Shop and Shopee"
+            href="/marketplace-reviews"
+          />
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <StatCard
+              label="Total Reviews"
+              value={loadingReviewStats ? '…' : reviewStats.total}
+              icon={Star}
+              color="blue"
+              index={0}
+              onClick={goToReviews}
+            />
+            <StatCard
+              label="Needs Reply"
+              value={loadingReviewStats ? '…' : reviewStats.unreplied}
+              icon={MessageSquare}
+              color="warning"
+              index={1}
+              onClick={goToReviews}
+            />
+            <StatCard
+              label="Replied"
+              value={loadingReviewStats ? '…' : reviewStats.replied}
+              icon={MessageSquare}
+              color="success"
+              index={2}
+              onClick={goToReviews}
+            />
+            <StatCard
+              label="Low (≤3★)"
+              value={loadingReviewStats ? '…' : reviewStats.low}
+              icon={Store}
+              color="danger"
+              index={3}
+              onClick={goToReviews}
+            />
+          </div>
+        </AnimatedSection>
+      )}
+
+      <AnimatedSection delay={0.16}>
+        <AnalyticsSnapshot complaints={visibleComplaints} />
       </AnimatedSection>
 
-      {/* Recent Activity — visible only on mobile/tablet, hidden on lg+ */}
+      {/* Charts + reviews / activity */}
+      <AnimatedSection delay={0.2} className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <ComplaintTrendChart complaints={visibleComplaints} />
+        <div className="hidden lg:block">
+          {canViewReviews ? (
+            <RecentReviewsCard
+              reviews={attentionReviews}
+              isLoading={loadingAttentionReviews}
+            />
+          ) : (
+            <RecentActivity activities={visibleActivities} />
+          )}
+        </div>
+      </AnimatedSection>
+
+      {canViewReviews && (
+        <AnimatedSection delay={0.22} className="hidden lg:block">
+          <RecentActivity activities={visibleActivities} />
+        </AnimatedSection>
+      )}
+
+      {/* Mobile: reviews needing attention */}
+      {canViewReviews && (
+        <AnimatedSection delay={0.23} className="lg:hidden">
+          <RecentReviewsCard
+            reviews={attentionReviews}
+            isLoading={loadingAttentionReviews}
+          />
+        </AnimatedSection>
+      )}
+
+      {/* Top issues */}
+      <AnimatedSection delay={0.25} className="space-y-3">
+        <SectionLabel
+          title="Top Issues"
+          description="Where complaints concentrate"
+        />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <TopIssuesCard
+            title="Top Complaint Types"
+            data={topTypes}
+            onItemClick={(item) => item.typeId && goToComplaints({ type: item.typeId })}
+          />
+          <TopIssuesCard
+            title="Most Problematic Products"
+            data={topProducts}
+            onItemClick={(item) => goToComplaints({ search: item.name })}
+          />
+          <TopIssuesCard
+            title="Most Problematic Couriers"
+            data={topCouriers}
+            onItemClick={(item) => item.courierId && goToComplaints({ courier: item.courierId })}
+          />
+        </div>
+      </AnimatedSection>
+
+      {/* Mobile activity feed */}
       <AnimatedSection delay={0.3} className="lg:hidden">
         <RecentActivity activities={visibleActivities} />
       </AnimatedSection>
 
-      {/* Unassigned Tickets — Quick Reassign */}
+      {/* Unassigned Tickets */}
       <AnimatedSection delay={0.35}>
-      <UnassignedTickets
-        complaints={visibleComplaints}
-        onAssign={c => setAssignTarget(c)}
-      />
+        <UnassignedTickets
+          complaints={visibleComplaints}
+          resolvedStatusNames={resolvedStatusNames}
+          onAssign={c => setAssignTarget(c)}
+        />
       </AnimatedSection>
 
       {assignTarget && (
@@ -181,7 +294,7 @@ export default function Dashboard() {
   );
 }
 
-function UnassignedTickets({ complaints, onAssign }) {
+function UnassignedTickets({ complaints, resolvedStatusNames, onAssign }) {
   const unassigned = complaints
     .filter(c => !hasAssignedAgents(c) && !resolvedStatusNames.includes(c.status))
     .slice(0, 10);

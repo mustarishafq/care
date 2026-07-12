@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { format, subDays, startOfDay } from 'date-fns';
+import { chartTooltipProps } from '@/lib/chartTooltip';
 
 export default function ComplaintTrendChart({ complaints }) {
   const last30Days = Array.from({ length: 30 }, (_, i) => {
@@ -29,12 +30,21 @@ export default function ComplaintTrendChart({ complaints }) {
                   <stop offset="95%" stopColor="hsl(199, 89%, 48%)" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" />
-              <XAxis dataKey="date" tick={{ fontSize: 11 }} tickLine={false} axisLine={false} interval={4} />
-              <YAxis tick={{ fontSize: 11 }} tickLine={false} axisLine={false} allowDecimals={false} />
-              <Tooltip
-                contentStyle={{ borderRadius: '8px', border: '1px solid hsl(220, 13%, 91%)', fontSize: '13px' }}
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+              <XAxis
+                dataKey="date"
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                tickLine={false}
+                axisLine={false}
+                interval={4}
               />
+              <YAxis
+                tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+              />
+              <Tooltip {...chartTooltipProps} />
               <Area
                 type="monotone"
                 dataKey="count"

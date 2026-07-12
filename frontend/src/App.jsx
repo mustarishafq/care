@@ -14,6 +14,7 @@ import Complaints from '@/pages/Complaints';
 import ComplaintDetail from '@/pages/ComplaintDetail';
 import Kanban from '@/pages/Kanban';
 import Reports from '@/pages/Reports';
+import Analytics from '@/pages/Analytics';
 import Notifications from '@/pages/Notifications';
 import Users from '@/pages/Users';
 import Settings from '@/pages/Settings';
@@ -66,6 +67,7 @@ const AppRoutes = () => (
       <Route path="/complaints/:id" element={<ComplaintDetail />} />
       <Route path="/kanban" element={<Kanban />} />
       <Route path="/reports" element={<Reports />} />
+      <Route path="/analytics" element={<Analytics />} />
       <Route path="/notifications" element={<Notifications />} />
       <Route path="/users" element={<Users />} />
       <Route path="/settings" element={<Settings />} />

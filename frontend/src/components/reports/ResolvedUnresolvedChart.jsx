@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useSlaSettings } from '@/lib/useSlaSettings';
+import { chartTooltipProps } from '@/lib/chartTooltip';
 
 export default function ResolvedUnresolvedChart({ complaints }) {
   const { resolvedStatusNames } = useSlaSettings();
@@ -55,7 +56,7 @@ export default function ResolvedUnresolvedChart({ complaints }) {
                 >
                   {data.map((_, i) => <Cell key={i} fill={COLORS[i]} />)}
                 </Pie>
-                <Tooltip formatter={(v, name, props) => [`${v} (${props.payload.pct}%)`, name]} />
+                <Tooltip {...chartTooltipProps} formatter={(v, name, props) => [`${v} (${props.payload.pct}%)`, name]} />
               </PieChart>
             </ResponsiveContainer>
           </div>

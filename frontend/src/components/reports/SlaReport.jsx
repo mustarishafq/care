@@ -11,6 +11,7 @@ import {
 } from '@/components/complaints/SlaBadge';
 import { isSlaPausedStatus } from '@/lib/slaSettings';
 import { useSlaSettings } from '@/lib/useSlaSettings';
+import { chartTooltipProps } from '@/lib/chartTooltip';
 
 function formatRemaining(complaint, pausedStatusNames) {
   if (isSlaPausedStatus(complaint.status, pausedStatusNames)) return 'Paused';
@@ -122,10 +123,10 @@ export default function SlaReport({ complaints }) {
             <div className="h-[220px]">
               <ResponsiveContainer>
                 <BarChart data={breachByPriority} barGap={4}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                  <YAxis allowDecimals={false} />
-                  <Tooltip />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} />
+                  <YAxis allowDecimals={false} tick={{ fill: 'hsl(var(--muted-foreground))' }} />
+                  <Tooltip {...chartTooltipProps} />
                   <Bar dataKey="total" name="Total" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="breached" name="Breached" fill="#ef4444" radius={[4, 4, 0, 0]} />
                 </BarChart>

@@ -3,6 +3,7 @@ import { getAssignedAgents } from '@/lib/assignedAgents';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { differenceInHours } from 'date-fns';
+import { chartTooltipProps } from '@/lib/chartTooltip';
 
 const COLORS = ['#0ea5e9', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b'];
 
@@ -51,10 +52,10 @@ function ResolutionBarChart({ data, color }) {
     <div className="h-[280px]">
       <ResponsiveContainer>
         <BarChart data={data} layout="vertical" margin={{ left: 10, right: 32, top: 4, bottom: 4 }}>
-          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} tickFormatter={v => `${v}h`} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 11 }} width={160} />
-          <Tooltip formatter={(v, _, props) => [`${formatHours(v)} (${props.payload.count} resolved)`, 'Avg resolution']} />
+          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+          <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={v => `${v}h`} />
+          <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} width={160} />
+          <Tooltip {...chartTooltipProps} formatter={(v, _, props) => [`${formatHours(v)} (${props.payload.count} resolved)`, 'Avg resolution']} />
           <Bar dataKey="avgHours" radius={[0, 4, 4, 0]}>
             {data.map((_, i) => <Cell key={i} fill={color || COLORS[i % COLORS.length]} />)}
           </Bar>

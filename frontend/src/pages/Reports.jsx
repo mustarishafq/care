@@ -26,6 +26,7 @@ import { filterVisibleComplaints } from '@/lib/complaintVisibility';
 import { CalendarDays, BarChart3 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
+import { chartTooltipProps } from '@/lib/chartTooltip';
 
 const CHART_COLORS = ['#0ea5e9', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#14b8a6'];
 
@@ -197,7 +198,7 @@ export default function Reports() {
                       <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                       <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
                       <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={140} />
-                      <Tooltip />
+                      <Tooltip {...chartTooltipProps} />
                       <Bar dataKey="count" fill="hsl(199, 89%, 48%)" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -215,7 +216,7 @@ export default function Reports() {
                       <Pie data={byType} cx="50%" cy="50%" innerRadius={55} outerRadius={90} paddingAngle={2} dataKey="count" label={false}>
                         {byType.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
                       </Pie>
-                      <Tooltip formatter={(v, name) => [v, name]} />
+                      <Tooltip {...chartTooltipProps} formatter={(v, name) => [v, name]} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -245,7 +246,7 @@ export default function Reports() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} />
                       <YAxis allowDecimals={false} />
-                      <Tooltip />
+                      <Tooltip {...chartTooltipProps} />
                       <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                         {byPriority.map((_, i) => <Cell key={i} fill={['#64748b', '#0ea5e9', '#f59e0b', '#ef4444'][i]} />)}
                       </Bar>
@@ -265,7 +266,7 @@ export default function Reports() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} />
-                      <Tooltip />
+                      <Tooltip {...chartTooltipProps} />
                       <Bar dataKey="count" fill="hsl(262, 83%, 58%)" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -283,7 +284,7 @@ export default function Reports() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" tick={{ fontSize: 11 }} />
                       <YAxis allowDecimals={false} />
-                      <Tooltip />
+                      <Tooltip {...chartTooltipProps} />
                       <Bar dataKey="count" fill="#06b6d4" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
