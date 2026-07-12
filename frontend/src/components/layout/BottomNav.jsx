@@ -5,6 +5,8 @@ import { glassDockStyles } from './glassStyles';
 import CreateComplaintDialog from '@/components/complaints/CreateComplaintDialog';
 import CenterOrbNavItem from './CenterOrbNavItem';
 import MobileMoreMenu from './MobileMoreMenu';
+import { useVisualViewportBottomOffset } from '@/hooks/useVisualViewportBottomOffset';
+import { isRunningStandalone } from '@/lib/pwa';
 import {
   desktopBottomNavItems,
   isNavActive,
@@ -76,13 +78,13 @@ function BottomNavDock({
         'pointer-events-auto flex items-stretch px-1',
         mobile
           ? 'h-[4.25rem] w-full max-w-lg overflow-visible'
-          : 'h-16 w-fit max-w-[min(calc(100vw-2rem),56rem)] overflow-hidden',
+          : 'h-16 w-fit max-w-full overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden',
       )}
     >
       <div
         className={cn(
           'flex min-w-0 flex-1 items-stretch',
-          mobile ? 'h-[4.25rem] overflow-visible' : 'h-16 overflow-x-auto scrollbar-hide',
+          mobile ? 'h-[4.25rem] overflow-visible' : 'h-16',
         )}
       >
         {items.map((item) => {
@@ -149,6 +151,8 @@ export default function BottomNav({ unreadCount = 0, permissions, isAdmin }) {
   const location = useLocation();
   const [createOpen, setCreateOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const viewportBottomOffset = useVisualViewportBottomOffset();
+  const standalone = isRunningStandalone();
 
   const centerOrb = getMobileCenterOrbItem(permissions, isAdmin);
   const mobileItems = buildMobileDockItems(permissions, isAdmin);
@@ -163,30 +167,39 @@ export default function BottomNav({ unreadCount = 0, permissions, isAdmin }) {
   return (
     <>
       <nav
-        className="fixed bottom-0 left-0 right-0 z-40 flex justify-center pointer-events-none pb-[calc(0.75rem+env(safe-area-inset-bottom))] px-3 sm:px-4"
+        className={cn(
+          'fixed inset-x-0 z-40 pointer-events-none',
+          // Browser chrome already clears the home indicator; safe-area only in PWA (§2.1)
+          standalone
+            ? 'pb-[calc(0.75rem+env(safe-area-inset-bottom))]'
+            : 'pb-3',
+        )}
+        style={{ bottom: viewportBottomOffset }}
         aria-label="Main navigation"
       >
-        <div className="w-full max-w-lg overflow-visible md:hidden">
-          <BottomNavDock
-            items={mobileItems}
-            location={location}
-            unreadCount={unreadCount}
-            mobile
-            onAction={handleAction}
-            onMoreOpen={() => setMoreOpen(true)}
-            centerOrb={centerOrb}
-            permissions={permissions}
-            isAdmin={isAdmin}
-          />
-        </div>
+        <div className="flex justify-center px-3 sm:px-4">
+          <div className="w-full max-w-lg overflow-visible md:hidden">
+            <BottomNavDock
+              items={mobileItems}
+              location={location}
+              unreadCount={unreadCount}
+              mobile
+              onAction={handleAction}
+              onMoreOpen={() => setMoreOpen(true)}
+              centerOrb={centerOrb}
+              permissions={permissions}
+              isAdmin={isAdmin}
+            />
+          </div>
 
-        <div className="hidden md:flex justify-center w-full">
-          <BottomNavDock
-            items={desktopItems}
-            location={location}
-            unreadCount={unreadCount}
-            mobile={false}
-          />
+          <div className="hidden w-full justify-center md:flex">
+            <BottomNavDock
+              items={desktopItems}
+              location={location}
+              unreadCount={unreadCount}
+              mobile={false}
+            />
+          </div>
         </div>
       </nav>
 
