@@ -233,96 +233,144 @@ class MarketplaceReviewSyncService
         $lookbackDays = (int) app(MarketplacePlatformConfigService::class)
             ->getSetting(MarketplacePlatform::TIKTOK_SHOP, 'review_lookback_days', 30);
 
-        $startTs = $startAt?->copy()->startOfDay()->timestamp;
-        $endTs = $endAt?->copy()->endOfDay()->timestamp;
-
-        $page = max(1, (int) ($pageToken ?: 1));
+        $rangeStart = ($startAt ?? now()->subDays(max(1, $lookbackDays)))->copy()->startOfDay();
+        $rangeEnd = ($endAt ?? now())->copy()->endOfDay();
         $pageSize = min(max($pageSize, 1), 50);
+
+        // Large single-range pagination eventually fails with TikTok "internal error".
+        // Day windows keep each request shallow and cover the full reported total.
+        $windows = $fetchAll
+            ? $this->shopeeSyncWindows($rangeStart, $rangeEnd)
+            : [[$rangeStart->timestamp, $rangeEnd->timestamp]];
+
         $synced = 0;
         $created = 0;
         $updated = 0;
         $createdComplaints = 0;
         $pagesFetched = 0;
-        $maxPages = $fetchAll ? 200 : 1;
-        $nextPageToken = null;
+        $seen = [];
+        $reportedTotal = 0;
 
-        do {
-            $result = $this->shopService->searchReviews(
-                $connection,
-                $pageSize,
-                (string) $page,
-                $lookbackDays,
-                $startTs,
-                $endTs,
-            );
+        foreach ($windows as [$windowStart, $windowEnd]) {
+            $page = 1;
+            $windowFetched = 0;
+            $windowTotal = null;
+            $emptyStreak = 0;
 
-            $pagesFetched++;
-
-            Log::debug('tiktok_shop.reviews.seller_cookie.raw_response', [
-                'connection_id' => $connection->id,
-                'shop_id' => $connection->shop_id,
-                'page' => $result['page'] ?? null,
-                'total' => $result['total'] ?? null,
-                'list_count' => count($result['list'] ?? []),
-            ]);
-
-            foreach ($this->extractReviewItems($result) as $item) {
-                $productInfo = is_array($item['product_info'] ?? null) ? $item['product_info'] : [];
-                $itemProductId = (string) ($productInfo['product_id'] ?? $item['product_id'] ?? '');
-
-                if ($productId !== null && $productId !== '' && $itemProductId !== $productId) {
-                    continue;
-                }
-
-                $rating = $this->normalizeRating($item['star_level'] ?? $item['rating'] ?? null);
-
-                if ($minRating !== null && ($rating === null || $rating < $minRating)) {
-                    continue;
-                }
-
-                if ($maxRating !== null && ($rating === null || $rating > $maxRating)) {
-                    continue;
-                }
-
-                $reviewData = is_array($item['review'] ?? null) ? $item['review'] : $item;
-                $externalId = (string) (
-                    $reviewData['main_review_id']
-                    ?? $reviewData['review_id']
-                    ?? $reviewData['id']
-                    ?? $item['main_review_id']
-                    ?? $item['review_id']
-                    ?? ''
+            while ($page <= 200) {
+                $result = $this->shopService->searchReviews(
+                    $connection,
+                    $pageSize,
+                    (string) $page,
+                    $lookbackDays,
+                    $windowStart,
+                    $windowEnd,
                 );
 
-                if ($externalId === '') {
+                $pagesFetched++;
+                $pageList = $result['list'] ?? [];
+                $windowFetched += count($pageList);
+                if (isset($result['total'])) {
+                    $windowTotal = (int) $result['total'];
+                    if ($page === 1) {
+                        $reportedTotal += $windowTotal;
+                    }
+                }
+
+                Log::debug('tiktok_shop.reviews.seller_cookie.raw_response', [
+                    'connection_id' => $connection->id,
+                    'shop_id' => $connection->shop_id,
+                    'window_start' => $windowStart,
+                    'window_end' => $windowEnd,
+                    'page' => $result['page'] ?? $page,
+                    'total' => $result['total'] ?? null,
+                    'list_count' => count($pageList),
+                ]);
+
+                if (count($pageList) === 0) {
+                    $emptyStreak++;
+                    if ($emptyStreak >= 2) {
+                        break;
+                    }
+                    $page++;
                     continue;
                 }
+                $emptyStreak = 0;
 
-                $existed = MarketplaceProductReview::query()
-                    ->where('platform', MarketplacePlatform::TIKTOK_SHOP)
-                    ->where('marketplace_shop_connection_id', $connection->id)
-                    ->where('external_review_id', $externalId)
-                    ->exists();
+                foreach ($this->extractReviewItems($result) as $item) {
+                    $productInfo = is_array($item['product_info'] ?? null) ? $item['product_info'] : [];
+                    $itemProductId = (string) ($productInfo['product_id'] ?? $item['product_id'] ?? '');
 
-                $review = $this->upsertTikTokReview($connection, $item);
-                $synced++;
+                    if ($productId !== null && $productId !== '' && $itemProductId !== $productId) {
+                        continue;
+                    }
 
-                if ($existed) {
-                    $updated++;
-                } else {
-                    $created++;
+                    $rating = $this->normalizeRating($item['star_level'] ?? $item['rating'] ?? null);
+
+                    if ($minRating !== null && ($rating === null || $rating < $minRating)) {
+                        continue;
+                    }
+
+                    if ($maxRating !== null && ($rating === null || $rating > $maxRating)) {
+                        continue;
+                    }
+
+                    $reviewData = is_array($item['review'] ?? null) ? $item['review'] : $item;
+                    $externalId = (string) (
+                        $reviewData['main_review_id']
+                        ?? $reviewData['review_id']
+                        ?? $reviewData['id']
+                        ?? $item['main_review_id']
+                        ?? $item['review_id']
+                        ?? ''
+                    );
+
+                    if ($externalId === '') {
+                        continue;
+                    }
+
+                    if (isset($seen[$externalId])) {
+                        continue;
+                    }
+                    $seen[$externalId] = true;
+
+                    $existed = MarketplaceProductReview::query()
+                        ->where('platform', MarketplacePlatform::TIKTOK_SHOP)
+                        ->where('marketplace_shop_connection_id', $connection->id)
+                        ->where('external_review_id', $externalId)
+                        ->exists();
+
+                    $review = $this->upsertTikTokReview($connection, $item);
+                    $synced++;
+
+                    if ($existed) {
+                        $updated++;
+                    } else {
+                        $created++;
+                    }
+
+                    if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
+                        $createdComplaints++;
+                    }
                 }
 
-                if ($this->complaintBridge->maybeCreateComplaintForReview($review)) {
-                    $createdComplaints++;
+                $nextPage = $result['next_page'] ?? null;
+                if ($nextPage === null
+                    && count($pageList) > 0
+                    && $windowTotal !== null
+                    && $windowFetched < $windowTotal
+                    && ($page * $pageSize) < $windowTotal
+                ) {
+                    $nextPage = $page + 1;
                 }
+
+                if ($nextPage === null) {
+                    break;
+                }
+
+                $page = (int) $nextPage;
             }
-
-            $nextPageToken = isset($result['next_page']) && $result['next_page'] !== null
-                ? (string) $result['next_page']
-                : null;
-            $page = $nextPageToken !== null ? (int) $nextPageToken : null;
-        } while ($fetchAll && $page !== null && $pagesFetched < $maxPages);
+        }
 
         return [
             'synced' => $synced,
@@ -330,7 +378,9 @@ class MarketplaceReviewSyncService
             'updated' => $updated,
             'created_complaints' => $createdComplaints,
             'pages_fetched' => $pagesFetched,
-            'next_page_token' => $fetchAll ? null : $nextPageToken,
+            'reported_total' => $reportedTotal,
+            'unique_reviews' => count($seen),
+            'next_page_token' => null,
         ];
     }
 
@@ -942,15 +992,26 @@ class MarketplaceReviewSyncService
             return null;
         }
 
+        $timezone = (string) config('app.timezone', 'Asia/Kuala_Lumpur');
+
         if (is_numeric($value)) {
             $seconds = (int) $value;
-            if ($seconds > 9999999999) {
-                return Carbon::createFromTimestampMs($seconds);
+            if ($seconds === 0) {
+                return null;
             }
 
-            return Carbon::createFromTimestamp($seconds);
+            $carbon = $seconds > 9999999999
+                ? Carbon::createFromTimestampMs($seconds, $timezone)
+                : Carbon::createFromTimestamp($seconds, $timezone);
+
+            // Ignore epoch / sentinel values from marketplace APIs.
+            if ($carbon->year < 2000) {
+                return null;
+            }
+
+            return $carbon;
         }
 
-        return Carbon::parse((string) $value);
+        return Carbon::parse((string) $value, $timezone);
     }
 }

@@ -7,14 +7,13 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Star, Loader2, RefreshCw, MessageSquare, ExternalLink, Store,
   ChevronDown, SlidersHorizontal, CalendarDays, ChevronLeft, ChevronRight,
@@ -281,22 +280,17 @@ function SyncFields({
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">From</Label>
-        <Input
-          type="date"
-          className="h-10"
-          value={syncStartDate}
-          onChange={(e) => setSyncStartDate(e.target.value)}
-        />
-      </div>
-      <div className="space-y-1.5">
-        <Label className="text-xs text-muted-foreground">To</Label>
-        <Input
-          type="date"
-          className="h-10"
-          value={syncEndDate}
-          onChange={(e) => setSyncEndDate(e.target.value)}
+      <div className="space-y-1.5 sm:col-span-2">
+        <Label className="text-xs text-muted-foreground">Date range</Label>
+        <DateRangePicker
+          from={syncStartDate}
+          to={syncEndDate}
+          onChange={({ from, to }) => {
+            setSyncStartDate(from);
+            setSyncEndDate(to);
+          }}
+          placeholder="Select date range"
+          allowClear={false}
         />
       </div>
       <div className="space-y-1.5 sm:col-span-2">
@@ -403,8 +397,7 @@ export default function MarketplaceReviews() {
     shopFilter,
     ratingFilter,
     replyFilter,
-    fromDate,
-    toDate,
+    dateRange: fromDate || toDate,
   });
 
   const resetToFirstPage = () => setPage(1);
@@ -477,88 +470,106 @@ export default function MarketplaceReviews() {
     }
   };
 
+  const clearBrowseFilters = () => {
+    setPlatformFilter('all');
+    setShopFilter('all');
+    setRatingFilter('all');
+    setReplyFilter('all');
+    setFromDate('');
+    setToDate('');
+    resetToFirstPage();
+  };
+
   const filterControls = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,0.9fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
-      <Select value={platformFilter} onValueChange={(v) => { setPlatformFilter(v); setShopFilter('all'); resetToFirstPage(); }}>
-        <SelectTrigger className="w-full h-10 sm:h-9">
-          <SelectValue placeholder="Platform" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All platforms</SelectItem>
-          <SelectItem value="tiktok_shop">TikTok Shop</SelectItem>
-          <SelectItem value="shopee">Shopee</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={shopFilter} onValueChange={(v) => { setShopFilter(v); resetToFirstPage(); }}>
-        <SelectTrigger className="w-full h-10 sm:h-9">
-          <SelectValue placeholder="Shop" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All shops</SelectItem>
-          {filteredShops.map((shop) => (
-            <SelectItem key={shop.id} value={String(shop.id)}>
-              {shop.shop_name || shop.shop_id}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Select value={ratingFilter} onValueChange={(v) => { setRatingFilter(v); resetToFirstPage(); }}>
-        <SelectTrigger className="w-full h-10 sm:h-9">
-          <SelectValue placeholder="Rating" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All ratings</SelectItem>
-          <SelectItem value="low">Low (≤3★)</SelectItem>
-          <SelectItem value="5">5★ only</SelectItem>
-          <SelectItem value="4">4★ only</SelectItem>
-          <SelectItem value="3">3★ only</SelectItem>
-          <SelectItem value="2">2★ only</SelectItem>
-          <SelectItem value="1">1★ only</SelectItem>
-        </SelectContent>
-      </Select>
-      <Select value={replyFilter} onValueChange={(v) => { setReplyFilter(v); resetToFirstPage(); }}>
-        <SelectTrigger className="w-full h-10 sm:h-9">
-          <SelectValue placeholder="Reply status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All replies</SelectItem>
-          <SelectItem value="unreplied">Needs reply</SelectItem>
-          <SelectItem value="replied">Already replied</SelectItem>
-        </SelectContent>
-      </Select>
-      <div className="space-y-1">
-        <Label className="text-[10px] text-muted-foreground">From</Label>
-        <Input
-          type="date"
-          className="h-10 sm:h-9"
-          value={fromDate}
-          max={toDate || undefined}
-          onChange={(e) => { setFromDate(e.target.value); resetToFirstPage(); }}
-          aria-label="From date"
-        />
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Platform</Label>
+          <Select value={platformFilter} onValueChange={(v) => { setPlatformFilter(v); setShopFilter('all'); resetToFirstPage(); }}>
+            <SelectTrigger className="w-full h-10">
+              <SelectValue placeholder="Platform" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All platforms</SelectItem>
+              <SelectItem value="tiktok_shop">TikTok Shop</SelectItem>
+              <SelectItem value="shopee">Shopee</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Shop</Label>
+          <Select value={shopFilter} onValueChange={(v) => { setShopFilter(v); resetToFirstPage(); }}>
+            <SelectTrigger className="w-full h-10">
+              <SelectValue placeholder="Shop" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All shops</SelectItem>
+              {filteredShops.map((shop) => (
+                <SelectItem key={shop.id} value={String(shop.id)}>
+                  {shop.shop_name || shop.shop_id}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Rating</Label>
+          <Select value={ratingFilter} onValueChange={(v) => { setRatingFilter(v); resetToFirstPage(); }}>
+            <SelectTrigger className="w-full h-10">
+              <SelectValue placeholder="Rating" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All ratings</SelectItem>
+              <SelectItem value="low">Low (≤3★)</SelectItem>
+              <SelectItem value="5">5★ only</SelectItem>
+              <SelectItem value="4">4★ only</SelectItem>
+              <SelectItem value="3">3★ only</SelectItem>
+              <SelectItem value="2">2★ only</SelectItem>
+              <SelectItem value="1">1★ only</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Reply</Label>
+          <Select value={replyFilter} onValueChange={(v) => { setReplyFilter(v); resetToFirstPage(); }}>
+            <SelectTrigger className="w-full h-10">
+              <SelectValue placeholder="Reply status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All replies</SelectItem>
+              <SelectItem value="unreplied">Needs reply</SelectItem>
+              <SelectItem value="replied">Already replied</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Date range</Label>
+          <DateRangePicker
+            from={fromDate}
+            to={toDate}
+            onChange={({ from, to }) => {
+              setFromDate(from);
+              setToDate(to);
+              resetToFirstPage();
+            }}
+            placeholder="Any dates"
+            className="w-full"
+          />
+        </div>
+        {filterCount > 0 && (
+          <div className="flex items-end">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={clearBrowseFilters}
+              className="h-10 px-3 text-muted-foreground"
+            >
+              Clear
+            </Button>
+          </div>
+        )}
       </div>
-      <div className="space-y-1">
-        <Label className="text-[10px] text-muted-foreground">To</Label>
-        <Input
-          type="date"
-          className="h-10 sm:h-9"
-          value={toDate}
-          min={fromDate || undefined}
-          onChange={(e) => { setToDate(e.target.value); resetToFirstPage(); }}
-          aria-label="To date"
-        />
-      </div>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => refetchReviews()}
-        disabled={loadingReviews}
-        className="w-full 2xl:w-10 2xl:px-0 h-10 sm:h-9 sm:col-span-2 xl:col-span-1 2xl:col-span-1"
-        aria-label="Refresh reviews"
-      >
-        {loadingReviews ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
-        <span className="2xl:hidden ml-2">Refresh</span>
-      </Button>
     </div>
   );
 
@@ -586,37 +597,34 @@ export default function MarketplaceReviews() {
 
         <div ref={listTopRef} className="scroll-mt-20 md:scroll-mt-24" />
 
-        <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} className="md:hidden">
-          <Card className="rounded-xl border shadow-sm">
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-3 p-3.5 text-left min-h-11"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="text-sm font-medium">Filters</span>
+        <Card className="rounded-xl sm:rounded-2xl border shadow-sm">
+          <CardHeader className="pb-3 px-3.5 sm:px-5 pt-3.5 sm:pt-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  <SlidersHorizontal className="h-4 w-4 text-muted-foreground shrink-0" />
+                  Filters
                   {filterCount > 0 && (
-                    <Badge variant="secondary" className="text-[10px]">{filterCount} active</Badge>
+                    <Badge variant="secondary" className="text-[10px] font-normal">{filterCount} active</Badge>
                   )}
-                </div>
-                <ChevronDown className={cn('h-4 w-4 shrink-0 text-muted-foreground transition-transform', filtersOpen && 'rotate-180')} />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <CardContent className="pt-0 pb-3.5 px-3.5">
-                {filterControls}
-              </CardContent>
-            </CollapsibleContent>
-          </Card>
-        </Collapsible>
-
-        <Card className="rounded-xl sm:rounded-2xl border shadow-sm hidden md:block">
-          <CardHeader className="pb-3 px-5 pt-5">
-            <CardTitle className="text-base">Browse filters</CardTitle>
-            <CardDescription>Filter the stored review list (independent from sync)</CardDescription>
+                </CardTitle>
+                <CardDescription className="mt-1">
+                  Narrow the stored review list
+                </CardDescription>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="md:hidden h-8 px-2 text-muted-foreground"
+                onClick={() => setFiltersOpen((open) => !open)}
+                aria-expanded={filtersOpen}
+              >
+                <ChevronDown className={cn('h-4 w-4 transition-transform', filtersOpen && 'rotate-180')} />
+              </Button>
+            </div>
           </CardHeader>
-          <CardContent className="pt-0 px-5 pb-5">
+          <CardContent className={cn('pt-0 px-3.5 sm:px-5 pb-3.5 sm:pb-5', !filtersOpen && 'hidden md:block')}>
             {filterControls}
           </CardContent>
         </Card>

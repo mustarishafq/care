@@ -193,8 +193,10 @@ class TikTokSellerReviewClient
         $list = is_array($data['list'] ?? null) ? array_values($data['list']) : [];
         $total = (int) ($data['total'] ?? count($list));
 
+        // TikTok often returns a short final-looking page (e.g. 49/50) while more pages still exist.
+        // Keep paging while we have results and haven't reached the reported total.
         $nextPage = null;
-        if (count($list) >= $size && ($page * $size) < $total) {
+        if (count($list) > 0 && ($page * $size) < $total) {
             $nextPage = $page + 1;
         }
 
@@ -268,13 +270,33 @@ class TikTokSellerReviewClient
             $headers['x-tt-csrf-token'] = $csrf;
         }
 
-        $response = Http::withHeaders($headers)->send(
-            $method,
-            $host.$path.'?'.http_build_query($query),
-            ['json' => $body],
-        );
+        $pending = Http::withHeaders($headers)->timeout(45);
+        $url = $host.$path.'?'.http_build_query($query);
+        $attempts = 0;
+        $lastException = null;
 
-        return $this->unwrap($response);
+        while ($attempts < 3) {
+            $attempts++;
+            try {
+                $response = $pending->send($method, $url, ['json' => $body]);
+
+                return $this->unwrap($response);
+            } catch (RuntimeException $exception) {
+                $lastException = $exception;
+                $message = strtolower($exception->getMessage());
+                $retryable = str_contains($message, 'internal error')
+                    || str_contains($message, 'timeout')
+                    || str_contains($message, 'temporarily');
+
+                if (! $retryable || $attempts >= 3) {
+                    throw $exception;
+                }
+
+                usleep(250000 * $attempts);
+            }
+        }
+
+        throw $lastException ?? new RuntimeException('TikTok seller review request failed.');
     }
 
     /**
