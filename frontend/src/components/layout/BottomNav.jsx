@@ -168,13 +168,14 @@ export default function BottomNav({ unreadCount = 0, permissions, isAdmin }) {
     <>
       <nav
         className={cn(
-          'fixed inset-x-0 z-40 pointer-events-none',
+          'fixed inset-x-0 bottom-0 z-40 pointer-events-none',
           // Browser chrome already clears the home indicator; safe-area only in PWA (§2.1)
           standalone
             ? 'pb-[calc(0.75rem+env(safe-area-inset-bottom))]'
             : 'pb-3',
         )}
-        style={{ bottom: viewportBottomOffset }}
+        // Only lift for soft keyboard — ignore Safari toolbar deltas (avoids mid-scroll jump)
+        style={viewportBottomOffset > 0 ? { bottom: viewportBottomOffset } : undefined}
         aria-label="Main navigation"
       >
         <div className="flex justify-center px-3 sm:px-4">

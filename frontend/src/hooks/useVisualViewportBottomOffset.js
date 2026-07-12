@@ -1,18 +1,27 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Distance (px) from the layout viewport bottom to the visual viewport bottom.
- * On iOS Safari, collapsing/expanding chrome changes the visual viewport while
- * the layout viewport stays tall — pin fixed bottom UI with this offset
- * (MOBILE_BOTTOM_NAV_DESIGN §2.1).
+ * Soft-keyboard inset only — not Safari URL-bar chrome.
  *
- * offset = max(0, round(innerHeight - visualViewport.height - visualViewport.offsetTop))
+ * Tracking every visualViewport resize lifts the dock mid-scroll when the
+ * toolbar expands (scroll up) and drops it again when scrolling settles.
+ * Toolbar deltas are typically < ~150px; the soft keyboard is much larger.
  */
-function readViewportBottomOffset() {
+const KEYBOARD_OFFSET_THRESHOLD_PX = 150;
+
+/**
+ * Distance (px) to lift fixed bottom UI above the soft keyboard.
+ * Returns 0 during Safari chrome expand/collapse so the dock stays pinned.
+ *
+ * raw = max(0, round(innerHeight - visualViewport.height - visualViewport.offsetTop))
+ */
+function readKeyboardBottomOffset() {
   if (typeof window === 'undefined') return 0;
   const vv = window.visualViewport;
   if (!vv) return 0;
-  return Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+
+  const raw = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+  return raw >= KEYBOARD_OFFSET_THRESHOLD_PX ? raw : 0;
 }
 
 export function useVisualViewportBottomOffset() {
@@ -24,7 +33,7 @@ export function useVisualViewportBottomOffset() {
     const update = () => {
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        setOffset(readViewportBottomOffset());
+        setOffset(readKeyboardBottomOffset());
       });
     };
 
