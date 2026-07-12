@@ -24,6 +24,7 @@ import StatCard from '@/components/dashboard/StatCard';
 import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import { toast } from 'sonner';
 import { usePermissions } from '@/lib/usePermissions';
+import { useDisplayFormat } from '@/lib/DisplayFormatProvider';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -108,6 +109,7 @@ function ReviewCard({
   const galleryItems = reviewGalleryItems(review);
   const reviewPhotoCount = (review.review_images || []).length;
   const reviewedAt = review.review_created_at ? new Date(review.review_created_at) : null;
+  const { formatDate, formatDateTime, formatNumber } = useDisplayFormat();
 
   return (
     <article className="rounded-xl sm:rounded-2xl border bg-card/50 p-3.5 sm:p-5 space-y-3 transition-colors hover:bg-card">
@@ -136,7 +138,7 @@ function ReviewCard({
             </Badge>
             {reviewPhotoCount > 0 && (
               <Badge variant="outline" className="text-[10px] sm:text-xs font-normal">
-                {reviewPhotoCount} photo{reviewPhotoCount === 1 ? '' : 's'}
+                {formatNumber(reviewPhotoCount)} photo{reviewPhotoCount === 1 ? '' : 's'}
               </Badge>
             )}
             {review.complaint_id && (
@@ -152,9 +154,8 @@ function ReviewCard({
         {reviewedAt && (
           <time className="text-[11px] sm:text-xs text-muted-foreground shrink-0 inline-flex items-center gap-1 pt-0.5 text-right">
             <CalendarDays className="w-3.5 h-3.5 hidden sm:inline" />
-            <span className="sm:hidden">{format(reviewedAt, 'dd MMM')}</span>
-            <span className="hidden sm:inline md:hidden">{format(reviewedAt, 'dd MMM yyyy')}</span>
-            <span className="hidden md:inline">{format(reviewedAt, 'dd MMM yyyy · HH:mm')}</span>
+            <span className="md:hidden">{formatDate(reviewedAt)}</span>
+            <span className="hidden md:inline">{formatDateTime(reviewedAt)}</span>
           </time>
         )}
       </div>
@@ -189,7 +190,7 @@ function ReviewCard({
             </span>
             {review.seller_replied_at && (
               <span className="font-normal text-emerald-700/70 dark:text-emerald-400/70">
-                · {format(new Date(review.seller_replied_at), 'dd MMM yyyy')}
+                · {formatDate(review.seller_replied_at)}
               </span>
             )}
           </p>
@@ -317,6 +318,7 @@ function SyncFields({
 export default function MarketplaceReviews() {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
+  const { formatNumber } = useDisplayFormat();
   const canManage = hasPermission('reviews.manage');
   const listTopRef = useRef(null);
 
@@ -635,7 +637,7 @@ export default function MarketplaceReviews() {
               <CardTitle className="text-sm sm:text-base">
                 {loadingReviews
                   ? 'Loading…'
-                  : `${meta.from ?? 0}–${meta.to ?? 0} of ${meta.total ?? 0}`}
+                  : `${formatNumber(meta.from ?? 0, { empty: '0' })}–${formatNumber(meta.to ?? 0, { empty: '0' })} of ${formatNumber(meta.total ?? 0, { empty: '0' })}`}
               </CardTitle>
               <p className="text-xs text-muted-foreground shrink-0">reviews</p>
             </div>

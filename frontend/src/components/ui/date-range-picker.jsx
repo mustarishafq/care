@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useDisplayFormat } from '@/lib/DisplayFormatProvider';
 
 const ISO_FORMAT = 'yyyy-MM-dd';
 
@@ -12,16 +13,6 @@ function parseIsoDate(value) {
   if (!value) return undefined;
   const date = parse(value, ISO_FORMAT, new Date());
   return isValid(date) ? date : undefined;
-}
-
-function formatDisplay(from, to) {
-  if (from && to) {
-    return `${format(from, 'dd/MM/yyyy')} – ${format(to, 'dd/MM/yyyy')}`;
-  }
-  if (from) {
-    return `${format(from, 'dd/MM/yyyy')} – …`;
-  }
-  return null;
 }
 
 function useMediaQuery(query) {
@@ -55,11 +46,21 @@ export function DateRangePicker({
   const [open, setOpen] = React.useState(false);
   const isWide = useMediaQuery('(min-width: 640px)');
   const months = numberOfMonths ?? (isWide ? 2 : 1);
+  const { formatDate } = useDisplayFormat();
   const selected = {
     from: parseIsoDate(from),
     to: parseIsoDate(to),
   };
-  const label = formatDisplay(selected.from, selected.to);
+
+  const label = (() => {
+    if (selected.from && selected.to) {
+      return `${formatDate(selected.from)} – ${formatDate(selected.to)}`;
+    }
+    if (selected.from) {
+      return `${formatDate(selected.from)} – …`;
+    }
+    return null;
+  })();
   const hasValue = Boolean(from || to);
 
   const handleSelect = (range) => {

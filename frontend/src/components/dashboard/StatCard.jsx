@@ -2,6 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { statCardMotion } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import { useDisplayFormat } from '@/lib/DisplayFormatProvider';
 
 const colorMap = {
   primary: 'bg-primary/10 text-primary',
@@ -13,8 +14,33 @@ const colorMap = {
   blue: 'bg-primary/10 text-primary',
 };
 
-export default function StatCard({ label, value, icon: Icon, trend, color = 'primary', index = 0, onClick }) {
+function isNumericDisplayValue(value) {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'string' && value.trim() !== '' && !Number.isNaN(Number(value))) {
+    return true;
+  }
+  return false;
+}
+
+export default function StatCard({
+  label,
+  value,
+  icon: Icon,
+  trend,
+  color = 'primary',
+  index = 0,
+  onClick,
+  format = 'auto',
+}) {
+  const { formatNumber, formatMoney } = useDisplayFormat();
   const clickable = typeof onClick === 'function';
+
+  let displayValue = value;
+  if (format === 'number' || (format === 'auto' && isNumericDisplayValue(value))) {
+    displayValue = formatNumber(value);
+  } else if (format === 'money') {
+    displayValue = formatMoney(value);
+  }
 
   return (
     <motion.div
@@ -36,7 +62,7 @@ export default function StatCard({ label, value, icon: Icon, trend, color = 'pri
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider leading-snug">{label}</p>
-          <p className="text-2xl sm:text-3xl font-bold mt-1 tracking-tight">{value}</p>
+          <p className="text-2xl sm:text-3xl font-bold mt-1 tracking-tight tabular-nums">{displayValue}</p>
           {trend != null && (
             <p className={cn(
               'text-xs mt-1.5 font-medium',

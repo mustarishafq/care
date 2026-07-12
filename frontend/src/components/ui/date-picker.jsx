@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useDisplayFormat } from '@/lib/DisplayFormatProvider';
 
 const ISO_FORMAT = 'yyyy-MM-dd';
 
@@ -23,6 +24,7 @@ export function DatePicker({
   disabled,
 }) {
   const [open, setOpen] = React.useState(false);
+  const { formatDate } = useDisplayFormat();
   const selected = parseIsoDate(value);
 
   const handleSelect = (date) => {
@@ -45,7 +47,7 @@ export function DatePicker({
           )}
         >
           <CalendarIcon className="mr-2 h-4 w-4 shrink-0 opacity-60" />
-          {selected ? format(selected, 'dd/MM/yyyy') : placeholder}
+          {selected ? formatDate(selected) : placeholder}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0 z-[100]" align="start">

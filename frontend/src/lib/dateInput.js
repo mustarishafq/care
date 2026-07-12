@@ -1,20 +1,28 @@
 import { format, isValid, parse } from 'date-fns';
+import { DISPLAY_FORMAT_DEFAULT } from '@/lib/displayFormat';
 
-const DISPLAY_FORMAT = 'dd/MM/yyyy';
 const ISO_FORMAT = 'yyyy-MM-dd';
 
-export function formatDateForDisplay(isoDate) {
+export function formatDateForDisplay(isoDate, dateFormat = DISPLAY_FORMAT_DEFAULT.date_format) {
   if (!isoDate) return '';
   const date = parse(isoDate, ISO_FORMAT, new Date());
-  return isValid(date) ? format(date, DISPLAY_FORMAT) : '';
+  if (!isValid(date)) return '';
+  try {
+    return format(date, dateFormat);
+  } catch {
+    return format(date, DISPLAY_FORMAT_DEFAULT.date_format);
+  }
 }
 
-export function parseDateInput(text) {
+export function parseDateInput(text, dateFormat = DISPLAY_FORMAT_DEFAULT.date_format) {
   if (!text?.trim()) return '';
 
   const trimmed = text.trim();
 
-  const dmy = parse(trimmed, DISPLAY_FORMAT, new Date());
+  const configured = parse(trimmed, dateFormat, new Date());
+  if (isValid(configured)) return format(configured, ISO_FORMAT);
+
+  const dmy = parse(trimmed, 'dd/MM/yyyy', new Date());
   if (isValid(dmy)) return format(dmy, ISO_FORMAT);
 
   const iso = parse(trimmed, ISO_FORMAT, new Date());

@@ -5,6 +5,7 @@ import { queryClientInstance } from '@/lib/query-client'
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
+import { DisplayFormatProvider } from '@/lib/DisplayFormatProvider';
 import { getToken } from '@/api/http';
 
 import AppLayout from '@/components/layout/AppLayout';
@@ -87,10 +88,12 @@ function App() {
     <ThemeProvider>
       <AuthProvider>
         <QueryClientProvider client={queryClientInstance}>
-          <Router>
-            <AppRoutes />
-          </Router>
-          <Toaster />
+          <DisplayFormatProvider>
+            <Router>
+              <AppRoutes />
+            </Router>
+            <Toaster />
+          </DisplayFormatProvider>
         </QueryClientProvider>
       </AuthProvider>
     </ThemeProvider>

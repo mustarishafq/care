@@ -1,6 +1,6 @@
 import { db } from '@/api/db';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
@@ -17,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
   Bell, Clock, Database, GitBranch, Link2, Loader2, Eye, EyeOff, Copy, Check,
-  Shield, Settings2, Webhook, Lock, Sun, ClipboardCheck, ShoppingBag,
+  Shield, Settings2, Webhook, Lock, Sun, ClipboardCheck, ShoppingBag, CalendarDays,
 } from 'lucide-react';
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { Switch } from '@/components/ui/switch';
@@ -55,6 +55,15 @@ import {
   normalizeAutoCloseSettings,
 } from '@/lib/autoCloseSettings';
 import { DEFAULT_STATUS_COLOR, defaultColorForIndex } from '@/lib/statusColors';
+import {
+  DATE_FORMAT_PRESETS,
+  DATETIME_FORMAT_PRESETS,
+  DISPLAY_FORMAT_CONFIG_KEY,
+  DISPLAY_FORMAT_DEFAULT,
+  LOCALE_PRESETS,
+  createDisplayFormatters,
+  normalizeDisplayFormat,
+} from '@/lib/displayFormat';
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -74,6 +83,8 @@ export default function Settings() {
   const [preResolvedForm, setPreResolvedForm] = useState(PRE_RESOLVED_DEFAULT);
   const [orderSourcesOpen, setOrderSourcesOpen] = useState(false);
   const [orderSourcesForm, setOrderSourcesForm] = useState(ORDER_SOURCES_DEFAULT);
+  const [displayFormatForm, setDisplayFormatForm] = useState(DISPLAY_FORMAT_DEFAULT);
+  const [displayFormatDirty, setDisplayFormatDirty] = useState(false);
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [lookupOpen, setLookupOpen] = useState(false);
@@ -139,6 +150,9 @@ export default function Settings() {
   const getOrderSources = () => normalizeOrderSources(
     configs.find((c) => c.key === 'order_sources')?.json_value,
   );
+  const getDisplayFormat = () => normalizeDisplayFormat(
+    configs.find((c) => c.key === DISPLAY_FORMAT_CONFIG_KEY)?.json_value,
+  );
   const getSso = () => {
     const raw = configs.find((c) => c.key === 'nexus_sso')?.json_value ?? {};
     return {
@@ -163,6 +177,19 @@ export default function Settings() {
   const routingRuleCount = routing.rules.filter((rule) => rule.department_id || rule.status_id).length;
   const automationActive = [routing.enabled, autoClose.enabled, preResolved.enabled].filter(Boolean).length;
 
+  useEffect(() => {
+    if (!displayFormatDirty) {
+      setDisplayFormatForm(getDisplayFormat());
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- sync from configs when saved / loaded
+  }, [configs, displayFormatDirty]);
+
+  const displayFormatPreview = useMemo(
+    () => createDisplayFormatters(displayFormatForm),
+    [displayFormatForm],
+  );
+  const previewNow = useMemo(() => new Date('2026-07-12T13:05:00'), []);
+
   const routingPreview = useMemo(() => routing.rules
     .filter((rule) => rule.department_id || rule.status_id)
     .map((rule) => {
@@ -186,6 +213,26 @@ export default function Settings() {
       await db.entities.SystemConfig.create({ key, label, json_value });
     }
     await queryClient.invalidateQueries({ queryKey: ['system_configs'] });
+  };
+
+  const updateDisplayFormatForm = (patch) => {
+    setDisplayFormatForm((prev) => normalizeDisplayFormat({ ...prev, ...patch }));
+    setDisplayFormatDirty(true);
+  };
+
+  const saveDisplayFormat = async () => {
+    setSaving(true);
+    try {
+      await saveConfig(
+        DISPLAY_FORMAT_CONFIG_KEY,
+        'Display Format',
+        normalizeDisplayFormat(displayFormatForm),
+      );
+      setDisplayFormatDirty(false);
+      toast.success('Display format saved');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const openSla = () => { setSlaForm(getSla()); setSlaOpen(true); };
@@ -449,7 +496,7 @@ export default function Settings() {
         <TabsContent value="general" className="space-y-6 mt-0">
           <SettingsSectionIntro
             title="General"
-            description="Appearance and a quick overview of your workspace configuration."
+            description="Appearance, display formats, and a quick overview of your workspace configuration."
           />
 
           <Card className="rounded-2xl border border-border shadow-sm">
@@ -468,11 +515,157 @@ export default function Settings() {
             </CardContent>
           </Card>
 
+          <Card className="rounded-2xl border border-border shadow-sm">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                    Display &amp; format
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Workspace-wide number, money, and date formats used across Care.
+                  </p>
+                </div>
+                {canManage && (
+                  <Button
+                    size="sm"
+                    onClick={saveDisplayFormat}
+                    disabled={saving || !displayFormatDirty}
+                  >
+                    {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                    Save
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Number style (locale)</Label>
+                  <Select
+                    value={displayFormatForm.locale}
+                    onValueChange={(value) => {
+                      const preset = LOCALE_PRESETS.find((item) => item.value === value);
+                      updateDisplayFormatForm({
+                        locale: value,
+                        ...(preset?.currency ? { currency_code: preset.currency } : {}),
+                      });
+                    }}
+                    disabled={!canManage}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {LOCALE_PRESETS.map((preset) => (
+                        <SelectItem key={preset.value} value={preset.value}>
+                          {preset.label} · {preset.sample}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Currency</Label>
+                  <Select
+                    value={displayFormatForm.currency_code}
+                    onValueChange={(value) => updateDisplayFormatForm({ currency_code: value })}
+                    disabled={!canManage}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['MYR', 'USD', 'SGD', 'IDR', 'GBP', 'EUR'].map((code) => (
+                        <SelectItem key={code} value={code}>{code}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Money decimals</Label>
+                  <Select
+                    value={String(displayFormatForm.currency_decimals)}
+                    onValueChange={(value) => updateDisplayFormatForm({ currency_decimals: Number(value) })}
+                    disabled={!canManage}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[0, 1, 2, 3, 4].map((n) => (
+                        <SelectItem key={n} value={String(n)}>{n}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Date format</Label>
+                  <Select
+                    value={displayFormatForm.date_format}
+                    onValueChange={(value) => updateDisplayFormatForm({ date_format: value })}
+                    disabled={!canManage}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATE_FORMAT_PRESETS.map((preset) => (
+                        <SelectItem key={preset.value} value={preset.value}>
+                          {preset.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Date &amp; time format</Label>
+                  <Select
+                    value={displayFormatForm.datetime_format}
+                    onValueChange={(value) => updateDisplayFormatForm({ datetime_format: value })}
+                    disabled={!canManage}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DATETIME_FORMAT_PRESETS.map((preset) => (
+                        <SelectItem key={preset.value} value={preset.value}>
+                          {preset.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/30 p-3 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Number</p>
+                  <p className="font-medium tabular-nums mt-0.5">{displayFormatPreview.formatNumber(12139)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Money</p>
+                  <p className="font-medium tabular-nums mt-0.5">{displayFormatPreview.formatMoney(1000)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Date</p>
+                  <p className="font-medium mt-0.5">{displayFormatPreview.formatDate(previewNow)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Date &amp; time</p>
+                  <p className="font-medium mt-0.5">{displayFormatPreview.formatDateTime(previewNow)}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard label="Lookup items" value={lookupTotal} icon={Database} index={0} />
             <StatCard label="Automation active" value={automationActive} icon={GitBranch} color="blue" index={1} />
             <StatCard label="Routing rules" value={routingRuleCount} icon={Shield} color="purple" index={2} />
-            <StatCard label="SSO" value={sso.enabled ? 'On' : 'Off'} icon={Link2} color={sso.enabled ? 'success' : 'primary'} index={3} />
+            <StatCard label="SSO" value={sso.enabled ? 'On' : 'Off'} icon={Link2} color={sso.enabled ? 'success' : 'primary'} index={3} format="none" />
           </div>
         </TabsContent>
 
