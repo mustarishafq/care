@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Upload, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { getUserFacingError } from '@/lib/userFacingError';
+import { toastApiError } from '@/lib/toastApi';
 import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
 import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 
@@ -80,7 +82,7 @@ export default function ClosureProofEditor({
             isImage: true,
           });
         } catch (err) {
-          const message = err.message || `Failed to upload "${file.name}"`;
+          const message = getUserFacingError(err, `Failed to upload "${file.name}"`);
           errors.push(message);
           toast.error(message);
         }
@@ -128,7 +130,7 @@ export default function ClosureProofEditor({
       setDirty(false);
       onSaved?.();
     } catch (err) {
-      toast.error(err.message || 'Failed to save closure proof');
+      toastApiError(err, 'Failed to save closure proof');
     } finally {
       setSaving(false);
     }

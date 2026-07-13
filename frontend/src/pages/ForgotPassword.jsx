@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { Loader2, Mail, CheckCircle2, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -21,7 +22,7 @@ export default function ForgotPassword() {
       toast.success(result.message || 'Reset link sent');
       setSent(true);
     } catch (err) {
-      toast.error(err.message || 'Failed to send reset link');
+      toastApiError(err, 'Failed to send reset link');
     } finally {
       setLoading(false);
     }

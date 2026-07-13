@@ -22,6 +22,7 @@ import {
 import ThemeToggle from '@/components/theme/ThemeToggle';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 import { usePermissions } from '@/lib/usePermissions';
 import { useDepartments } from '@/lib/useDepartments';
 import { useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement, useComplaintStatuses } from '@/lib/useLookups';
@@ -399,7 +400,7 @@ export default function Settings() {
           : {}),
       })));
     } catch (err) {
-      toast.error(err.message || `Failed to load ${section.label}`);
+      toastApiError(err, `Failed to load ${section.label}`);
       setLookupOpen(false);
     } finally {
       setLookupLoading(false);
@@ -444,7 +445,7 @@ export default function Settings() {
       toast.success(`${lookupMeta.label} saved`);
       setLookupOpen(false);
     } catch (err) {
-      toast.error(err.message || `Failed to save ${lookupMeta.label}`);
+      toastApiError(err, `Failed to save ${lookupMeta.label}`);
     } finally {
       setSaving(false);
     }

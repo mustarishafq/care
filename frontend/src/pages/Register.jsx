@@ -9,6 +9,7 @@ import AuthLayout from '@/components/layout/AuthLayout';
 import NexusBrainLoginButton from '@/components/auth/NexusBrainLoginButton';
 import { Loader2, User, Mail, Phone, Lock, Eye, EyeOff, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function Register() {
       toast.success(result.message || 'Registration successful');
       navigate('/login');
     } catch (err) {
-      toast.error(err.message || 'Registration failed');
+      toastApiError(err, 'Registration failed');
     } finally {
       setLoading(false);
     }

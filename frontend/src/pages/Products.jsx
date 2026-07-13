@@ -23,6 +23,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
 import StatCard from '@/components/dashboard/StatCard';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/lib/usePermissions';
 import { cn } from '@/lib/utils';
@@ -112,7 +113,7 @@ export default function Products() {
       invalidateProducts();
       setDialogOpen(false);
     } catch (err) {
-      toast.error(err.message || 'Failed to save product');
+      toastApiError(err, 'Failed to save product');
     } finally {
       setSaving(false);
     }
@@ -126,7 +127,7 @@ export default function Products() {
       invalidateProducts();
       toast.success('Product deleted');
     } catch (err) {
-      toast.error(err.message || 'Failed to delete product');
+      toastApiError(err, 'Failed to delete product');
     } finally {
       setActionProductId(null);
     }
@@ -140,7 +141,7 @@ export default function Products() {
       invalidateProducts();
       toast.success(`${product.name} ${nextActive ? 'activated' : 'deactivated'}`);
     } catch (err) {
-      toast.error(err.message || 'Failed to update status');
+      toastApiError(err, 'Failed to update status');
     } finally {
       setActionProductId(null);
     }

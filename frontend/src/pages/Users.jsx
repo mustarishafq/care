@@ -26,6 +26,7 @@ import {
   UserCheck, UserX, Shield, MoreHorizontal, AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 import RoleSelectOptions from '@/components/users/RoleSelectOptions';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
@@ -153,7 +154,7 @@ export default function Users() {
       toast.success('User updated');
       setEditUserOpen(false);
     } catch (err) {
-      toast.error(err.message || 'Failed to update user');
+      toastApiError(err, 'Failed to update user');
     } finally {
       setSavingUser(false);
     }
@@ -166,7 +167,7 @@ export default function Users() {
       invalidateUsers();
       toast.success(`Password reset flagged for ${u.full_name || u.email}`);
     } catch (err) {
-      toast.error(err.message || 'Failed to flag password reset');
+      toastApiError(err, 'Failed to flag password reset');
     } finally {
       setActionUserId(null);
     }
@@ -179,7 +180,7 @@ export default function Users() {
       invalidateUsers();
       toast.success(`${u.full_name || u.email} approved`);
     } catch (err) {
-      toast.error(err.message || 'Failed to approve user');
+      toastApiError(err, 'Failed to approve user');
     } finally {
       setActionUserId(null);
     }
@@ -192,7 +193,7 @@ export default function Users() {
       invalidateUsers();
       toast.success(`${u.full_name || u.email} rejected`);
     } catch (err) {
-      toast.error(err.message || 'Failed to reject user');
+      toastApiError(err, 'Failed to reject user');
     } finally {
       setActionUserId(null);
     }
@@ -209,7 +210,7 @@ export default function Users() {
       invalidateUsers();
       toast.success(`${u.full_name || u.email} ${active ? 'activated' : 'deactivated'}`);
     } catch (err) {
-      toast.error(err.message || 'Failed to update status');
+      toastApiError(err, 'Failed to update status');
     } finally {
       setActionUserId(null);
     }
@@ -225,7 +226,7 @@ export default function Users() {
       setInviteEmail('');
       setInviteOpen(false);
     } catch (err) {
-      toast.error(err.message || 'Failed to send invitation');
+      toastApiError(err, 'Failed to send invitation');
     } finally {
       setInviting(false);
     }
@@ -253,7 +254,7 @@ export default function Users() {
       toast.success(`User ${addForm.email} created`);
       setAddOpen(false);
     } catch (err) {
-      toast.error(err.message || 'Failed to create user');
+      toastApiError(err, 'Failed to create user');
     } finally {
       setAdding(false);
     }

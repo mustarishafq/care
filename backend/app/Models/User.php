@@ -82,6 +82,24 @@ class User extends Authenticatable
     }
 
     /**
+     * Complaint list/detail visibility for this user's role.
+     * Assigned agents always keep access to their tickets under department/assigned scopes.
+     */
+    public function getComplaintVisibility(): string
+    {
+        $visibility = $this->role?->complaint_visibility;
+
+        if (is_string($visibility) && in_array($visibility, Permissions::complaintVisibilityKeys(), true)) {
+            return $visibility;
+        }
+
+        // Fallback when the column is missing/unset.
+        return $this->isAdmin()
+            ? Permissions::COMPLAINT_VISIBILITY_ALL
+            : Permissions::COMPLAINT_VISIBILITY_DEPARTMENT;
+    }
+
+    /**
      * @return list<string>|'*'
      */
     public function getPermissions(): array|string

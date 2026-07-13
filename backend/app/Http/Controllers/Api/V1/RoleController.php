@@ -28,6 +28,7 @@ class RoleController extends Controller
         return response()->json([
             'permissions' => Permissions::catalog(),
             'default_pages' => Permissions::defaultPages(),
+            'complaint_visibility_options' => Permissions::complaintVisibilityOptions(),
         ]);
     }
 
@@ -59,12 +60,14 @@ class RoleController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(Permissions::allKeys())],
             'default_page' => ['nullable', 'string', Rule::in(Permissions::defaultPagePaths())],
+            'complaint_visibility' => ['nullable', 'string', Rule::in(Permissions::complaintVisibilityKeys())],
             'is_active' => ['nullable', 'boolean'],
         ]);
 
         $data['is_system'] = false;
         $data['is_admin'] = false;
         $data['default_page'] = $data['default_page'] ?? '/dashboard';
+        $data['complaint_visibility'] = $data['complaint_visibility'] ?? Permissions::COMPLAINT_VISIBILITY_DEPARTMENT;
 
         return new RoleResource(Role::create($data));
     }
@@ -80,6 +83,7 @@ class RoleController extends Controller
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['string', Rule::in(Permissions::allKeys())],
             'default_page' => ['nullable', 'string', Rule::in(Permissions::defaultPagePaths())],
+            'complaint_visibility' => ['nullable', 'string', Rule::in(Permissions::complaintVisibilityKeys())],
             'is_active' => ['nullable', 'boolean'],
         ]);
 

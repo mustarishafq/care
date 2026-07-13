@@ -18,10 +18,11 @@ Follow this order. Check off each item before production.
 [ ] 3. DISPLAY_FORMAT_REQUIREMENTS.md — number / money / date formats in Settings → General
 [ ] 4. GRAPH_DESIGN.md — charts / Recharts tokens + theme-safe tooltips (if the app has graphs)
 [ ] 5. MOBILE_BOTTOM_NAV_DESIGN.md — glass dock (define your own navItems.js routes)
-[ ] 6. REACT_SPA_APACHE_HTACCESS.md — production SPA routing + split domains
-[ ] 7. (Optional) nexus-sso-setup.md — Brain tile / “Continue with Nexus” login
-[ ] 8. (Optional) event-webhook-setup.md — push events to Brain
-[ ] 9. (Optional) emzi-nexus-mcp-catalog-spec.md — Brain Connected Systems / AI tools
+[ ] 6. TOAST_DESIGN.md — user-facing toast copy + toastApiError (no HTTP codes in UI)
+[ ] 7. REACT_SPA_APACHE_HTACCESS.md — production SPA routing + split domains
+[ ] 8. (Optional) nexus-sso-setup.md — Brain tile / “Continue with Nexus” login
+[ ] 9. (Optional) event-webhook-setup.md — push events to Brain
+[ ] 10. (Optional) emzi-nexus-mcp-catalog-spec.md — Brain Connected Systems / AI tools
 ```
 
 Skip sections in **INITIAL_SETUP** marked **Linkly example** when starting greenfield (not migrating from Base44).
@@ -40,6 +41,7 @@ Skip sections in **INITIAL_SETUP** marked **Linkly example** when starting green
 | [DISPLAY_FORMAT_REQUIREMENTS.md](./DISPLAY_FORMAT_REQUIREMENTS.md) | Workspace number (`1,000`), money (`1,000.00`), and date formats via Settings → General |
 | [GRAPH_DESIGN.md](./GRAPH_DESIGN.md) | Chart tokens, Recharts tooltips, grid/axis chrome (light + dark) |
 | [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) | Glass dock: sizing, glass tokens, mobile orb, safe area, active indicator (routes are per-app) |
+| [TOAST_DESIGN.md](./TOAST_DESIGN.md) | Sonner toasts: user-facing copy rules, `toastApiError`, no status codes (422, etc.) |
 | [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md) | Apache `.htaccess` for React Router; split SPA/API domains; CORS on `/storage/*` |
 
 ### Optional — Nexus Brain integrations

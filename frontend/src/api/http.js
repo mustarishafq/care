@@ -1,3 +1,5 @@
+import { getUserFacingError, statusFallbackMessage } from '@/lib/userFacingError';
+
 const TOKEN_KEY = 'care_auth_token';
 
 export function getToken() {
@@ -41,16 +43,19 @@ function getApiErrorMessage(data, status, raw = '') {
   if (uploadMessage) return uploadMessage;
 
   if (!data) {
-    if (status >= 500) return 'Something went wrong on the server. Please try again.';
-    return `Request failed (${status})`;
+    return statusFallbackMessage(status);
   }
 
   const fieldErrors = data.errors ? Object.values(data.errors).flat().filter(Boolean) : [];
-  if (fieldErrors.length) return fieldErrors[0];
+  if (fieldErrors.length) {
+    return getUserFacingError({ message: fieldErrors[0], status }, fieldErrors[0]);
+  }
 
-  if (data.message && data.message !== 'The given data was invalid.') return data.message;
+  if (data.message && data.message !== 'The given data was invalid.') {
+    return getUserFacingError({ message: data.message, status }, statusFallbackMessage(status));
+  }
 
-  return `Request failed (${status})`;
+  return statusFallbackMessage(status);
 }
 
 async function readResponseBody(response) {
@@ -79,7 +84,9 @@ async function readResponseBody(response) {
 
 function getUnexpectedResponseMessage(status, raw = '') {
   return getUploadErrorMessage(status, raw)
-    || (status >= 500 ? 'Something went wrong on the server. Please try again.' : 'Unexpected server response. Please try again.');
+    || (status >= 500
+      ? statusFallbackMessage(500)
+      : 'Unexpected server response. Please try again.');
 }
 
 class ApiError extends Error {

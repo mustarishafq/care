@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import AuthLayout from '@/components/layout/AuthLayout';
 import { Loader2, Mail, Lock, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -29,7 +30,7 @@ export default function ResetPassword() {
       toast.success(result.message || 'Password reset successfully');
       navigate('/login');
     } catch (err) {
-      toast.error(err.message || 'Password reset failed');
+      toastApiError(err, 'Password reset failed');
     } finally {
       setLoading(false);
     }

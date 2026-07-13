@@ -13,6 +13,7 @@ class Role extends Model
         'description',
         'permissions',
         'default_page',
+        'complaint_visibility',
         'is_active',
         'is_system',
         'is_admin',

@@ -9,7 +9,7 @@ export const careNavItems = [
   { label: 'Complaints', icon: FileText, path: '/complaints', permission: 'complaints.view' },
   { label: 'Reviews', icon: Star, path: '/marketplace-reviews', permission: 'reviews.view' },
   { label: 'Kanban', icon: Columns3, path: '/kanban', permission: 'complaints.view' },
-  { label: 'Analytics', icon: LineChart, path: '/analytics', permission: 'reports.view' },
+  { label: 'Analytics', icon: LineChart, path: '/analytics', permission: 'analytics.view' },
   { label: 'Reports', icon: BarChart3, path: '/reports', permission: 'reports.view' },
   { label: 'Notifications', icon: Bell, path: '/notifications', permission: null, badge: true },
   { label: 'Products', icon: Package, path: '/products', permission: 'products.view' },

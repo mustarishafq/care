@@ -22,6 +22,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import AnimatedSection from '@/components/layout/AnimatedSection';
 import StatCard from '@/components/dashboard/StatCard';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 import { usePermissions } from '@/lib/usePermissions';
 import { format } from 'date-fns';
 
@@ -104,7 +105,7 @@ export default function TikTokShop({ embedded = false } = {}) {
       setSearchParams({}, { replace: true });
     }
     if (error) {
-      toast.error(decodeURIComponent(error));
+      toastApiError(decodeURIComponent(error), 'Authorization failed. Please try again.');
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams, queryClient]);
@@ -161,7 +162,7 @@ export default function TikTokShop({ embedded = false } = {}) {
       const { url } = await db.integrations.TikTokShop.getAuthUrl();
       window.location.href = url;
     } catch (error) {
-      toast.error(error.message || 'Failed to start TikTok Shop authorization');
+      toastApiError(error, 'Failed to start TikTok Shop authorization');
       setConnecting(false);
     }
   };
@@ -174,7 +175,7 @@ export default function TikTokShop({ embedded = false } = {}) {
       if (String(selectedShopId) === String(id)) setSelectedShopId('');
       toast.success('Shop disconnected');
     } catch (error) {
-      toast.error(error.message || 'Failed to disconnect shop');
+      toastApiError(error, 'Failed to disconnect shop');
     } finally {
       setDisconnectingId(null);
     }
@@ -187,7 +188,7 @@ export default function TikTokShop({ embedded = false } = {}) {
       await refetchConnections();
       toast.success('Token refreshed');
     } catch (error) {
-      toast.error(error.message || 'Failed to refresh token');
+      toastApiError(error, 'Failed to refresh token');
     } finally {
       setRefreshingId(null);
     }
@@ -218,7 +219,7 @@ export default function TikTokShop({ embedded = false } = {}) {
       setSettingsForm((prev) => ({ ...prev, app_key: '', app_secret: '', webhook_secret: '' }));
       toast.success('Settings saved');
     } catch (error) {
-      toast.error(error.message || 'Failed to save settings');
+      toastApiError(error, 'Failed to save settings');
     } finally {
       setSavingSettings(false);
     }
@@ -242,7 +243,7 @@ export default function TikTokShop({ embedded = false } = {}) {
       await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
       toast.success('Shop cookie saved');
     } catch (error) {
-      toast.error(error.message || 'Failed to save shop cookie');
+      toastApiError(error, 'Failed to save shop cookie');
     } finally {
       setSavingCookieShop(false);
     }
@@ -262,7 +263,7 @@ export default function TikTokShop({ embedded = false } = {}) {
       await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
       toast.success('Shop cookie updated');
     } catch (error) {
-      toast.error(error.message || 'Failed to update shop cookie');
+      toastApiError(error, 'Failed to update shop cookie');
     } finally {
       setSavingCookieShop(false);
     }

@@ -23,6 +23,7 @@ import PageContent from '@/components/layout/PageContent';
 import StatCard from '@/components/dashboard/StatCard';
 import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 import { usePermissions } from '@/lib/usePermissions';
 import { useDisplayFormat } from '@/lib/DisplayFormatProvider';
 import { format } from 'date-fns';
@@ -513,7 +514,7 @@ export default function MarketplaceReviews() {
       toast.success(`${result.message}${created ? ` · ${created} complaint(s) auto-created` : ''}`);
       setSyncModalOpen(false);
     } catch (error) {
-      toast.error(error.message || 'Failed to sync reviews');
+      toastApiError(error, 'Failed to sync reviews');
     } finally {
       setSyncing(false);
     }
@@ -536,7 +537,7 @@ export default function MarketplaceReviews() {
       ]);
       toast.success('Reply posted');
     } catch (error) {
-      toast.error(error.message || 'Failed to post reply');
+      toastApiError(error, 'Failed to post reply');
     } finally {
       setReplyingId(null);
     }

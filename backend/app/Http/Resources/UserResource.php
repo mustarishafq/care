@@ -34,6 +34,7 @@ class UserResource extends JsonResource
             'is_admin' => $this->resource->isAdmin(),
             'permissions' => $permissions === '*' ? Permissions::allKeys() : $permissions,
             'default_page' => $this->resource->getDefaultPage(),
+            'complaint_visibility' => $this->resource->getComplaintVisibility(),
         ], $this->resource);
     }
 }

@@ -309,10 +309,8 @@ class ShopeeSellerReviewClient
 
         $json = $response->json();
         if (! is_array($json)) {
-            $snippet = substr($body, 0, 300);
-
             throw new RuntimeException(
-                "Invalid Shopee seller review response (HTTP {$response->status()}): {$snippet}",
+                'We could not reach Shopee Seller Center. Check your shop cookie and try again.',
             );
         }
 
@@ -327,16 +325,19 @@ class ShopeeSellerReviewClient
 
             if ($this->looksLikeAuthFailure($response->status(), $message, $json)) {
                 throw new RuntimeException(
-                    'Shopee Seller Center cookie expired or is invalid. Paste a fresh cookie for this shop and try again. ('.$message.')',
+                    'Shopee Seller Center cookie expired or is invalid. Paste a fresh cookie for this shop and try again.',
                     (int) $code,
                 );
             }
 
-            throw new RuntimeException($message, (int) $code);
+            throw new RuntimeException(
+                'Shopee Seller Center could not complete that request. Please try again.',
+                (int) $code,
+            );
         }
 
         if ($code === null && is_string($json['message'] ?? null) && str_contains(strtolower((string) $json['message']), 'param')) {
-            throw new RuntimeException((string) $json['message']);
+            throw new RuntimeException('Shopee Seller Center rejected the request parameters.');
         }
 
         return $json;

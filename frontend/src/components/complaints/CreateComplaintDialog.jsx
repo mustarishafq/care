@@ -16,6 +16,7 @@ import { useComplaintCreateOptions } from '@/lib/useComplaintCreateOptions';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { getUserFacingError } from '@/lib/userFacingError';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 import { isValidIsoDate } from '@/lib/dateInput';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -147,7 +148,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
             isVideo: file.type.startsWith('video/'),
           });
         } catch (err) {
-          const message = err.message || `Failed to upload "${file.name}"`;
+          const message = getUserFacingError(err, `Failed to upload "${file.name}"`);
           errors.push(message);
           toast.error(message);
         }
@@ -197,7 +198,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
             type: 'vendor_screenshot',
           });
         } catch (err) {
-          const message = err.message || `Failed to upload "${file.name}"`;
+          const message = getUserFacingError(err, `Failed to upload "${file.name}"`);
           errors.push(message);
           toast.error(message);
         }

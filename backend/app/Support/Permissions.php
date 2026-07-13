@@ -17,8 +17,9 @@ class Permissions
             ['key' => 'complaints.assign', 'label' => 'Assign Department/User', 'group' => 'Complaints'],
             ['key' => 'complaints.change_status', 'label' => 'Change Status', 'group' => 'Complaints'],
             ['key' => 'complaints.add_notes', 'label' => 'Add Internal Notes', 'group' => 'Complaints'],
-            ['key' => 'reports.view', 'label' => 'View Reports & Analytics', 'group' => 'Reports'],
+            ['key' => 'reports.view', 'label' => 'View Reports', 'group' => 'Reports'],
             ['key' => 'reports.export', 'label' => 'Export Reports', 'group' => 'Reports'],
+            ['key' => 'analytics.view', 'label' => 'View Analytics', 'group' => 'Analytics'],
             ['key' => 'users.view', 'label' => 'View Users', 'group' => 'Users'],
             ['key' => 'users.invite', 'label' => 'Invite Users', 'group' => 'Users'],
             ['key' => 'users.manage', 'label' => 'Manage Users & Roles', 'group' => 'Users'],
@@ -73,5 +74,46 @@ class Permissions
     public static function defaultPagePaths(): array
     {
         return array_column(self::defaultPages(), 'path');
+    }
+
+    public const COMPLAINT_VISIBILITY_ALL = 'all';
+
+    public const COMPLAINT_VISIBILITY_DEPARTMENT = 'department';
+
+    public const COMPLAINT_VISIBILITY_ASSIGNED = 'assigned';
+
+    /**
+     * How far a role can see complaints.
+     * Assigned agents always retain access to their tickets under department/assigned scopes.
+     *
+     * @return list<array{key: string, label: string, description: string}>
+     */
+    public static function complaintVisibilityOptions(): array
+    {
+        return [
+            [
+                'key' => self::COMPLAINT_VISIBILITY_ALL,
+                'label' => 'All complaints',
+                'description' => 'Can view every complaint in the system.',
+            ],
+            [
+                'key' => self::COMPLAINT_VISIBILITY_DEPARTMENT,
+                'label' => 'Department only',
+                'description' => 'Can view complaints in their department(s), plus any ticket assigned to them.',
+            ],
+            [
+                'key' => self::COMPLAINT_VISIBILITY_ASSIGNED,
+                'label' => 'Assigned only',
+                'description' => 'Can view only complaints assigned to them as an agent.',
+            ],
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function complaintVisibilityKeys(): array
+    {
+        return array_column(self::complaintVisibilityOptions(), 'key');
     }
 }

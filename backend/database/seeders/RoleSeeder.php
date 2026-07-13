@@ -2,13 +2,25 @@
 
 namespace Database\Seeders;
 
+use App\Support\Permissions;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class RoleSeeder extends Seeder
 {
-    /** @return list<array{slug: string, name: string, description: string, permissions: list<string>, is_admin: bool, sort_order: int, default_page: string}> */
+    /**
+     * @return list<array{
+     *   slug: string,
+     *   name: string,
+     *   description: string,
+     *   permissions: list<string>,
+     *   is_admin: bool,
+     *   sort_order: int,
+     *   default_page: string,
+     *   complaint_visibility: string
+     * }>
+     */
     public static function definitions(): array
     {
         return [
@@ -20,6 +32,7 @@ class RoleSeeder extends Seeder
                 'is_admin' => true,
                 'sort_order' => 0,
                 'default_page' => '/dashboard',
+                'complaint_visibility' => Permissions::COMPLAINT_VISIBILITY_ALL,
             ],
             [
                 'slug' => 'admin',
@@ -29,6 +42,7 @@ class RoleSeeder extends Seeder
                 'is_admin' => true,
                 'sort_order' => 1,
                 'default_page' => '/dashboard',
+                'complaint_visibility' => Permissions::COMPLAINT_VISIBILITY_ALL,
             ],
             [
                 'slug' => 'management',
@@ -38,6 +52,7 @@ class RoleSeeder extends Seeder
                 'is_admin' => true,
                 'sort_order' => 2,
                 'default_page' => '/dashboard',
+                'complaint_visibility' => Permissions::COMPLAINT_VISIBILITY_ALL,
             ],
             [
                 'slug' => 'customer_service',
@@ -51,6 +66,7 @@ class RoleSeeder extends Seeder
                 'is_admin' => false,
                 'sort_order' => 3,
                 'default_page' => '/complaints',
+                'complaint_visibility' => Permissions::COMPLAINT_VISIBILITY_DEPARTMENT,
             ],
             [
                 'slug' => 'fulfillment',
@@ -63,6 +79,7 @@ class RoleSeeder extends Seeder
                 'is_admin' => false,
                 'sort_order' => 4,
                 'default_page' => '/kanban',
+                'complaint_visibility' => Permissions::COMPLAINT_VISIBILITY_DEPARTMENT,
             ],
             [
                 'slug' => 'logistics',
@@ -75,15 +92,17 @@ class RoleSeeder extends Seeder
                 'is_admin' => false,
                 'sort_order' => 5,
                 'default_page' => '/kanban',
+                'complaint_visibility' => Permissions::COMPLAINT_VISIBILITY_DEPARTMENT,
             ],
             [
                 'slug' => 'viewer',
                 'name' => 'Viewer',
                 'description' => 'Read-only access to complaints and reports',
-                'permissions' => ['complaints.view', 'reports.view', 'products.view', 'reviews.view'],
+                'permissions' => ['complaints.view', 'reports.view', 'analytics.view', 'products.view', 'reviews.view'],
                 'is_admin' => false,
                 'sort_order' => 6,
                 'default_page' => '/dashboard',
+                'complaint_visibility' => Permissions::COMPLAINT_VISIBILITY_DEPARTMENT,
             ],
         ];
     }
@@ -109,6 +128,10 @@ class RoleSeeder extends Seeder
 
             if (Schema::hasColumn('roles', 'default_page')) {
                 $payload['default_page'] = $definition['default_page'];
+            }
+
+            if (Schema::hasColumn('roles', 'complaint_visibility')) {
+                $payload['complaint_visibility'] = $definition['complaint_visibility'];
             }
 
             DB::table('roles')->updateOrInsert(

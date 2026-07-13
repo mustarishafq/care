@@ -18,6 +18,7 @@ import EditComplaintDialog from '@/components/complaints/EditComplaintDialog';
 import { Link } from 'react-router-dom';
 import { format, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 import { buildStatusOrder, buildStatusChangeUpdates, requiresClosureProof, hasClosureProof, CLOSURE_PROOF_REQUIRED_STATUSES } from '@/lib/ticketUtils';
 import { useComplaintStatuses } from '@/lib/useLookups';
 import { useSlaSettings } from '@/lib/useSlaSettings';
@@ -104,7 +105,7 @@ export default function ComplaintDetail() {
       queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
       invalidateNotificationQueries(queryClient);
     } catch (err) {
-      toast.error(err.message || 'Failed to update ticket');
+      toastApiError(err, 'Failed to update ticket');
     } finally {
       setUpdating(false);
     }

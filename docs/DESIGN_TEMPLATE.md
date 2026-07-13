@@ -1691,6 +1691,8 @@ PersonProfile / ApplicationBrowser: centered `text-sm text-muted-foreground` + `
 
 **File:** `components/ui/sonner.jsx` — mounted as `<Toaster />` in `App.jsx`
 
+**Full copy & error logic:** [TOAST_DESIGN.md](./TOAST_DESIGN.md) — never show HTTP status codes (e.g. 422); use `toastApiError` for API failures.
+
 | Setting | Value |
 |---------|-------|
 | `theme` | From `useTheme()` |
@@ -1716,9 +1718,16 @@ group-[.toaster]:border-border group-[.toaster]:shadow-lg
 
 ```js
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
+
 toast.success('Saved');
-toast.error('Failed');
 toast.info('Not available yet');
+
+try {
+  await save();
+} catch (err) {
+  toastApiError(err, 'Failed to save'); // not toast.error(err.message)
+}
 ```
 
 Push notifications map types via `notificationVisuals.js` → `toast.success|error|warning|info`.

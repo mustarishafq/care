@@ -19,6 +19,7 @@ import {
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 import { format } from 'date-fns';
 import { usePermissions } from '@/lib/usePermissions';
 import { Switch } from '@/components/ui/switch';
@@ -226,7 +227,7 @@ export default function Integrations({ embedded = false } = {}) {
       await refetchWebhook();
       toast.success('Incoming webhook secret regenerated');
     } catch (error) {
-      toast.error(error.message || 'Failed to regenerate secret');
+      toastApiError(error, 'Failed to regenerate secret');
     } finally {
       setRegeneratingIncoming(false);
     }
@@ -239,7 +240,7 @@ export default function Integrations({ embedded = false } = {}) {
       await refetchWebhook();
       toast.success('Outgoing webhooks saved');
     } catch (error) {
-      toast.error(error.message || 'Failed to save outgoing webhooks');
+      toastApiError(error, 'Failed to save outgoing webhooks');
     } finally {
       setSavingOutgoing(false);
     }
@@ -280,7 +281,7 @@ export default function Integrations({ embedded = false } = {}) {
       await refetchWebhook();
       toast.success('Outgoing webhook secret regenerated');
     } catch (error) {
-      toast.error(error.message || 'Failed to regenerate secret');
+      toastApiError(error, 'Failed to regenerate secret');
     } finally {
       setRegeneratingOutgoingId(null);
     }
@@ -299,12 +300,12 @@ export default function Integrations({ embedded = false } = {}) {
       });
       const failed = (result.results ?? []).filter(item => !item.success);
       if (failed.length > 0) {
-        toast.error(result.message || 'Outgoing webhook test failed');
+        toastApiError(result.message, 'Outgoing webhook test failed');
       } else {
         toast.success(result.message || 'Test webhook delivered successfully');
       }
     } catch (error) {
-      toast.error(error.message || 'Outgoing webhook test failed');
+      toastApiError(error, 'Outgoing webhook test failed');
     } finally {
       setTestingOutgoingId(null);
     }

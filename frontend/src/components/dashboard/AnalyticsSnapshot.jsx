@@ -38,7 +38,7 @@ async function fetchAvgRating(params) {
 
 export default function AnalyticsSnapshot({ complaints = [] }) {
   const { hasPermission } = usePermissions();
-  const canViewAnalytics = hasPermission('reports.view');
+  const canViewAnalytics = hasPermission('analytics.view');
   const canViewReviews = hasPermission('reviews.view');
   const { resolvedStatusNames, pausedStatusNames } = useSlaSettings();
 

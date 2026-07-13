@@ -16,6 +16,8 @@ import { Plus, Pencil, Trash2, Shield, Loader2, ShieldCheck } from 'lucide-react
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
+import { COMPLAINT_VISIBILITY_OPTIONS, COMPLAINT_VISIBILITY_DEPARTMENT } from '@/lib/complaintVisibility';
 
 /** Fallback catalog if /roles/meta is unavailable */
 export const ALL_PERMISSIONS = [
@@ -26,8 +28,9 @@ export const ALL_PERMISSIONS = [
   { key: 'complaints.assign', label: 'Assign Department/User', group: 'Complaints' },
   { key: 'complaints.change_status', label: 'Change Status', group: 'Complaints' },
   { key: 'complaints.add_notes', label: 'Add Internal Notes', group: 'Complaints' },
-  { key: 'reports.view', label: 'View Reports & Analytics', group: 'Reports' },
+  { key: 'reports.view', label: 'View Reports', group: 'Reports' },
   { key: 'reports.export', label: 'Export Reports', group: 'Reports' },
+  { key: 'analytics.view', label: 'View Analytics', group: 'Analytics' },
   { key: 'users.view', label: 'View Users', group: 'Users' },
   { key: 'users.invite', label: 'Invite Users', group: 'Users' },
   { key: 'users.manage', label: 'Manage Users & Roles', group: 'Users' },
@@ -48,6 +51,7 @@ const FALLBACK_DEFAULT_PAGES = [
   { path: '/complaints', label: 'Complaints' },
   { path: '/marketplace-reviews', label: 'Reviews' },
   { path: '/kanban', label: 'Kanban' },
+  { path: '/analytics', label: 'Analytics' },
   { path: '/reports', label: 'Reports' },
   { path: '/notifications', label: 'Notifications' },
   { path: '/products', label: 'Products' },
@@ -63,6 +67,7 @@ const emptyRole = {
   description: '',
   permissions: [],
   default_page: '/dashboard',
+  complaint_visibility: COMPLAINT_VISIBILITY_DEPARTMENT,
   is_active: true,
 };
 
@@ -88,12 +93,16 @@ export default function RolesPermissions() {
 
   const permissionsCatalog = meta?.permissions?.length ? meta.permissions : ALL_PERMISSIONS;
   const defaultPages = meta?.default_pages?.length ? meta.default_pages : FALLBACK_DEFAULT_PAGES;
+  const visibilityOptions = meta?.complaint_visibility_options?.length
+    ? meta.complaint_visibility_options
+    : COMPLAINT_VISIBILITY_OPTIONS;
   const groups = useMemo(
     () => [...new Set(permissionsCatalog.map((p) => p.group))],
     [permissionsCatalog],
   );
 
   const pageLabel = (path) => defaultPages.find((p) => p.path === path)?.label || path;
+  const visibilityLabel = (key) => visibilityOptions.find((o) => o.key === key)?.label || key;
 
   const openCreate = () => {
     setEditingRole(null);
@@ -111,6 +120,7 @@ export default function RolesPermissions() {
       description: role.description || '',
       permissions: role.permissions || [],
       default_page: defaultPage,
+      complaint_visibility: role.complaint_visibility || COMPLAINT_VISIBILITY_DEPARTMENT,
       is_active: role.is_active !== false,
     });
     setDialogOpen(true);
@@ -153,7 +163,7 @@ export default function RolesPermissions() {
       queryClient.invalidateQueries({ queryKey: ['roles'] });
       setDialogOpen(false);
     } catch (err) {
-      toast.error(err.message || 'Failed to save role');
+      toastApiError(err, 'Failed to save role');
     } finally {
       setSaving(false);
     }
@@ -218,6 +228,9 @@ export default function RolesPermissions() {
                 {role.description && <p className="text-xs text-muted-foreground mt-1">{role.description}</p>}
                 <p className="text-[11px] text-muted-foreground mt-2">
                   Default page: {pageLabel(role.default_page || '/dashboard')}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Complaints: {visibilityLabel(role.complaint_visibility || COMPLAINT_VISIBILITY_DEPARTMENT)}
                 </p>
               </CardHeader>
               <CardContent>
@@ -297,6 +310,29 @@ export default function RolesPermissions() {
               </Select>
               <p className="text-[11px] text-muted-foreground">
                 Users with this role land here after login (unless a redirect URL is provided).
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs">Complaint visibility</Label>
+              <Select
+                value={form.complaint_visibility || COMPLAINT_VISIBILITY_DEPARTMENT}
+                onValueChange={(v) => setForm((p) => ({ ...p, complaint_visibility: v }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select visibility" />
+                </SelectTrigger>
+                <SelectContent>
+                  {visibilityOptions.map((option) => (
+                    <SelectItem key={option.key} value={option.key}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {visibilityOptions.find((o) => o.key === form.complaint_visibility)?.description
+                  || 'Assigned agents can always view tickets assigned to them.'}
               </p>
             </div>
 

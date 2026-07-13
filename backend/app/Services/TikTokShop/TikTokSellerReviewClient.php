@@ -307,10 +307,8 @@ class TikTokSellerReviewClient
         $json = $response->json();
 
         if (! is_array($json)) {
-            $snippet = substr($response->body(), 0, 300);
-
             throw new RuntimeException(
-                "Invalid TikTok seller review response (HTTP {$response->status()}): {$snippet}",
+                'We could not reach TikTok Seller Center. Check your shop cookie and try again.',
             );
         }
 
@@ -320,12 +318,15 @@ class TikTokSellerReviewClient
 
             if ($this->looksLikeAuthFailure($response->status(), $message, $json)) {
                 throw new RuntimeException(
-                    'TikTok Seller Center cookie expired or is invalid. Paste a fresh cookie for this shop and try again. ('.$message.')',
+                    'TikTok Seller Center cookie expired or is invalid. Paste a fresh cookie for this shop and try again.',
                     (int) $code,
                 );
             }
 
-            throw new RuntimeException($message, (int) $code);
+            throw new RuntimeException(
+                'TikTok Seller Center could not complete that request. Please try again.',
+                (int) $code,
+            );
         }
 
         return $json;

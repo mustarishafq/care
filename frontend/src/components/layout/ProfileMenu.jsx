@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { LogOut, User, Loader2, Eye, EyeOff, KeyRound } from 'lucide-react';
 
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 
 export default function ProfileMenu({ user }) {
   const { logout } = useAuth();
@@ -68,8 +69,10 @@ export default function ProfileMenu({ user }) {
       setProfileOpen(false);
       window.location.reload();
     } catch (err) {
-      const msg = err.data?.errors?.current_password?.[0] || err.message || 'Failed to update profile';
-      toast.error(msg);
+      toastApiError(
+        err.data?.errors?.current_password?.[0] || err,
+        'Failed to update profile',
+      );
     } finally {
       setSaving(false);
     }

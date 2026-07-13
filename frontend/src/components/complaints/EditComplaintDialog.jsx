@@ -14,6 +14,8 @@ import { useComplaintCreateOptions } from '@/lib/useComplaintCreateOptions';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { getUserFacingError } from '@/lib/userFacingError';
+import { toastApiError } from '@/lib/toastApi';
 import { isValidIsoDate } from '@/lib/dateInput';
 import { DatePicker } from '@/components/ui/date-picker';
 import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
@@ -192,7 +194,7 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
             isVideo: file.type.startsWith('video/'),
           });
         } catch (err) {
-          const message = err.message || `Failed to upload "${file.name}"`;
+          const message = getUserFacingError(err, `Failed to upload "${file.name}"`);
           errors.push(message);
           toast.error(message);
         }
@@ -273,7 +275,7 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
-      toast.error(err.message || 'Failed to update complaint');
+      toastApiError(err, 'Failed to update complaint');
     } finally {
       setSaving(false);
     }

@@ -11,6 +11,7 @@ import AuthLayout from '@/components/layout/AuthLayout';
 import NexusBrainLoginButton from '@/components/auth/NexusBrainLoginButton';
 import { Loader2, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { toastApiError } from '@/lib/toastApi';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -40,7 +41,7 @@ export default function Login() {
       toast.success('Logged in successfully');
       navigate(resolvePostLoginPath(loginReturn, user?.default_page));
     } catch (err) {
-      toast.error(err.message || 'Login failed');
+      toastApiError(err, 'Login failed');
     } finally {
       setLoading(false);
     }
