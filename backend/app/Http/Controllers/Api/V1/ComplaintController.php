@@ -38,7 +38,10 @@ class ComplaintController extends Controller
 
     public function createFormOptions(Request $request): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'complaints.create');
+        $user = $request->user();
+        if (! $user->hasPermission('complaints.create') && ! $user->hasPermission('complaints.edit')) {
+            $this->ensurePermission($user, 'complaints.create');
+        }
 
         return response()->json([
             'pre_resolved' => $this->preResolvedComplaints->getPublicSettings(),

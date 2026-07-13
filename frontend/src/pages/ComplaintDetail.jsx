@@ -12,8 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, User, Package, Truck, Clock, Loader2, UserCheck, CornerUpLeft, X } from 'lucide-react';
+import { ArrowLeft, User, Package, Truck, Clock, Loader2, UserCheck, CornerUpLeft, X, Pencil } from 'lucide-react';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
+import EditComplaintDialog from '@/components/complaints/EditComplaintDialog';
 import { Link } from 'react-router-dom';
 import { format, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
@@ -49,6 +50,7 @@ export default function ComplaintDetail() {
   const queryClient = useQueryClient();
   const [updating, setUpdating] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: complaint, isLoading } = useQuery({
     queryKey: ['complaint', complaintId],
@@ -250,7 +252,15 @@ export default function ComplaintDetail() {
           {/* Complaint Info */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2"><User className="w-4 h-4" />Customer & Order Info</CardTitle>
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle className="text-base flex items-center gap-2"><User className="w-4 h-4" />Customer & Order Info</CardTitle>
+                {canEdit && (
+                  <Button size="sm" variant="outline" className="h-8 text-xs shrink-0" onClick={() => setEditOpen(true)}>
+                    <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                    Edit
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -414,6 +424,18 @@ export default function ComplaintDetail() {
                 queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
                 const target = updatedComplaint ?? complaint;
                 offerWhatsappShareToast(target, { event: 'assigned' });
+              }}
+            />
+          )}
+
+          {editOpen && canEdit && (
+            <EditComplaintDialog
+              complaint={complaint}
+              open={editOpen}
+              onOpenChange={setEditOpen}
+              onSaved={() => {
+                queryClient.invalidateQueries({ queryKey: ['complaint', complaintId] });
+                queryClient.invalidateQueries({ queryKey: ['activities', complaintId] });
               }}
             />
           )}
