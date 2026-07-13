@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -26,6 +25,7 @@ import StatCard from '@/components/dashboard/StatCard';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
 import { usePermissions } from '@/lib/usePermissions';
+import { cn } from '@/lib/utils';
 
 const EMPTY_FILTERS = { search: '', status: '' };
 const emptyProduct = { name: '', sku: '', description: '', is_active: true };
@@ -135,10 +135,10 @@ export default function Products() {
   const handleToggleActive = async (product) => {
     setActionProductId(product.id);
     try {
-      const active = product.is_active === false;
-      await db.entities.Product.update(product.id, { is_active: !active });
+      const nextActive = product.is_active === false;
+      await db.entities.Product.update(product.id, { is_active: nextActive });
       invalidateProducts();
-      toast.success(`${product.name} ${active ? 'activated' : 'deactivated'}`);
+      toast.success(`${product.name} ${nextActive ? 'activated' : 'deactivated'}`);
     } catch (err) {
       toast.error(err.message || 'Failed to update status');
     } finally {
@@ -153,8 +153,6 @@ export default function Products() {
       </div>
     );
   }
-
-  const colSpan = canManage ? 4 : 3;
 
   return (
     <div className="space-y-6">
@@ -207,115 +205,117 @@ export default function Products() {
         </div>
       </div>
 
-      <Card className="rounded-2xl">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold text-xs uppercase tracking-wider">Product</TableHead>
-                <TableHead className="font-semibold text-xs uppercase tracking-wider">SKU</TableHead>
-                <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
-                {canManage && <TableHead className="font-semibold text-xs uppercase tracking-wider w-28">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map(p => {
-                const isActive = p.is_active !== false;
-                const isBusy = actionProductId === p.id;
-                return (
-                  <TableRow key={p.id} className={!isActive ? 'opacity-70' : undefined}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-                          <span className="text-[10px] font-bold text-primary">{productInitials(p.name)}</span>
-                        </div>
+      {filtered.length === 0 ? (
+        <Card className="rounded-2xl">
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="font-medium">
+              {hasActiveFilters ? 'No products match your filters' : 'No products yet'}
+            </p>
+            <p className="text-sm mt-1">
+              {hasActiveFilters
+                ? 'Try adjusting your search or filters.'
+                : canManage
+                  ? 'Add your first product to get started.'
+                  : 'Products will appear here once added.'}
+            </p>
+            {canManage && !hasActiveFilters && (
+              <Button onClick={openCreate} variant="outline" size="sm" className="mt-4 gap-2">
+                <Plus className="w-4 h-4" />Add Product
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map(p => {
+            const isActive = p.is_active !== false;
+            const isBusy = actionProductId === p.id;
+            return (
+              <Card
+                key={p.id}
+                className={cn(
+                  'rounded-2xl transition-opacity',
+                  !isActive && 'opacity-70',
+                )}
+              >
+                <CardContent className="p-4 flex flex-col gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-bold text-primary">{productInitials(p.name)}</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="font-medium text-sm">{p.name}</p>
-                          {p.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-[280px]">{p.description}</p>
+                          <p className="font-medium text-sm leading-snug truncate">{p.name}</p>
+                          {p.description ? (
+                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{p.description}</p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground/60 mt-0.5 italic">No description</p>
                           )}
                         </div>
+                        {canManage && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0 -mt-1 -mr-1" disabled={isBusy}>
+                                {isBusy
+                                  ? <Loader2 className="w-4 h-4 animate-spin" />
+                                  : <MoreHorizontal className="w-4 h-4" />
+                                }
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => openEdit(p)}>
+                                <Pencil className="w-4 h-4 mr-2" />Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => handleDelete(p)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {p.sku
-                        ? <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{p.sku}</code>
-                        : <span className="text-muted-foreground text-sm">—</span>
-                      }
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        {canManage ? (
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 pt-1 border-t border-border/60">
+                    <div className="min-w-0">
+                      {p.sku ? (
+                        <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">{p.sku}</code>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">No SKU</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {canManage ? (
+                        <>
+                          <span className="text-xs text-muted-foreground">{isActive ? 'Active' : 'Inactive'}</span>
                           <Switch
                             checked={isActive}
                             onCheckedChange={() => handleToggleActive(p)}
                             disabled={isBusy}
                           />
-                        ) : (
-                          <Badge className={`text-xs border-0 w-fit ${isActive
-                            ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                            : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                          }`}>
-                            {isActive ? 'Active' : 'Inactive'}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    {canManage && (
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button size="icon" variant="ghost" className="h-8 w-8" disabled={isBusy}>
-                              {isBusy
-                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <MoreHorizontal className="w-4 h-4" />
-                              }
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openEdit(p)}>
-                              <Pencil className="w-4 h-4 mr-2" />Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => handleDelete(p)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })}
-              {filtered.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={colSpan} className="text-center py-12 text-muted-foreground">
-                    <Package className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                    <p className="font-medium">
-                      {hasActiveFilters ? 'No products match your filters' : 'No products yet'}
-                    </p>
-                    <p className="text-sm mt-1">
-                      {hasActiveFilters
-                        ? 'Try adjusting your search or filters.'
-                        : canManage
-                          ? 'Add your first product to get started.'
-                          : 'Products will appear here once added.'}
-                    </p>
-                    {canManage && !hasActiveFilters && (
-                      <Button onClick={openCreate} variant="outline" size="sm" className="mt-4 gap-2">
-                        <Plus className="w-4 h-4" />Add Product
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                        </>
+                      ) : (
+                        <Badge className={`text-xs border-0 w-fit ${isActive
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                          : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                        }`}>
+                          {isActive ? 'Active' : 'Inactive'}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
       </PageContent>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

@@ -12,7 +12,7 @@
 | **Satellite apps** (Linkly, Booking, …) | Same tokens, shadcn/ui, auth template, overlays, forms, loading/error states, mobile dock **visual spec**. Define your own routes in `navItems.js`; omit hub-only features (e.g. People grid) if not in scope. |
 | **New systems** | Copy the reference stack (§2), implement §28 pre-ship checklist before production. |
 
-Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) (dock detail), [DISPLAY_FORMAT_REQUIREMENTS.md](./DISPLAY_FORMAT_REQUIREMENTS.md) (number / money / date formats), [nexus-sso-setup.md](./nexus-sso-setup.md), [event-webhook-setup.md](./event-webhook-setup.md), [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md).
+Related portable specs: [docs/README.md](./README.md) (index), [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) (dock detail), [DISPLAY_FORMAT_REQUIREMENTS.md](./DISPLAY_FORMAT_REQUIREMENTS.md) (number / money / date formats), [GRAPH_DESIGN.md](./GRAPH_DESIGN.md) (charts / Recharts), [nexus-sso-setup.md](./nexus-sso-setup.md), [event-webhook-setup.md](./event-webhook-setup.md), [emzi-nexus-mcp-catalog-spec.md](./emzi-nexus-mcp-catalog-spec.md).
 
 ---
 
@@ -175,40 +175,11 @@ Tailwind: `bg-sidebar`, `text-sidebar-foreground`, etc.
 
 ### 3.5 Chart tokens
 
+**Full contract:** [GRAPH_DESIGN.md](./GRAPH_DESIGN.md) — required on every satellite app that ships charts.
+
 `--chart-1` through `--chart-5` — mapped to `chart.1` … `chart.5` in Tailwind. Use for Recharts / chart components.
 
-#### Recharts hover tooltips (required)
-
-Default Recharts tooltips use a hard-coded white panel. In dark mode the label inherits light chart text and becomes unreadable. **Never** leave `<Tooltip />` unstyled.
-
-Use the shared helper:
-
-**File:** `frontend/src/lib/chartTooltip.js`
-
-```jsx
-import { chartTooltipProps } from '@/lib/chartTooltip';
-
-<Tooltip {...chartTooltipProps} />
-<Tooltip {...chartTooltipProps} formatter={(v) => [v, 'Cases']} />
-```
-
-| Prop | Token / value | Purpose |
-|------|---------------|---------|
-| `contentStyle.backgroundColor` | `hsl(var(--popover))` | Panel surface (light + dark) |
-| `contentStyle.color` | `hsl(var(--popover-foreground))` | Default text |
-| `contentStyle.border` | `1px solid hsl(var(--border))` | Theme border |
-| `labelStyle.color` | `hsl(var(--foreground))` | Category / axis label (e.g. agent name) |
-| `cursor.fill` | `hsl(var(--muted) / 0.55)` | Hover band behind bars |
-
-**Also theme chart chrome** with the same tokens:
-
-- Grid: `stroke="hsl(var(--border))"`
-- Axis ticks: `tick={{ fill: 'hsl(var(--muted-foreground))' }}`
-- Prefer `ChartTooltip` / `ChartTooltipContent` from `@/components/ui/chart` when using `ChartContainer` (already token-based: `bg-background`, `border-border`, `text-foreground`)
-
-**Do not:** hard-code `bg-white`, `hsl(220, 13%, 91%)`, or light-only borders on tooltip `contentStyle`.
-
-When using shadcn `ChartContainer`, prefer `ChartTooltip` + `ChartTooltipContent` instead of raw Recharts `Tooltip` styles.
+**Tooltips (required):** every raw Recharts `<Tooltip />` must spread `chartTooltipProps` from `frontend/src/lib/chartTooltip.js`. Default white tooltips fail contrast in dark mode. Theme grid/axes with `--border` / `--muted-foreground`; prefer shadcn `ChartTooltip` when using `ChartContainer`.
 
 ### 3.6 Brand panel (auth pages only)
 
@@ -1855,7 +1826,7 @@ See §16.1 for full spring spec.
 - Auth warning/success banners: always include `dark:` variants
 - Glass panels: separate dark shadows (§7.0)
 - Mobile auth card uses `bg-card` ( adapts to theme), not hardcoded white
-- **Charts:** Recharts hover tooltips must use `chartTooltipProps` (§3.5) — default white tooltips fail contrast in dark mode (label text becomes invisible). Verify every new chart in both themes.
+- **Charts:** Recharts hover tooltips must use `chartTooltipProps` ([GRAPH_DESIGN.md](./GRAPH_DESIGN.md), §3.5) — default white tooltips fail contrast in dark mode (label text becomes invisible). Verify every new chart in both themes.
 
 ---
 
@@ -2213,7 +2184,7 @@ Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back a
 - [ ] Forms: Label above Input; focus rings present
 - [ ] Avatars: square `rounded-lg` in chrome, correct fallback colors
 - [ ] Icons: Lucide only, sizes per §27
-- [ ] Recharts `<Tooltip />` uses `chartTooltipProps` from `@/lib/chartTooltip` (§3.5) — verified in light + dark
+- [ ] Recharts `<Tooltip />` uses `chartTooltipProps` from `@/lib/chartTooltip` ([GRAPH_DESIGN.md](./GRAPH_DESIGN.md), §3.5) — verified in light + dark
 
 ### Navigation
 - [ ] New routes added to `navItems.js` if needed

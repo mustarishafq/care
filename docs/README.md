@@ -16,11 +16,12 @@ Follow this order. Check off each item before production.
 [ ] 1. INITIAL_SETUP.md — Phases 1, 3, 4, 7 (backend, UI, auth, deploy)
 [ ] 2. DESIGN_TEMPLATE.md — full UI spec; pass §28 pre-ship checklist
 [ ] 3. DISPLAY_FORMAT_REQUIREMENTS.md — number / money / date formats in Settings → General
-[ ] 4. MOBILE_BOTTOM_NAV_DESIGN.md — glass dock (define your own navItems.js routes)
-[ ] 5. REACT_SPA_APACHE_HTACCESS.md — production SPA routing + split domains
-[ ] 6. (Optional) nexus-sso-setup.md — Brain tile / “Continue with Nexus” login
-[ ] 7. (Optional) event-webhook-setup.md — push events to Brain
-[ ] 8. (Optional) emzi-nexus-mcp-catalog-spec.md — Brain Connected Systems / AI tools
+[ ] 4. GRAPH_DESIGN.md — charts / Recharts tokens + theme-safe tooltips (if the app has graphs)
+[ ] 5. MOBILE_BOTTOM_NAV_DESIGN.md — glass dock (define your own navItems.js routes)
+[ ] 6. REACT_SPA_APACHE_HTACCESS.md — production SPA routing + split domains
+[ ] 7. (Optional) nexus-sso-setup.md — Brain tile / “Continue with Nexus” login
+[ ] 8. (Optional) event-webhook-setup.md — push events to Brain
+[ ] 9. (Optional) emzi-nexus-mcp-catalog-spec.md — Brain Connected Systems / AI tools
 ```
 
 Skip sections in **INITIAL_SETUP** marked **Linkly example** when starting greenfield (not migrating from Base44).
@@ -37,6 +38,7 @@ Skip sections in **INITIAL_SETUP** marked **Linkly example** when starting green
 | [INITIAL_SETUP.md](./INITIAL_SETUP.md) | Monorepo layout, Laravel + React setup, migration phases, database rules (integer PKs), post-install admin |
 | [DESIGN_TEMPLATE.md](./DESIGN_TEMPLATE.md) | **Single source of truth** for UI: tokens, shadcn/ui, layout, auth pages, overlays, forms, confirms, back navigation, dark mode |
 | [DISPLAY_FORMAT_REQUIREMENTS.md](./DISPLAY_FORMAT_REQUIREMENTS.md) | Workspace number (`1,000`), money (`1,000.00`), and date formats via Settings → General |
+| [GRAPH_DESIGN.md](./GRAPH_DESIGN.md) | Chart tokens, Recharts tooltips, grid/axis chrome (light + dark) |
 | [MOBILE_BOTTOM_NAV_DESIGN.md](./MOBILE_BOTTOM_NAV_DESIGN.md) | Glass dock: sizing, glass tokens, mobile orb, safe area, active indicator (routes are per-app) |
 | [REACT_SPA_APACHE_HTACCESS.md](./REACT_SPA_APACHE_HTACCESS.md) | Apache `.htaccess` for React Router; split SPA/API domains; CORS on `/storage/*` |
 
@@ -64,6 +66,7 @@ These requirements are identical across every EMZI app:
 |------|------|------|
 | UI look & feel | Semantic tokens, shadcn/ui New York, Lucide icons, Sonner toasts | DESIGN_TEMPLATE |
 | Display formats | Numbers `1,000`, money `1,000.00`, configurable date/datetime via Settings → General | DISPLAY_FORMAT_REQUIREMENTS |
+| Charts / graphs | `--chart-*` tokens; Recharts tooltips via `chartTooltipProps` | GRAPH_DESIGN |
 | Mobile nav chrome | Glass dock visual spec; own route map | MOBILE_BOTTOM_NAV_DESIGN |
 | Back buttons | History `-1` first, then parent route fallback | DESIGN_TEMPLATE §7.5 |
 | User decisions | Confirm dialog before persist / mode switch / delete | DESIGN_TEMPLATE §11.3 |
@@ -110,4 +113,4 @@ When shared patterns change in the canonical frontend or integration APIs:
 2. Update **INITIAL_SETUP** checklists if setup steps change.
 3. Keep **Linkly example** sections in sync with this repo’s code.
 
-All seven spec files plus this index should stay aligned so new systems inherit the same requirements.
+All portable spec files plus this index should stay aligned so new systems inherit the same requirements.

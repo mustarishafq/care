@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import VolumeTrendChart from '@/components/analytics/VolumeTrendChart';
 import { usePermissions } from '@/lib/usePermissions';
 import { useSlaSettings } from '@/lib/useSlaSettings';
+import { useDisplayFormat } from '@/lib/DisplayFormatProvider';
 import { db } from '@/api/db';
 import {
   filterByCreatedRange,
@@ -185,6 +186,7 @@ export default function AnalyticsSnapshot({ complaints = [] }) {
 }
 
 function MetricTile({ icon: Icon, label, value, tone = 'primary' }) {
+  const { formatNumber } = useDisplayFormat();
   const tones = {
     primary: 'bg-primary/10 text-primary',
     success: 'bg-success/10 text-success',
@@ -192,6 +194,7 @@ function MetricTile({ icon: Icon, label, value, tone = 'primary' }) {
     danger: 'bg-destructive/10 text-destructive',
     purple: 'bg-chart-3/10 text-chart-3',
   };
+  const displayValue = typeof value === 'number' ? formatNumber(value) : value;
 
   return (
     <div className="rounded-2xl border bg-card p-4 flex items-start justify-between gap-2">
@@ -199,7 +202,7 @@ function MetricTile({ icon: Icon, label, value, tone = 'primary' }) {
         <p className="text-[10px] sm:text-xs font-medium text-muted-foreground uppercase tracking-wider">
           {label}
         </p>
-        <p className="text-2xl font-bold mt-1 tracking-tight tabular-nums">{value}</p>
+        <p className="text-2xl font-bold mt-1 tracking-tight tabular-nums">{displayValue}</p>
       </div>
       <div className={`p-2 rounded-lg shrink-0 ${tones[tone] || tones.primary}`}>
         <Icon className="w-4 h-4" />
@@ -209,10 +212,13 @@ function MetricTile({ icon: Icon, label, value, tone = 'primary' }) {
 }
 
 function Row({ label, value, danger = false }) {
+  const { formatNumber } = useDisplayFormat();
+  const displayValue = typeof value === 'number' ? formatNumber(value) : value;
+
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-muted-foreground">{label}</span>
-      <span className={`font-semibold tabular-nums ${danger ? 'text-destructive' : ''}`}>{value}</span>
+      <span className={`font-semibold tabular-nums ${danger ? 'text-destructive' : ''}`}>{displayValue}</span>
     </div>
   );
 }

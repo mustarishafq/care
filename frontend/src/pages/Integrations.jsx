@@ -150,10 +150,11 @@ function createOutgoingWebhook() {
   };
 }
 
-export default function Integrations() {
+export default function Integrations({ embedded = false } = {}) {
   const queryClient = useQueryClient();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const canManage = hasPermission('oms.manage');
+  const canView = hasPermission('oms.view');
   const [copied, setCopied] = useState(null);
   const [showIncomingSecret, setShowIncomingSecret] = useState(false);
   const [visibleSecrets, setVisibleSecrets] = useState({});
@@ -169,9 +170,12 @@ export default function Integrations() {
   const [outgoingWebhooks, setOutgoingWebhooks] = useState([]);
   const [activeTab, setActiveTab] = useState('incoming');
 
+  const webhooksEnabled = (!embedded || canView) && !permissionsLoading;
+
   const { data: webhookSettings, isLoading: loadingWebhook, refetch: refetchWebhook } = useQuery({
     queryKey: ['webhook-settings'],
     queryFn: () => db.integrations.Webhook.getSettings(),
+    enabled: webhooksEnabled,
   });
 
   React.useEffect(() => {
@@ -198,6 +202,7 @@ export default function Integrations() {
   const { data: recentActivity = [], isLoading: loadingActivity, refetch } = useQuery({
     queryKey: ['webhook-activity'],
     queryFn: () => db.entities.TicketActivity.list('-created_date', 50),
+    enabled: webhooksEnabled,
   });
 
   const webhookActivity = recentActivity.filter(a =>
@@ -353,15 +358,25 @@ export default function Integrations() {
     python: pythonExample,
   };
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        icon={Webhook}
-        title="Integrations"
-        description="Connect fulfillment systems and external apps using incoming and outgoing webhooks"
-      />
+  if (embedded && !canView) {
+    if (permissionsLoading) {
+      return (
+        <div className="flex items-center justify-center py-12 text-muted-foreground">
+          <Loader2 className="w-5 h-5 animate-spin" />
+        </div>
+      );
+    }
+    return (
+      <Card className="rounded-2xl border border-border shadow-sm">
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+          You need the Integrations permission to view webhook settings.
+        </CardContent>
+      </Card>
+    );
+  }
 
-      <PageContent>
+  const body = (
+    <>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
           label="Incoming"
@@ -723,58 +738,82 @@ export default function Integrations() {
           </Card>
         </TabsContent>
       </Tabs>
-      </PageContent>
+    </>
+  );
 
-      <Dialog open={manualUpdateOpen} onOpenChange={setManualUpdateOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Push Status Update</DialogTitle>
-            <p className="text-xs text-muted-foreground">This simulates what your fulfillment system would send via API</p>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1.5">
-              <Label className="text-xs">Order Number *</Label>
-              <Input
-                value={manualForm.order_number}
-                onChange={e => setManualForm(p => ({ ...p, order_number: e.target.value }))}
-                placeholder="ORD-2024-001"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">New Status *</Label>
-              <Select value={manualForm.status} onValueChange={v => setManualForm(p => ({ ...p, status: v }))}>
-                <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
-                <SelectContent>
-                  {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Tracking Number (optional)</Label>
-              <Input
-                value={manualForm.tracking_number}
-                onChange={e => setManualForm(p => ({ ...p, tracking_number: e.target.value }))}
-                placeholder="JNE123456789"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="text-xs">Notes (optional)</Label>
-              <Input
-                value={manualForm.notes}
-                onChange={e => setManualForm(p => ({ ...p, notes: e.target.value }))}
-                placeholder="e.g. Package dispatched from warehouse"
-              />
-            </div>
+  const manualUpdateDialog = (
+    <Dialog open={manualUpdateOpen} onOpenChange={setManualUpdateOpen}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Push Status Update</DialogTitle>
+          <p className="text-xs text-muted-foreground">This simulates what your fulfillment system would send via API</p>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Order Number *</Label>
+            <Input
+              value={manualForm.order_number}
+              onChange={e => setManualForm(p => ({ ...p, order_number: e.target.value }))}
+              placeholder="ORD-2024-001"
+            />
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setManualUpdateOpen(false)}>Cancel</Button>
-            <Button onClick={handleManualUpdate} disabled={updating}>
-              {updating ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-              Push Update
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          <div className="space-y-1.5">
+            <Label className="text-xs">New Status *</Label>
+            <Select value={manualForm.status} onValueChange={v => setManualForm(p => ({ ...p, status: v }))}>
+              <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+              <SelectContent>
+                {STATUSES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Tracking Number (optional)</Label>
+            <Input
+              value={manualForm.tracking_number}
+              onChange={e => setManualForm(p => ({ ...p, tracking_number: e.target.value }))}
+              placeholder="JNE123456789"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Notes (optional)</Label>
+            <Input
+              value={manualForm.notes}
+              onChange={e => setManualForm(p => ({ ...p, notes: e.target.value }))}
+              placeholder="e.g. Package dispatched from warehouse"
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setManualUpdateOpen(false)}>Cancel</Button>
+          <Button onClick={handleManualUpdate} disabled={updating}>
+            {updating ? <RefreshCw className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+            Push Update
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  if (embedded) {
+    return (
+      <div className="space-y-6">
+        {body}
+        {manualUpdateDialog}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icon={Webhook}
+        title="Integrations"
+        description="Connect fulfillment systems and external apps using incoming and outgoing webhooks"
+      />
+      <PageContent>
+        {body}
+      </PageContent>
+      {manualUpdateDialog}
     </div>
   );
 }

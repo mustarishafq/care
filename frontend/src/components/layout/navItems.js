@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, FileText, Columns3, BarChart3, LineChart,
-  Bell, Package, Users, ShieldCheck, Webhook, Settings, Plus, ShoppingBag, Star, Grip,
+  Bell, Package, Users, ShieldCheck, Settings, Plus, ShoppingBag, Star, Grip,
 } from 'lucide-react';
 
 /** All navigation items for EMZI Nexus Care */
@@ -15,7 +15,6 @@ export const careNavItems = [
   { label: 'Products', icon: Package, path: '/products', permission: 'products.view' },
   { label: 'Users', icon: Users, path: '/users', permission: 'users.view', admin: true },
   { label: 'Roles', icon: ShieldCheck, path: '/roles', permission: 'users.manage', admin: true },
-  { label: 'Integrations', icon: Webhook, path: '/integrations', permission: 'oms.view' },
   { label: 'Marketplace', icon: ShoppingBag, path: '/marketplace', permission: 'marketplace.view' },
   { label: 'Settings', icon: Settings, path: '/settings', permission: 'settings.view' },
 ];
@@ -41,7 +40,7 @@ const centerOrbFallbacks = [
   careNavItems[4], // Analytics
 ];
 
-/** Bottom dock on desktop/tablet — workflow first, then integrations, Settings, admin last */
+/** Bottom dock on desktop/tablet — workflow first, then Marketplace, Settings, admin last */
 export const desktopBottomNavItems = [
   careNavItems[0],  // Dashboard
   careNavItems[1],  // Complaints
@@ -50,9 +49,8 @@ export const desktopBottomNavItems = [
   careNavItems[4],  // Analytics
   careNavItems[5],  // Reports
   careNavItems[7],  // Products
-  careNavItems[10], // Integrations
-  careNavItems[11], // Marketplace
-  careNavItems[12], // Settings
+  careNavItems[10], // Marketplace
+  careNavItems[11], // Settings
   careNavItems[8],  // Users
   careNavItems[9],  // Roles
 ];

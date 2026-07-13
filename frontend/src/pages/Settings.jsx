@@ -1,7 +1,7 @@
 import { db } from '@/api/db';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -28,6 +28,7 @@ import { useComplaintTypes, useCouriers, usePriorities, useUnitsOfMeasurement, u
 import StatCard from '@/components/dashboard/StatCard';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
+import Integrations from '@/pages/Integrations';
 import LookupEditDialog from '@/components/settings/LookupEditDialog';
 import SettingsConfigCard from '@/components/settings/SettingsConfigCard';
 import SettingsLookupCard from '@/components/settings/SettingsLookupCard';
@@ -65,11 +66,18 @@ import {
   normalizeDisplayFormat,
 } from '@/lib/displayFormat';
 
+const SETTINGS_TABS = new Set(['general', 'lookups', 'automation', 'integrations', 'notifications']);
+
 export default function Settings() {
   const queryClient = useQueryClient();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('settings.manage');
-  const [activeTab, setActiveTab] = useState('general');
+  const tabFromUrl = searchParams.get('tab');
+  const activeTab = SETTINGS_TABS.has(tabFromUrl) ? tabFromUrl : 'general';
+  const setActiveTab = (tab) => {
+    setSearchParams(tab === 'general' ? {} : { tab }, { replace: true });
+  };
   const [saving, setSaving] = useState(false);
   const [slaOpen, setSlaOpen] = useState(false);
   const [slaForm, setSlaForm] = useState(SLA_DEFAULT);
@@ -468,25 +476,25 @@ export default function Settings() {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="rounded-2xl border border-border bg-muted/30 p-1 overflow-x-auto">
-          <TabsList className="h-10 w-full min-w-max justify-start bg-transparent gap-1">
-            <TabsTrigger value="general" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+        <div className="w-fit max-w-full rounded-2xl border border-border bg-muted/30 p-1 overflow-x-auto">
+          <TabsList className="h-10 w-auto justify-start bg-transparent gap-1">
+            <TabsTrigger value="general" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Sun className="w-4 h-4" />
               General
             </TabsTrigger>
-            <TabsTrigger value="lookups" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="lookups" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Database className="w-4 h-4" />
               Lookup Data
             </TabsTrigger>
-            <TabsTrigger value="automation" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="automation" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <GitBranch className="w-4 h-4" />
               Automation
             </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="integrations" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Webhook className="w-4 h-4" />
               Integrations
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2 flex-1 sm:flex-none data-[state=active]:bg-background data-[state=active]:shadow-sm">
+            <TabsTrigger value="notifications" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Bell className="w-4 h-4" />
               Notifications
             </TabsTrigger>
@@ -833,7 +841,7 @@ export default function Settings() {
             title="Integrations"
             description="Authentication and connections to external systems."
           />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="max-w-xl">
             <SettingsConfigCard
               title="Nexus SSO"
               description="Single sign-on from Nexus using signed JWT tokens"
@@ -847,22 +855,15 @@ export default function Settings() {
                 { label: 'Endpoint', value: `${window.location.origin}/sso/nexus` },
               ]}
             />
-
-            <SettingsConfigCard
-              title="Webhooks"
-              description="Incoming tracking updates and outgoing event notifications"
-              icon={Webhook}
-              canManage={canManage}
-              rows={[
-                { label: 'Configuration', value: 'Integrations page' },
-                { label: 'Incoming', value: 'Fulfillment status updates' },
-                { label: 'Outgoing', value: 'Ticket & notification events' },
-              ]}
-            >
-              <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
-                <Link to="/integrations">Open Integrations</Link>
-              </Button>
-            </SettingsConfigCard>
+          </div>
+          <div className="space-y-3">
+            <div>
+              <h3 className="text-base font-semibold tracking-tight">Webhooks</h3>
+              <p className="text-sm text-muted-foreground">
+                Connect fulfillment systems and external apps using incoming and outgoing webhooks.
+              </p>
+            </div>
+            <Integrations embedded />
           </div>
         </TabsContent>
 

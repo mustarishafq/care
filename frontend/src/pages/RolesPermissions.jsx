@@ -53,9 +53,9 @@ const FALLBACK_DEFAULT_PAGES = [
   { path: '/products', label: 'Products' },
   { path: '/users', label: 'Users' },
   { path: '/roles', label: 'Roles' },
-  { path: '/integrations', label: 'Integrations' },
   { path: '/marketplace', label: 'Marketplace' },
   { path: '/settings', label: 'Settings' },
+  { path: '/settings?tab=integrations', label: 'Integrations' },
 ];
 
 const emptyRole = {
@@ -102,12 +102,15 @@ export default function RolesPermissions() {
   };
 
   const openEdit = (role) => {
+    const defaultPage = role.default_page === '/integrations' || role.default_page === '/oms'
+      ? '/settings?tab=integrations'
+      : (role.default_page || '/dashboard');
     setEditingRole(role);
     setForm({
       name: role.name,
       description: role.description || '',
       permissions: role.permissions || [],
-      default_page: role.default_page || '/dashboard',
+      default_page: defaultPage,
       is_active: role.is_active !== false,
     });
     setDialogOpen(true);

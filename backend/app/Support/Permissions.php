@@ -61,9 +61,9 @@ class Permissions
             ['path' => '/products', 'label' => 'Products'],
             ['path' => '/users', 'label' => 'Users'],
             ['path' => '/roles', 'label' => 'Roles'],
-            ['path' => '/integrations', 'label' => 'Integrations'],
             ['path' => '/marketplace', 'label' => 'Marketplace'],
             ['path' => '/settings', 'label' => 'Settings'],
+            ['path' => '/settings?tab=integrations', 'label' => 'Integrations'],
         ];
     }
 
