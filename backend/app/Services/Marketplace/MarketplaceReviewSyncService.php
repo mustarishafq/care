@@ -400,6 +400,7 @@ class MarketplaceReviewSyncService
         ?Carbon $startAt = null,
         ?Carbon $endAt = null,
         ?string $productName = null,
+        ?string $reviewerName = null,
     ): LengthAwarePaginator {
         return $this->filteredReviewsQuery(
             $platform,
@@ -410,6 +411,7 @@ class MarketplaceReviewSyncService
             $startAt,
             $endAt,
             $productName,
+            $reviewerName,
         )
             ->with('shopConnection')
             ->orderByDesc('review_created_at')
@@ -434,6 +436,7 @@ class MarketplaceReviewSyncService
         ?Carbon $startAt = null,
         ?Carbon $endAt = null,
         ?string $productName = null,
+        ?string $reviewerName = null,
     ): array {
         $row = $this->filteredReviewsQuery(
             $platform,
@@ -444,6 +447,7 @@ class MarketplaceReviewSyncService
             $startAt,
             $endAt,
             $productName,
+            $reviewerName,
         )
             ->selectRaw('COUNT(*) as total')
             ->selectRaw("SUM(CASE WHEN seller_reply IS NOT NULL AND seller_reply != '' THEN 1 ELSE 0 END) as replied")
@@ -471,6 +475,7 @@ class MarketplaceReviewSyncService
         ?Carbon $startAt = null,
         ?Carbon $endAt = null,
         ?string $productName = null,
+        ?string $reviewerName = null,
     ): Builder {
         return MarketplaceProductReview::query()
             ->when($platform, fn ($query) => $query->where('platform', $platform))
@@ -478,6 +483,10 @@ class MarketplaceReviewSyncService
             ->when($productName, function ($query) use ($productName) {
                 $escaped = addcslashes($productName, '%_\\');
                 $query->where('product_name', 'like', '%'.$escaped.'%');
+            })
+            ->when($reviewerName, function ($query) use ($reviewerName) {
+                $escaped = addcslashes($reviewerName, '%_\\');
+                $query->where('reviewer_name', 'like', '%'.$escaped.'%');
             })
             ->when($minRating, fn ($query) => $query->where('rating', '>=', $minRating))
             ->when($maxRating, fn ($query) => $query->where('rating', '<=', $maxRating))

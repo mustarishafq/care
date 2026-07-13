@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -341,7 +342,10 @@ export default function MarketplaceReviews() {
 
   const [platformFilter, setPlatformFilter] = useState('all');
   const [shopFilter, setShopFilter] = useState('all');
-  const [productFilter, setProductFilter] = useState('all');
+  const [productFilter, setProductFilter] = useState('');
+  const [buyerFilter, setBuyerFilter] = useState('');
+  const [debouncedProductName, setDebouncedProductName] = useState('');
+  const [debouncedBuyerName, setDebouncedBuyerName] = useState('');
   const [ratingFilter, setRatingFilter] = useState('all');
   const [replyFilter, setReplyFilter] = useState('all');
   const [fromDate, setFromDate] = useState('');
@@ -359,19 +363,24 @@ export default function MarketplaceReviews() {
   const [page, setPage] = useState(1);
   const perPage = 20;
 
-  const { data: products = [] } = useQuery({
-    queryKey: ['products', 'active'],
-    queryFn: () => db.entities.Product.filter({ is_active: true }, 'name', 200),
-  });
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedProductName(productFilter.trim());
+      setDebouncedBuyerName(buyerFilter.trim());
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [productFilter, buyerFilter]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedProductName, debouncedBuyerName]);
 
   const reviewParams = useMemo(() => {
     const params = { page, per_page: perPage };
     if (platformFilter !== 'all') params.platform = platformFilter;
     if (shopFilter !== 'all') params.shop_connection_id = Number(shopFilter);
-    if (productFilter !== 'all') {
-      const product = products.find((p) => String(p.id) === String(productFilter));
-      if (product?.name) params.product_name = product.name;
-    }
+    if (debouncedProductName) params.product_name = debouncedProductName;
+    if (debouncedBuyerName) params.reviewer_name = debouncedBuyerName;
     if (ratingFilter === 'low') {
       params.max_rating = 3;
     } else if (ratingFilter !== 'all') {
@@ -384,7 +393,7 @@ export default function MarketplaceReviews() {
     if (fromDate) params.start_date = fromDate;
     if (toDate) params.end_date = toDate;
     return params;
-  }, [platformFilter, shopFilter, productFilter, products, ratingFilter, replyFilter, fromDate, toDate, page]);
+  }, [platformFilter, shopFilter, debouncedProductName, debouncedBuyerName, ratingFilter, replyFilter, fromDate, toDate, page]);
 
   const { data: shops = [], isLoading: loadingShops } = useQuery({
     queryKey: ['marketplace-shops'],
@@ -465,6 +474,7 @@ export default function MarketplaceReviews() {
     platformFilter,
     shopFilter,
     productFilter,
+    buyerFilter,
     ratingFilter,
     replyFilter,
     dateRange: fromDate || toDate,
@@ -546,7 +556,10 @@ export default function MarketplaceReviews() {
   const clearBrowseFilters = () => {
     setPlatformFilter('all');
     setShopFilter('all');
-    setProductFilter('all');
+    setProductFilter('');
+    setBuyerFilter('');
+    setDebouncedProductName('');
+    setDebouncedBuyerName('');
     setRatingFilter('all');
     setReplyFilter('all');
     setFromDate('');
@@ -556,6 +569,26 @@ export default function MarketplaceReviews() {
 
   const filterControls = (
     <div className="space-y-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Product name</Label>
+          <Input
+            className="h-10"
+            value={productFilter}
+            onChange={(e) => setProductFilter(e.target.value)}
+            placeholder="e.g. serum, moisturizer..."
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-xs text-muted-foreground">Buyer name</Label>
+          <Input
+            className="h-10"
+            value={buyerFilter}
+            onChange={(e) => setBuyerFilter(e.target.value)}
+            placeholder="e.g. buyer username..."
+          />
+        </div>
+      </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Platform</Label>
@@ -581,22 +614,6 @@ export default function MarketplaceReviews() {
               {filteredShops.map((shop) => (
                 <SelectItem key={shop.id} value={String(shop.id)}>
                   {shop.shop_name || shop.shop_id}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label className="text-xs text-muted-foreground">Product</Label>
-          <Select value={productFilter} onValueChange={(v) => { setProductFilter(v); resetToFirstPage(); }}>
-            <SelectTrigger className="w-full h-10">
-              <SelectValue placeholder="Product" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All products</SelectItem>
-              {products.map((product) => (
-                <SelectItem key={product.id} value={String(product.id)}>
-                  {product.name}{product.sku ? ` (${product.sku})` : ''}
                 </SelectItem>
               ))}
             </SelectContent>

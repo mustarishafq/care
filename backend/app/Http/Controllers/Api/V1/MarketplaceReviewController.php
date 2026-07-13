@@ -61,6 +61,7 @@ class MarketplaceReviewController extends Controller
             'platform' => ['sometimes', 'nullable', 'string', 'max:32'],
             'shop_connection_id' => ['sometimes', 'nullable', 'integer'],
             'product_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'reviewer_name' => ['sometimes', 'nullable', 'string', 'max:255'],
             'min_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'max_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
             'reply_status' => ['sometimes', 'nullable', 'string', 'in:replied,unreplied'],
@@ -89,6 +90,13 @@ class MarketplaceReviewController extends Controller
             $productName = null;
         }
 
+        $reviewerName = isset($validated['reviewer_name'])
+            ? trim((string) $validated['reviewer_name'])
+            : null;
+        if ($reviewerName === '') {
+            $reviewerName = null;
+        }
+
         $paginator = $this->reviewSync->listAllReviews(
             $validated['platform'] ?? null,
             $validated['shop_connection_id'] ?? null,
@@ -100,6 +108,7 @@ class MarketplaceReviewController extends Controller
             $startAt,
             $endAt,
             $productName,
+            $reviewerName,
         );
 
         $stats = $this->reviewSync->reviewStats(
@@ -111,6 +120,7 @@ class MarketplaceReviewController extends Controller
             $startAt,
             $endAt,
             $productName,
+            $reviewerName,
         );
 
         return response()->json([
