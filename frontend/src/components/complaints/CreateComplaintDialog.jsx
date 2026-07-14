@@ -304,6 +304,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       priority: created.priority ?? priorities.find((p) => String(p.id) === String(form.priority_id))?.name,
       assigned_department: created.assigned_department,
       assigned_user_name: created.assigned_user_name ?? user?.full_name,
+      assigned_user_avatar_url: created.assigned_user_avatar_url ?? user?.avatar_url ?? null,
       customer_name: created.customer_name ?? form.customer_name,
       order_number: created.order_number ?? form.order_number,
       order_source: created.order_source ?? form.order_source,

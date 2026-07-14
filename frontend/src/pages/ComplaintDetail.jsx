@@ -27,6 +27,7 @@ import { invalidateNotificationQueries } from '@/lib/notifications';
 import { useDepartments } from '@/lib/useDepartments';
 import { canViewComplaint } from '@/lib/complaintVisibility';
 import { getAssignedAgents } from '@/lib/assignedAgents';
+import UserAvatar from '@/components/UserAvatar';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import PriorityBadge from '@/components/complaints/PriorityBadge';
 import StatusProgressBar from '@/components/complaints/StatusProgressBar';
@@ -547,7 +548,12 @@ function AssignmentCard({
           ) : (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {assignedAgents.map((agent) => (
-                <Badge key={agent.id} variant="secondary" className="text-xs gap-1 pr-1">
+                <Badge key={agent.id} variant="secondary" className="text-xs gap-1.5 pr-1 pl-1 py-1">
+                  <UserAvatar
+                    user={agent}
+                    className="h-5 w-5"
+                    fallbackClassName="text-[8px] font-bold bg-primary/10 text-primary"
+                  />
                   {agent.full_name || agent.email}
                   <button
                     type="button"

@@ -34,6 +34,7 @@ class OutgoingWebhookService
             'priority',
             'assignedDepartment',
             'assignedUser',
+            'assignedUsers',
             'affectedProducts.product',
             'affectedProducts.unitOfMeasurement',
         ]);

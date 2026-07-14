@@ -13,6 +13,7 @@ export function getAssignedAgents(complaint) {
       id: String(complaint.assigned_user_id),
       email: complaint.assigned_user,
       full_name: complaint.assigned_user_name || complaint.assigned_user,
+      avatar_url: complaint.assigned_user_avatar_url || null,
     }];
   }
 

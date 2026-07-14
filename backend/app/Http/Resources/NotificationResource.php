@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Http\Resources\Concerns\HasLegacyDates;
 use App\Support\NotificationPayload;
+use App\Support\UserSummary;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +18,7 @@ class NotificationResource extends JsonResource
             'id' => (string) $this->id,
             'recipient_user_id' => $this->recipient_user_id ? (string) $this->recipient_user_id : null,
             'recipient_email' => $this->recipient?->email,
+            'recipient_avatar_url' => UserSummary::avatarUrl($this->recipient),
             'sso_id' => $this->recipient?->nexus_sso_id,
             'title' => $this->title,
             'message' => $this->message,

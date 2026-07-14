@@ -1,7 +1,6 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { Link } from 'react-router-dom';
 
 export default function RecentActivity({ activities }) {
   return (

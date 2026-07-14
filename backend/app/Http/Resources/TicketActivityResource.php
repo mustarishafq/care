@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Http\Resources\Concerns\HasLegacyDates;
+use App\Support\UserSummary;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,6 +23,7 @@ class TicketActivityResource extends JsonResource
             'user_id' => $this->user_id ? (string) $this->user_id : null,
             'user_email' => $this->user?->email,
             'user_name' => $this->user?->full_name ?? $this->user?->name,
+            'user_avatar_url' => UserSummary::avatarUrl($this->user),
         ], $this->resource);
     }
 }

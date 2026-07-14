@@ -23,6 +23,7 @@ import { useSlaSettings } from '@/lib/useSlaSettings';
 import { useAutoCloseSettings } from '@/lib/useAutoCloseSettings';
 import { invalidateNotificationQueries } from '@/lib/notifications';
 import { getAssignedAgentIds, getAssignedAgents } from '@/lib/assignedAgents';
+import UserAvatar from '@/components/UserAvatar';
 
 export default function AssignAgentDialog({ complaint, open, onClose, onSaved }) {
   const { user } = useCurrentUser();
@@ -111,6 +112,7 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
         id: String(u.id),
         email: u.email,
         full_name: u.full_name || u.email,
+        avatar_url: u.avatar_url || null,
       }));
       const updatedComplaint = {
         ...complaint,
@@ -205,6 +207,11 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
                                 checked={checked}
                                 onCheckedChange={() => toggleAgent(id)}
                               />
+                              <UserAvatar
+                                user={u}
+                                className="h-6 w-6 shrink-0"
+                                fallbackClassName="text-[9px] font-bold bg-primary/10 text-primary"
+                              />
                               <span className="truncate">{u.full_name || u.email}</span>
                             </label>
                           );
@@ -217,7 +224,12 @@ export default function AssignAgentDialog({ complaint, open, onClose, onSaved })
                 {selectedUsers.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">
                     {selectedUsers.map((u) => (
-                      <Badge key={u.id} variant="secondary" className="text-xs">
+                      <Badge key={u.id} variant="secondary" className="text-xs gap-1.5 pl-1 pr-2 py-1">
+                        <UserAvatar
+                          user={u}
+                          className="h-4 w-4"
+                          fallbackClassName="text-[7px] font-bold bg-primary/10 text-primary"
+                        />
                         {u.full_name || u.email}
                       </Badge>
                     ))}

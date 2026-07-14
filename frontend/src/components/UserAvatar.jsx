@@ -36,9 +36,14 @@ export default function UserAvatar({
   fallbackClassName,
   imageClassName,
 }) {
-  const src = avatarUrl ?? user?.avatar_url ?? user?.author_avatar_url ?? null;
-  const displayName = name ?? user?.full_name ?? user?.name ?? user?.author_name;
-  const displayEmail = email ?? user?.email ?? user?.author_email;
+  const src = avatarUrl
+    ?? user?.avatar_url
+    ?? user?.author_avatar_url
+    ?? user?.user_avatar_url
+    ?? user?.assigned_user_avatar_url
+    ?? null;
+  const displayName = name ?? user?.full_name ?? user?.name ?? user?.author_name ?? user?.user_name;
+  const displayEmail = email ?? user?.email ?? user?.author_email ?? user?.user_email;
   const initials = initialsFrom(displayName, displayEmail);
 
   return (
