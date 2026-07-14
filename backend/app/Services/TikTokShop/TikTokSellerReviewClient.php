@@ -439,6 +439,7 @@ class TikTokSellerReviewClient
         });
 
         $out = [];
+        $authFailure = null;
         foreach ($responses as $key => $response) {
             if ($response instanceof \Throwable) {
                 Log::warning('marketplace.tiktok.contact_pool_exception', [
@@ -460,7 +461,24 @@ class TikTokSellerReviewClient
                     'key' => (string) $key,
                     'message' => $exception->getMessage(),
                 ]);
+
+                $message = strtolower($exception->getMessage());
+                if (
+                    $authFailure === null
+                    && (
+                        str_contains($message, 'cookie')
+                        || str_contains($message, 'seller_token')
+                        || str_contains($message, 'security check')
+                        || str_contains($message, 'login')
+                    )
+                ) {
+                    $authFailure = $exception;
+                }
             }
+        }
+
+        if ($out === [] && $authFailure instanceof RuntimeException) {
+            throw $authFailure;
         }
 
         return $out;

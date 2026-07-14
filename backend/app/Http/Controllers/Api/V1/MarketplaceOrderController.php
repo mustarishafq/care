@@ -390,6 +390,9 @@ class MarketplaceOrderController extends Controller
         if (($result['blocked'] ?? 0) > 0) {
             $message .= "; {$result['blocked']} blocked by TikTok (unpaid/canceled/delivered/completed)";
         }
+        if (($result['failed'] ?? 0) > 0) {
+            $message .= "; {$result['failed']} failed (check shop cookie / TikTok access)";
+        }
         if ($result['remaining'] > 0) {
             $message .= "; {$result['remaining']} still eligible — run again if needed";
         }

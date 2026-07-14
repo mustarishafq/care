@@ -512,6 +512,10 @@ class MarketplaceOrderSyncService
             try {
                 $results = $client->getBuyerContactInfoMany($sellerId, $jobs);
             } catch (RuntimeException $exception) {
+                if ($this->isCookieOrAuthFailure($exception->getMessage())) {
+                    throw $exception;
+                }
+
                 $failed += $chunk->count();
                 Log::warning('marketplace.orders.contact_reveal_batch_failed', [
                     'connection_id' => $connection->id,
@@ -837,6 +841,17 @@ class MarketplaceOrderSyncService
             || str_contains($message, 'completed')
             || str_contains($message, 'delivered')
         );
+    }
+
+    private function isCookieOrAuthFailure(string $message): bool
+    {
+        $normalized = strtolower($message);
+
+        return str_contains($normalized, 'seller_token')
+            || str_contains($normalized, 'cookie expired')
+            || str_contains($normalized, 'cookie is missing')
+            || str_contains($normalized, 'fresh cookie')
+            || str_contains($normalized, 'security check');
     }
 
     /**
