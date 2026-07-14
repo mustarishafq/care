@@ -410,7 +410,8 @@ class MarketplaceOrderSyncService
     }
 
     /**
-     * Slow backfill for orders missing buyer phone. Caps batch size to avoid TikTok reveal limits.
+     * Slow backfill for orders missing buyer phone (oldest first). Caps batch size to avoid TikTok reveal limits.
+     * Pass $startAt/$endAt to narrow the window; omit both to process all eligible orders.
      *
      * @return array{
      *   attempted: int,
@@ -451,13 +452,9 @@ class MarketplaceOrderSyncService
             })
             ->when($startAt, fn (Builder $q) => $q->where('order_created_at', '>=', $startAt->copy()->startOfDay()))
             ->when($endAt, fn (Builder $q) => $q->where('order_created_at', '<=', $endAt->copy()->endOfDay()))
-            // Prefer statuses TikTok usually allows (to ship / fulfillment), then newest.
-            ->orderByRaw('CASE
-                WHEN order_status IN (101, 102, 111, 112, 114, 121, 122) THEN 0
-                ELSE 1
-            END')
-            ->orderByDesc('order_created_at')
-            ->orderByDesc('id');
+            // Oldest missing phones first so backfill clears from yesterday toward today.
+            ->orderBy('order_created_at')
+            ->orderBy('id');
 
         $remainingBefore = (clone $query)->count();
         $orders = (clone $query)->limit($limit)->get();

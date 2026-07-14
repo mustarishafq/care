@@ -13,21 +13,28 @@ use Throwable;
 class RevealMarketplaceOrderPhones extends Command
 {
     protected $signature = 'marketplace:reveal-order-phones
-                            {--days=2 : How many days back to look for orders missing phones}
+                            {--days= : Optional days window (omitted = all orders missing phones)}
                             {--limit=30 : Max phones to reveal per job pass (1-30)}
                             {--sync : Run one pass inline per shop instead of queueing}';
 
-    protected $description = 'Queue phone-reveal jobs for marketplace orders (separate from order sync)';
+    protected $description = 'Reveal missing buyer phones for orders (oldest first; separate from order sync)';
 
     public function handle(
         MarketplaceOrderSyncService $service,
         SchedulerLogService $schedulerLogs,
         MarketplaceCookieAlertService $cookieAlerts,
     ): int {
-        $days = max(1, min(30, (int) $this->option('days')));
         $limit = min(max((int) $this->option('limit'), 1), 30);
-        $startAt = Carbon::now()->subDays($days - 1)->startOfDay();
-        $endAt = Carbon::now()->endOfDay();
+        $daysOption = $this->option('days');
+        $startAt = null;
+        $endAt = null;
+
+        if ($daysOption !== null && $daysOption !== '') {
+            $days = max(1, min(30, (int) $daysOption));
+            $startAt = Carbon::now()->subDays($days - 1)->startOfDay();
+            $endAt = Carbon::now()->endOfDay();
+        }
+
         $runInline = (bool) $this->option('sync');
         $command = 'marketplace:reveal-order-phones';
 
@@ -41,8 +48,10 @@ class RevealMarketplaceOrderPhones extends Command
             return self::SUCCESS;
         }
 
-        $window = "{$startAt->toDateString()} → {$endAt->toDateString()}";
-        $this->info("Phone reveal window {$window} for {$connections->count()} shop(s).");
+        $window = $startAt && $endAt
+            ? "{$startAt->toDateString()} → {$endAt->toDateString()}"
+            : 'all orders missing phones (oldest first)';
+        $this->info("Phone reveal {$window} for {$connections->count()} shop(s).");
 
         if ($runInline) {
             foreach ($connections as $connection) {
@@ -83,8 +92,8 @@ class RevealMarketplaceOrderPhones extends Command
         foreach ($connections as $index => $connection) {
             RevealMarketplaceShopOrderPhonesJob::dispatch(
                 $connection->id,
-                $startAt->toDateString(),
-                $endAt->toDateString(),
+                $startAt?->toDateString(),
+                $endAt?->toDateString(),
                 $limit,
             )->delay(now()->addSeconds($index * 10));
 
@@ -97,8 +106,8 @@ class RevealMarketplaceOrderPhones extends Command
             'RevealMarketplaceOrderPhones',
             [
                 'shop_count' => $connections->count(),
-                'start_date' => $startAt->toDateString(),
-                'end_date' => $endAt->toDateString(),
+                'start_date' => $startAt?->toDateString(),
+                'end_date' => $endAt?->toDateString(),
                 'limit' => $limit,
             ],
             null,

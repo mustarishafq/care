@@ -23,8 +23,8 @@ class RevealMarketplaceShopOrderPhonesJob implements ShouldQueue
 
     public function __construct(
         public readonly int $shopConnectionId,
-        public readonly string $startDate,
-        public readonly string $endDate,
+        public readonly ?string $startDate = null,
+        public readonly ?string $endDate = null,
         public readonly int $limit = 30,
         public readonly int $pass = 1,
         public readonly int $maxPasses = 40,
@@ -46,8 +46,12 @@ class RevealMarketplaceShopOrderPhonesJob implements ShouldQueue
         }
 
         $source = class_basename(static::class);
-        $startAt = Carbon::createFromFormat('Y-m-d', $this->startDate)->startOfDay();
-        $endAt = Carbon::createFromFormat('Y-m-d', $this->endDate)->endOfDay();
+        $startAt = $this->startDate
+            ? Carbon::createFromFormat('Y-m-d', $this->startDate)->startOfDay()
+            : null;
+        $endAt = $this->endDate
+            ? Carbon::createFromFormat('Y-m-d', $this->endDate)->endOfDay()
+            : null;
         $limit = min(max($this->limit, 1), 30);
 
         try {
