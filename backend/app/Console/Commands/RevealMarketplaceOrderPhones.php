@@ -17,7 +17,7 @@ class RevealMarketplaceOrderPhones extends Command
                             {--limit=30 : Max phones to reveal per job pass (1-30)}
                             {--sync : Run one pass inline per shop instead of queueing}';
 
-    protected $description = 'Reveal missing buyer phones for orders (oldest first; separate from order sync)';
+    protected $description = 'Reveal missing buyer name, address, and phone (oldest first; separate from order sync)';
 
     public function handle(
         MarketplaceOrderSyncService $service,
@@ -50,18 +50,21 @@ class RevealMarketplaceOrderPhones extends Command
 
         $window = $startAt && $endAt
             ? "{$startAt->toDateString()} → {$endAt->toDateString()}"
-            : 'all orders missing phones (oldest first)';
-        $this->info("Phone reveal {$window} for {$connections->count()} shop(s).");
+            : 'all orders missing name/address/phone (oldest first)';
+        $this->info("Contact reveal {$window} for {$connections->count()} shop(s).");
 
         if ($runInline) {
             foreach ($connections as $connection) {
                 try {
                     $result = $service->revealMissingPhones($connection, $limit, $startAt, $endAt);
                     $line = sprintf(
-                        '%s · attempted %d, revealed %d, remaining %d',
+                        '%s · attempted %d, revealed %d (name %d, address %d, phone %d), remaining %d',
                         $connection->shop_name ?: "#{$connection->id}",
                         $result['attempted'] ?? 0,
                         $result['revealed'] ?? 0,
+                        $result['names_revealed'] ?? 0,
+                        $result['addresses_revealed'] ?? 0,
+                        $result['phones_revealed'] ?? 0,
                         $result['remaining'] ?? 0,
                     );
                     $this->line($line);
@@ -97,12 +100,12 @@ class RevealMarketplaceOrderPhones extends Command
                 $limit,
             )->delay(now()->addSeconds($index * 10));
 
-            $this->line("Queued phone reveal · {$connection->shop_name} (#{$connection->id})");
+            $this->line("Queued contact reveal · {$connection->shop_name} (#{$connection->id})");
         }
 
         $schedulerLogs->info(
             $command,
-            "Queued {$connections->count()} phone reveal job(s) for {$window}.",
+            "Queued {$connections->count()} contact reveal job(s) for {$window}.",
             'RevealMarketplaceOrderPhones',
             [
                 'shop_count' => $connections->count(),
@@ -111,7 +114,7 @@ class RevealMarketplaceOrderPhones extends Command
                 'limit' => $limit,
             ],
             null,
-            'Phone reveal jobs queued',
+            'Contact reveal jobs queued',
         );
 
         return self::SUCCESS;

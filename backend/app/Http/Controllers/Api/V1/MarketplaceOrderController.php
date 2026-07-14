@@ -356,7 +356,7 @@ class MarketplaceOrderController extends Controller
 
             if ($connection->platform !== MarketplacePlatform::TIKTOK_SHOP) {
                 return response()->json([
-                    'message' => 'Phone reveal is currently available for TikTok Shop shops only.',
+                    'message' => 'Contact reveal is currently available for TikTok Shop shops only.',
                 ], 422);
             }
 
@@ -377,7 +377,13 @@ class MarketplaceOrderController extends Controller
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        $message = "Revealed {$result['revealed']} phone(s)";
+        $message = sprintf(
+            'Revealed %d order(s) (name %d, address %d, phone %d)',
+            $result['revealed'] ?? 0,
+            $result['names_revealed'] ?? 0,
+            $result['addresses_revealed'] ?? 0,
+            $result['phones_revealed'] ?? $result['revealed'] ?? 0,
+        );
         if ($result['attempted']) {
             $message .= " from {$result['attempted']} attempt(s)";
         }

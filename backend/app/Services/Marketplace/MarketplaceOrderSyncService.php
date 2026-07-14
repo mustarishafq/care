@@ -410,14 +410,19 @@ class MarketplaceOrderSyncService
     }
 
     /**
-     * Slow backfill for orders missing buyer phone (oldest first). Caps batch size to avoid TikTok reveal limits.
-     * Pass $startAt/$endAt to narrow the window; omit both to process all eligible orders.
+     * Slow backfill for orders missing buyer name, address, and/or phone (oldest first).
+     * Caps batch size to avoid TikTok reveal limits. Pass $startAt/$endAt to narrow the window;
+     * omit both to process all eligible orders.
      *
      * @return array{
      *   attempted: int,
      *   revealed: int,
+     *   names_revealed: int,
+     *   addresses_revealed: int,
+     *   phones_revealed: int,
      *   remaining: int,
-     *   failed: int
+     *   failed: int,
+     *   blocked: int
      * }
      */
     public function revealMissingPhones(
@@ -427,7 +432,7 @@ class MarketplaceOrderSyncService
         ?Carbon $endAt = null,
     ): array {
         if ($connection->platform !== MarketplacePlatform::TIKTOK_SHOP) {
-            throw new RuntimeException('Phone reveal is currently available for TikTok Shop cookie shops only.');
+            throw new RuntimeException('Contact reveal is currently available for TikTok Shop cookie shops only.');
         }
 
         $tiktok = TikTokShopConnection::query()->findOrFail($connection->id);
@@ -443,16 +448,25 @@ class MarketplaceOrderSyncService
         $query = MarketplaceOrder::query()
             ->where('platform', MarketplacePlatform::TIKTOK_SHOP)
             ->where('marketplace_shop_connection_id', $connection->id)
-            ->where(function (Builder $builder) {
-                $builder->whereNull('buyer_phone')->orWhere('buyer_phone', '');
-            })
             ->where(function (Builder $builder) use ($blockedStatuses) {
-                $builder->whereNull('order_status')
-                    ->orWhereNotIn('order_status', $blockedStatuses);
+                $builder
+                    ->where(function (Builder $q) {
+                        $q->whereNull('buyer_name')->orWhere('buyer_name', '');
+                    })
+                    ->orWhere(function (Builder $q) {
+                        $q->whereNull('buyer_address')->orWhere('buyer_address', '');
+                    })
+                    ->orWhere(function (Builder $q) use ($blockedStatuses) {
+                        $q->where(function (Builder $phone) {
+                            $phone->whereNull('buyer_phone')->orWhere('buyer_phone', '');
+                        })->where(function (Builder $status) use ($blockedStatuses) {
+                            $status->whereNull('order_status')
+                                ->orWhereNotIn('order_status', $blockedStatuses);
+                        });
+                    });
             })
             ->when($startAt, fn (Builder $q) => $q->where('order_created_at', '>=', $startAt->copy()->startOfDay()))
             ->when($endAt, fn (Builder $q) => $q->where('order_created_at', '<=', $endAt->copy()->endOfDay()))
-            // Oldest missing phones first so backfill clears from yesterday toward today.
             ->orderBy('order_created_at')
             ->orderBy('id');
 
@@ -461,6 +475,9 @@ class MarketplaceOrderSyncService
 
         $attempted = 0;
         $revealed = 0;
+        $namesRevealed = 0;
+        $addressesRevealed = 0;
+        $phonesRevealed = 0;
         $failed = 0;
         $blocked = 0;
         $chunkSize = 5;
@@ -470,17 +487,29 @@ class MarketplaceOrderSyncService
         foreach ($chunks as $chunkIndex => $chunk) {
             $jobs = [];
             foreach ($chunk as $order) {
-                $jobs[] = [
-                    'order_id' => $order->external_order_id,
-                    'type' => 2,
-                ];
+                if (! $this->hasText($order->buyer_name)) {
+                    $jobs[] = ['order_id' => $order->external_order_id, 'type' => 0];
+                }
+                if (! $this->hasText($order->buyer_address)) {
+                    $jobs[] = ['order_id' => $order->external_order_id, 'type' => 1];
+                }
+                if (
+                    ! $this->hasText($order->buyer_phone)
+                    && ($order->order_status === null || ! in_array((int) $order->order_status, $blockedStatuses, true))
+                ) {
+                    $jobs[] = ['order_id' => $order->external_order_id, 'type' => 2];
+                }
+            }
+
+            if ($jobs === []) {
+                continue;
             }
 
             try {
                 $results = $client->getBuyerContactInfoMany($sellerId, $jobs);
             } catch (RuntimeException $exception) {
                 $failed += $chunk->count();
-                Log::warning('marketplace.orders.phone_reveal_batch_failed', [
+                Log::warning('marketplace.orders.contact_reveal_batch_failed', [
                     'connection_id' => $connection->id,
                     'chunk' => $chunkIndex + 1,
                     'message' => $exception->getMessage(),
@@ -490,30 +519,71 @@ class MarketplaceOrderSyncService
 
             foreach ($chunk as $order) {
                 $attempted++;
-                $phoneData = $results[$order->external_order_id.':2'] ?? [];
-                if (! is_array($phoneData)) {
-                    $phoneData = [];
+                $orderId = $order->external_order_id;
+                $changed = false;
+                $name = $order->buyer_name;
+                $address = $order->buyer_address;
+                $addressRaw = is_array($order->buyer_address_raw) ? $order->buyer_address_raw : null;
+                $phone = $order->buyer_phone;
+
+                $nameData = $results[$orderId.':0'] ?? null;
+                if (is_array($nameData) && ! $this->hasText($name)) {
+                    if ($this->isContactRevealRejected($nameData)) {
+                        $blocked++;
+                    } else {
+                        $revealedName = $this->nullableString($nameData['plain_text_name'] ?? null);
+                        if ($revealedName !== null) {
+                            $name = $revealedName;
+                            $namesRevealed++;
+                            $changed = true;
+                        }
+                    }
                 }
 
-                if ($this->isContactRevealRejected($phoneData)) {
-                    $blocked++;
-                    continue;
+                $addressData = $results[$orderId.':1'] ?? null;
+                if (is_array($addressData) && ! $this->hasText($address)) {
+                    if ($this->isContactRevealRejected($addressData)) {
+                        $blocked++;
+                    } else {
+                        $newAddressRaw = is_array($addressData['plain_text_address'] ?? null)
+                            ? $addressData['plain_text_address']
+                            : null;
+                        if ($newAddressRaw !== null) {
+                            $addressRaw = $newAddressRaw;
+                            $formatted = $this->displayFormat->formatAddress($addressRaw);
+                            if ($formatted !== '') {
+                                $address = $formatted;
+                                $addressesRevealed++;
+                                $changed = true;
+                            }
+                        }
+                    }
                 }
 
-                $phone = $this->extractPhoneNumber(
-                    $phoneData,
-                    is_array($order->buyer_address_raw) ? $order->buyer_address_raw : null,
-                );
-
-                if ($phone === null) {
-                    continue;
+                $phoneData = $results[$orderId.':2'] ?? null;
+                if (is_array($phoneData) && ! $this->hasText($phone)) {
+                    if ($this->isContactRevealRejected($phoneData)) {
+                        $blocked++;
+                    } else {
+                        $extracted = $this->extractPhoneNumber($phoneData, $addressRaw);
+                        if ($extracted !== null) {
+                            $phone = $extracted;
+                            $phonesRevealed++;
+                            $changed = true;
+                        }
+                    }
                 }
 
-                $order->forceFill([
-                    'buyer_phone' => $phone,
-                    'contact_synced_at' => now(),
-                ])->save();
-                $revealed++;
+                if ($changed) {
+                    $order->forceFill([
+                        'buyer_name' => $name ?: $order->buyer_name,
+                        'buyer_address' => $address ?: $order->buyer_address,
+                        'buyer_address_raw' => $addressRaw ?: $order->buyer_address_raw,
+                        'buyer_phone' => $phone ?: $order->buyer_phone,
+                        'contact_synced_at' => now(),
+                    ])->save();
+                    $revealed++;
+                }
             }
 
             if ($chunkIndex < $chunkCount - 1) {
@@ -524,6 +594,9 @@ class MarketplaceOrderSyncService
         return [
             'attempted' => $attempted,
             'revealed' => $revealed,
+            'names_revealed' => $namesRevealed,
+            'addresses_revealed' => $addressesRevealed,
+            'phones_revealed' => $phonesRevealed,
             'failed' => $failed,
             'blocked' => $blocked,
             'remaining' => max(0, $remainingBefore - $revealed),

@@ -74,10 +74,13 @@ class RevealMarketplaceShopOrderPhonesJob implements ShouldQueue
                 self::COMMAND,
                 $revealed > 0 ? 'success' : 'info',
                 sprintf(
-                    'Pass %d: attempted %d, revealed %d, remaining %d (blocked %d, failed %d).',
+                    'Pass %d: attempted %d, revealed %d (name %d, address %d, phone %d), remaining %d (blocked %d, failed %d).',
                     $this->pass,
                     $attempted,
                     $revealed,
+                    (int) ($result['names_revealed'] ?? 0),
+                    (int) ($result['addresses_revealed'] ?? 0),
+                    (int) ($result['phones_revealed'] ?? 0),
                     $remaining,
                     (int) ($result['blocked'] ?? 0),
                     (int) ($result['failed'] ?? 0),
@@ -88,11 +91,14 @@ class RevealMarketplaceShopOrderPhonesJob implements ShouldQueue
                     'pass' => $this->pass,
                     'attempted' => $attempted,
                     'revealed' => $revealed,
+                    'names_revealed' => $result['names_revealed'] ?? 0,
+                    'addresses_revealed' => $result['addresses_revealed'] ?? 0,
+                    'phones_revealed' => $result['phones_revealed'] ?? 0,
                     'remaining' => $remaining,
                     'blocked' => $result['blocked'] ?? 0,
                     'failed' => $result['failed'] ?? 0,
                 ],
-                'Phone reveal pass',
+                'Contact reveal pass',
             );
 
             if ($remaining > 0 && $revealed > 0 && $this->pass < $this->maxPasses) {
@@ -121,14 +127,14 @@ class RevealMarketplaceShopOrderPhonesJob implements ShouldQueue
     {
         app(SchedulerLogService::class)->error(
             self::COMMAND,
-            'Phone reveal job failed permanently: '.($exception?->getMessage() ?: 'unknown error'),
+            'Contact reveal job failed permanently: '.($exception?->getMessage() ?: 'unknown error'),
             class_basename(static::class),
             [
                 'shop_connection_id' => $this->shopConnectionId,
                 'pass' => $this->pass,
             ],
             $this->shopConnectionId,
-            'Phone reveal job failed',
+            'Contact reveal job failed',
         );
     }
 }

@@ -15,7 +15,7 @@ class SyncMarketplaceOrders extends Command
                             {--no-contacts : Skip buyer name/address unmask during sync}
                             {--sync : Run inline instead of queueing jobs (debug only)}';
 
-    protected $description = 'Queue marketplace order sync jobs per cookie shop (contacts on; phones are a separate command)';
+    protected $description = 'Queue marketplace order sync jobs per cookie shop (contacts on during sync; full backfill via reveal-order-phones)';
 
     public function handle(MarketplaceOrderSyncService $service, SchedulerLogService $schedulerLogs): int
     {
@@ -81,7 +81,7 @@ class SyncMarketplaceOrders extends Command
             'Order sync jobs queued',
         );
 
-        $this->info('Phone reveal is separate — marketplace:reveal-order-phones (also scheduled).');
+        $this->info('Contact reveal is separate — marketplace:reveal-order-phones (name/address/phone, also scheduled).');
 
         return self::SUCCESS;
     }
