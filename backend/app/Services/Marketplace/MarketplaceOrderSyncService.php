@@ -442,13 +442,17 @@ class MarketplaceOrderSyncService
 
         $this->raiseTimeLimit(120 + ($limit * 2));
 
-        // TikTok rejects phone reveal for unpaid / canceled / completed-style statuses.
-        $blockedStatuses = [100, 104, 130, 140];
+        // TikTok rejects contact reveal for closed / unpaid statuses (incl. delivered).
+        $blockedStatuses = $this->contactRevealBlockedStatuses();
 
         $query = MarketplaceOrder::query()
             ->where('platform', MarketplacePlatform::TIKTOK_SHOP)
             ->where('marketplace_shop_connection_id', $connection->id)
-            ->where(function (Builder $builder) use ($blockedStatuses) {
+            ->where(function (Builder $status) use ($blockedStatuses) {
+                $status->whereNull('order_status')
+                    ->orWhereNotIn('order_status', $blockedStatuses);
+            })
+            ->where(function (Builder $builder) {
                 $builder
                     ->where(function (Builder $q) {
                         $q->whereNull('buyer_name')->orWhere('buyer_name', '');
@@ -456,17 +460,17 @@ class MarketplaceOrderSyncService
                     ->orWhere(function (Builder $q) {
                         $q->whereNull('buyer_address')->orWhere('buyer_address', '');
                     })
-                    ->orWhere(function (Builder $q) use ($blockedStatuses) {
-                        $q->where(function (Builder $phone) {
-                            $phone->whereNull('buyer_phone')->orWhere('buyer_phone', '');
-                        })->where(function (Builder $status) use ($blockedStatuses) {
-                            $status->whereNull('order_status')
-                                ->orWhereNotIn('order_status', $blockedStatuses);
-                        });
+                    ->orWhere(function (Builder $q) {
+                        $q->whereNull('buyer_phone')->orWhere('buyer_phone', '');
                     });
             })
             ->when($startAt, fn (Builder $q) => $q->where('order_created_at', '>=', $startAt->copy()->startOfDay()))
             ->when($endAt, fn (Builder $q) => $q->where('order_created_at', '<=', $endAt->copy()->endOfDay()))
+            // Prefer active fulfillment statuses, then oldest → newest.
+            ->orderByRaw('CASE
+                WHEN order_status IN (101, 111, 112, 114, 121) THEN 0
+                ELSE 1
+            END')
             ->orderBy('order_created_at')
             ->orderBy('id');
 
@@ -801,6 +805,23 @@ class MarketplaceOrderSyncService
     }
 
     /**
+     * Order statuses TikTok will not unmask buyer contact for.
+     *
+     * @return list<int>
+     */
+    private function contactRevealBlockedStatuses(): array
+    {
+        return [
+            100, // Unpaid
+            102, // Delivered
+            104, // Cancelled
+            122, // Delivered
+            130, // Completed
+            140, // Cancelled
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $contactData
      */
     private function isContactRevealRejected(array $contactData): bool
@@ -814,6 +835,7 @@ class MarketplaceOrderSyncService
             || str_contains($message, 'canceled')
             || str_contains($message, 'cancelled')
             || str_contains($message, 'completed')
+            || str_contains($message, 'delivered')
         );
     }
 
