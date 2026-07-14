@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Store, Link2, Loader2, Package, RefreshCw, Unplug, ShoppingBag, AlertCircle,
-  Settings2,
+  Settings2, ClipboardList,
 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import AnimatedSection from '@/components/layout/AnimatedSection';
@@ -25,8 +25,10 @@ import { toast } from 'sonner';
 import { toastApiError } from '@/lib/toastApi';
 import { usePermissions } from '@/lib/usePermissions';
 import { format } from 'date-fns';
+import MarketplaceOrders from '@/pages/MarketplaceOrders';
 
 const PLATFORM = 'tiktok_shop';
+const VALID_TABS = new Set(['shops', 'orders', 'products', 'settings']);
 
 function productTitle(product) {
   return product?.title ?? product?.product_name ?? product?.name ?? product?.id ?? '—';
@@ -48,8 +50,13 @@ export default function TikTokShop({ embedded = false } = {}) {
   const queryClient = useQueryClient();
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('marketplace.manage');
+  const canViewOrders = hasPermission('orders.view');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('shops');
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'orders' && !canViewOrders) return 'shops';
+    return VALID_TABS.has(tab) ? tab : 'shops';
+  });
   const [selectedShopId, setSelectedShopId] = useState('');
   const [pageToken, setPageToken] = useState(null);
   const [connecting, setConnecting] = useState(false);
@@ -109,6 +116,33 @@ export default function TikTokShop({ embedded = false } = {}) {
       setSearchParams({}, { replace: true });
     }
   }, [searchParams, setSearchParams, queryClient]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab') || 'shops';
+    if (tab === 'orders' && !canViewOrders) {
+      setActiveTab('shops');
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('tab');
+        return next;
+      }, { replace: true });
+      return;
+    }
+    if (VALID_TABS.has(tab)) {
+      setActiveTab((current) => (current === tab ? current : tab));
+    }
+  }, [searchParams, canViewOrders, setSearchParams]);
+
+  const changeTab = (value) => {
+    if (value === 'orders' && !canViewOrders) return;
+    setActiveTab(value);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value === 'shops') next.delete('tab');
+      else next.set('tab', value);
+      return next;
+    }, { replace: true });
+  };
 
   useEffect(() => {
     if (!selectedShopId && connections.length > 0) {
@@ -284,7 +318,7 @@ export default function TikTokShop({ embedded = false } = {}) {
     </Select>
   );
 
-  const connectAction = canManage && activeTab !== 'settings' && activeTab !== 'shops' && (
+  const connectAction = canManage && activeTab !== 'settings' && activeTab !== 'shops' && activeTab !== 'orders' && (
     <Button onClick={connectShop} disabled={connecting || !status?.configured}>
       {connecting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Link2 className="w-4 h-4 mr-2" />}
       Connect shop (OAuth)
@@ -312,9 +346,15 @@ export default function TikTokShop({ embedded = false } = {}) {
       </div>
 
       <AnimatedSection delay={0.15}>
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={changeTab}>
         <TabsList>
           <TabsTrigger value="shops">Shops</TabsTrigger>
+          {canViewOrders && (
+            <TabsTrigger value="orders" className="gap-1.5">
+              <ClipboardList className="w-3.5 h-3.5" />
+              Orders
+            </TabsTrigger>
+          )}
           <TabsTrigger value="products">Products</TabsTrigger>
           <TabsTrigger value="settings" className="gap-1.5"><Settings2 className="w-3.5 h-3.5" />Settings</TabsTrigger>
         </TabsList>
@@ -445,6 +485,12 @@ export default function TikTokShop({ embedded = false } = {}) {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {canViewOrders && (
+          <TabsContent value="orders" className="mt-4">
+            <MarketplaceOrders embedded />
+          </TabsContent>
+        )}
 
         <TabsContent value="products" className="mt-4">
           <Card className="rounded-2xl">

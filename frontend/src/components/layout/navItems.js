@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, FileText, Columns3, BarChart3, LineChart,
-  Bell, Package, Users, ShieldCheck, Settings, Plus, ShoppingBag, Star, Grip,
+  Bell, Package, Users, ShieldCheck, Settings, Plus, ShoppingBag, Star, Grip, ScrollText,
 } from 'lucide-react';
 
 /** All navigation items for EMZI Nexus Care */
@@ -15,6 +15,7 @@ export const careNavItems = [
   { label: 'Products', icon: Package, path: '/products', permission: 'products.view' },
   { label: 'Users', icon: Users, path: '/users', permission: 'users.view', admin: true },
   { label: 'Roles', icon: ShieldCheck, path: '/roles', permission: 'users.manage', admin: true },
+  { label: 'Scheduler Logs', icon: ScrollText, path: '/scheduler-logs', permission: 'scheduler.view', admin: true },
   { label: 'Marketplace', icon: ShoppingBag, path: '/marketplace', permission: 'marketplace.view' },
   { label: 'Settings', icon: Settings, path: '/settings', permission: 'settings.view' },
 ];
@@ -49,10 +50,11 @@ export const desktopBottomNavItems = [
   careNavItems[4],  // Analytics
   careNavItems[5],  // Reports
   careNavItems[7],  // Products
-  careNavItems[10], // Marketplace
-  careNavItems[11], // Settings
+  careNavItems[11], // Marketplace
+  careNavItems[12], // Settings
   careNavItems[8],  // Users
   careNavItems[9],  // Roles
+  careNavItems[10], // Scheduler Logs
 ];
 
 export function isNavActive(pathname, itemPath) {

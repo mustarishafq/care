@@ -19,6 +19,7 @@ const TYPE_META = {
   status_changed: { severity: 'info', category: 'task', priority: 'medium', icon: RefreshCw },
   mention: { severity: 'info', category: 'task', priority: 'medium', icon: AtSign },
   sla_warning: { severity: 'warning', category: 'system', priority: 'high', icon: AlertTriangle },
+  low_rating_review: { severity: 'warning', category: 'system', priority: 'high', icon: AlertTriangle },
   overdue: { severity: 'critical', category: 'system', priority: 'critical', icon: Clock },
   approval: { severity: 'info', category: 'approval', priority: 'medium', icon: CheckCircle2 },
   announcement: { severity: 'info', category: 'announcement', priority: 'medium', icon: Megaphone },

@@ -318,6 +318,37 @@ export const db = {
       async replyToReview(reviewId, content) {
         return http.post(`/marketplace/reviews/${reviewId}/reply`, { content });
       },
+
+      async exportReviews(params = {}) {
+        return http.download('/marketplace/reviews/export', params, 'marketplace-reviews.xlsx');
+      },
+
+      async listOrders(params = {}) {
+        return http.get('/marketplace/orders', params);
+      },
+
+      async exportOrders(params = {}) {
+        return http.download('/marketplace/orders/export', params, 'marketplace-orders.xlsx');
+      },
+
+      async getOrder(id) {
+        const data = await http.get(`/marketplace/orders/${id}`);
+        return data.data ?? data;
+      },
+
+      async syncOrders(payload) {
+        return http.post('/marketplace/orders/sync', payload);
+      },
+
+      async revealOrderPhones(payload) {
+        return http.post('/marketplace/orders/reveal-phones', payload);
+      },
+    },
+  },
+
+  schedulerLogs: {
+    async list(params = {}) {
+      return http.get('/scheduler-logs', params);
     },
   },
 };

@@ -12,9 +12,11 @@ use App\Models\TikTokShopConnection;
 use App\Services\Marketplace\MarketplaceReviewSyncService;
 use App\Services\TikTokShop\TikTokSellerReviewClient;
 use App\Support\MarketplacePlatform;
+use App\Support\SimpleXlsxWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MarketplaceReviewController extends Controller
 {
@@ -148,6 +150,120 @@ class MarketplaceReviewController extends Controller
         return response()->json([
             'data' => new MarketplaceProductReviewResource($review),
         ]);
+    }
+
+    public function export(Request $request): BinaryFileResponse|JsonResponse
+    {
+        $this->ensurePermission($request->user(), 'reviews.view');
+
+        $validated = $request->validate([
+            'platform' => ['sometimes', 'nullable', 'string', 'max:32'],
+            'shop_connection_id' => ['sometimes', 'nullable', 'integer'],
+            'product_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'reviewer_name' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'min_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'max_rating' => ['sometimes', 'integer', 'min:1', 'max:5'],
+            'reply_status' => ['sometimes', 'nullable', 'string', 'in:replied,unreplied'],
+            'start_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],
+            'end_date' => ['sometimes', 'nullable', 'date_format:Y-m-d', 'after_or_equal:start_date'],
+        ]);
+
+        if (! empty($validated['platform']) && ! MarketplacePlatform::isValid($validated['platform'])) {
+            return response()->json(['message' => 'Unsupported platform.'], 422);
+        }
+
+        $startAt = ! empty($validated['start_date'])
+            ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['start_date'])
+            : null;
+        $endAt = ! empty($validated['end_date'])
+            ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['end_date'])
+            : null;
+
+        $productName = isset($validated['product_name'])
+            ? trim((string) $validated['product_name'])
+            : null;
+        if ($productName === '') {
+            $productName = null;
+        }
+
+        $reviewerName = isset($validated['reviewer_name'])
+            ? trim((string) $validated['reviewer_name'])
+            : null;
+        if ($reviewerName === '') {
+            $reviewerName = null;
+        }
+
+        $query = $this->reviewSync->filteredReviewsForExport(
+            $validated['platform'] ?? null,
+            $validated['shop_connection_id'] ?? null,
+            $validated['min_rating'] ?? null,
+            $validated['max_rating'] ?? null,
+            $validated['reply_status'] ?? null,
+            $startAt,
+            $endAt,
+            $productName,
+            $reviewerName,
+        );
+
+        $headers = [
+            'Platform',
+            'Shop',
+            'Product name',
+            'Product ID',
+            'Rating',
+            'Review',
+            'Buyer',
+            'Reviewed at',
+            'Seller reply',
+            'Replied at',
+            'Has reply',
+            'Complaint ID',
+            'External review ID',
+        ];
+
+        $platformLabels = [
+            'tiktok_shop' => 'TikTok Shop',
+            'shopee' => 'Shopee',
+        ];
+
+        $rows = (function () use ($query, $platformLabels) {
+            foreach ($query->cursor() as $review) {
+                $hasReply = filled($review->seller_reply)
+                    || (int) (data_get($review->raw_metadata, 'reply_count', 0)) > 0;
+
+                yield [
+                    $platformLabels[$review->platform] ?? $review->platform,
+                    $review->shopConnection?->shop_name ?? '',
+                    $review->product_name ?? '',
+                    $review->external_product_id ?? '',
+                    $review->rating ?? '',
+                    $review->review_text ?? '',
+                    $review->reviewer_name ?? '',
+                    $review->review_created_at?->format('Y-m-d H:i:s') ?? '',
+                    $review->seller_reply ?? '',
+                    $review->seller_replied_at?->format('Y-m-d H:i:s') ?? '',
+                    $hasReply ? 'Yes' : 'No',
+                    $review->complaint_id ? (string) $review->complaint_id : '',
+                    $review->external_review_id ?? '',
+                ];
+            }
+        })();
+
+        try {
+            $path = SimpleXlsxWriter::toTempFile($headers, $rows);
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 500);
+        }
+
+        $filename = 'marketplace-reviews-'.now()->format('Y-m-d-His').'.xlsx';
+
+        return response()->download(
+            $path,
+            $filename,
+            [
+                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            ],
+        )->deleteFileAfterSend(true);
     }
 
     public function sync(Request $request): JsonResponse

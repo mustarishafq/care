@@ -18,6 +18,7 @@ import { DateRangePicker } from '@/components/ui/date-range-picker';
 import {
   Star, Loader2, RefreshCw, MessageSquare, ExternalLink, Store,
   ChevronDown, SlidersHorizontal, CalendarDays, ChevronLeft, ChevronRight,
+  Download,
 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
@@ -355,6 +356,7 @@ export default function MarketplaceReviews() {
   const [syncEndDate, setSyncEndDate] = useState(todayIso);
   const [syncRating, setSyncRating] = useState('all');
   const [syncing, setSyncing] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState({});
   const [replyingId, setReplyingId] = useState(null);
   const [replyOpenId, setReplyOpenId] = useState(null);
@@ -375,8 +377,8 @@ export default function MarketplaceReviews() {
     setPage(1);
   }, [debouncedProductName, debouncedBuyerName]);
 
-  const reviewParams = useMemo(() => {
-    const params = { page, per_page: perPage };
+  const filterParams = useMemo(() => {
+    const params = {};
     if (platformFilter !== 'all') params.platform = platformFilter;
     if (shopFilter !== 'all') params.shop_connection_id = Number(shopFilter);
     if (debouncedProductName) params.product_name = debouncedProductName;
@@ -393,7 +395,13 @@ export default function MarketplaceReviews() {
     if (fromDate) params.start_date = fromDate;
     if (toDate) params.end_date = toDate;
     return params;
-  }, [platformFilter, shopFilter, debouncedProductName, debouncedBuyerName, ratingFilter, replyFilter, fromDate, toDate, page]);
+  }, [platformFilter, shopFilter, debouncedProductName, debouncedBuyerName, ratingFilter, replyFilter, fromDate, toDate]);
+
+  const reviewParams = useMemo(() => ({
+    ...filterParams,
+    page,
+    per_page: perPage,
+  }), [filterParams, page]);
 
   const { data: shops = [], isLoading: loadingShops } = useQuery({
     queryKey: ['marketplace-shops'],
@@ -486,6 +494,18 @@ export default function MarketplaceReviews() {
     if (page <= 1) return;
     listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [page]);
+
+  const exportReviews = async () => {
+    setExporting(true);
+    try {
+      await db.integrations.Marketplace.exportReviews(filterParams);
+      toast.success('Reviews exported');
+    } catch (error) {
+      toastApiError(error, 'Failed to export reviews');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const syncReviews = async () => {
     if (!syncShopId) {
@@ -686,12 +706,28 @@ export default function MarketplaceReviews() {
         icon={Star}
         title="Reviews"
         description="Sync and reply to product reviews across TikTok Shop and Shopee"
-        actions={canManage ? (
-          <Button onClick={() => setSyncModalOpen(true)} className="w-full sm:w-auto">
-            <RefreshCw className="w-4 h-4 mr-2" />
-            Resync
-          </Button>
-        ) : null}
+        actions={(
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={exportReviews}
+              disabled={exporting || loadingReviews || (meta.total ?? 0) < 1}
+              className="w-full sm:w-auto"
+            >
+              {exporting
+                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                : <Download className="w-4 h-4 mr-2" />}
+              Export
+            </Button>
+            {canManage && (
+              <Button onClick={() => setSyncModalOpen(true)} className="w-full sm:w-auto">
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Resync
+              </Button>
+            )}
+          </div>
+        )}
       />
 
       <PageContent className="space-y-4 md:space-y-6">

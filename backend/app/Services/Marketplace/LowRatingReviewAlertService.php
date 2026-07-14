@@ -8,9 +8,9 @@ use App\Models\Notification;
 use App\Models\User;
 use App\Support\MarketplacePlatform;
 use App\Support\NotificationPayload;
+use App\Services\SchedulerLogService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -20,13 +20,20 @@ class LowRatingReviewAlertService
 
     public const DEFAULT_MAX_RATING = 3;
 
+    public const COMMAND = 'marketplace:low-rating-alerts';
+
     /** @var Collection<int, User>|null */
     private ?Collection $recipientCache = null;
+
+    public function __construct(
+        private readonly MarketplaceCookieAlertService $cookieAlerts,
+        private readonly SchedulerLogService $schedulerLogs,
+    ) {}
 
     /**
      * Sync yesterday–today reviews, then notify users with reviews access for ratings ≤ max.
      *
-     * @return array{notifications: int, reviews: int, synced_shops: int, failed_shops: int}
+     * @return array{notifications: int, reviews: int, synced_shops: int, failed_shops: int, failure_logs: int}
      */
     public function run(int $maxRating = self::DEFAULT_MAX_RATING, bool $sync = true): array
     {
@@ -36,9 +43,28 @@ class LowRatingReviewAlertService
 
         $syncedShops = 0;
         $failedShops = 0;
+        $failureLogs = 0;
+
+        $this->schedulerLogs->info(
+            self::COMMAND,
+            sprintf(
+                'Starting low-rating alerts (max ≤ %d)%s.',
+                $maxRating,
+                $sync ? ' with shop sync' : ' without shop sync',
+            ),
+            'LowRatingReviewAlertService',
+            [
+                'max_rating' => $maxRating,
+                'sync' => $sync,
+                'start_date' => $startAt->toDateString(),
+                'end_date' => $endAt->toDateString(),
+            ],
+            null,
+            'Low-rating alerts started',
+        );
 
         if ($sync) {
-            [$syncedShops, $failedShops] = $this->syncActiveShops($startAt, $endAt);
+            [$syncedShops, $failedShops, $failureLogs] = $this->syncActiveShops($startAt, $endAt);
         }
 
         $reviews = MarketplaceProductReview::query()
@@ -57,11 +83,33 @@ class LowRatingReviewAlertService
             $notifications += $this->notifyForReview($review, $maxRating);
         }
 
+        $this->schedulerLogs->write(
+            self::COMMAND,
+            $failedShops > 0 ? 'warning' : 'success',
+            sprintf(
+                'Finished: synced %d shop(s), %d failed, %d low-rating review(s), %d notification(s).',
+                $syncedShops,
+                $failedShops,
+                $reviews->count(),
+                $notifications,
+            ),
+            'LowRatingReviewAlertService',
+            'Low-rating alerts finished',
+            [
+                'synced_shops' => $syncedShops,
+                'failed_shops' => $failedShops,
+                'failure_logs' => $failureLogs,
+                'reviews' => $reviews->count(),
+                'notifications' => $notifications,
+            ],
+        );
+
         return [
             'notifications' => $notifications,
             'reviews' => $reviews->count(),
             'synced_shops' => $syncedShops,
             'failed_shops' => $failedShops,
+            'failure_logs' => $failureLogs,
         ];
     }
 
@@ -118,7 +166,7 @@ class LowRatingReviewAlertService
     }
 
     /**
-     * @return array{0: int, 1: int}
+     * @return array{0: int, 1: int, 2: int} synced, failed, failure logs
      */
     private function syncActiveShops(Carbon $startAt, Carbon $endAt): array
     {
@@ -130,11 +178,12 @@ class LowRatingReviewAlertService
 
         $synced = 0;
         $failed = 0;
+        $failureLogs = 0;
         $reviewSync = app(MarketplaceReviewSyncService::class);
 
         foreach ($connections as $connection) {
             try {
-                $reviewSync->syncConnection(
+                $result = $reviewSync->syncConnection(
                     $connection,
                     50,
                     null,
@@ -145,19 +194,41 @@ class LowRatingReviewAlertService
                     $startAt,
                     $endAt,
                 );
+                if ($connection->connection_error) {
+                    $connection->clearConnectionError();
+                }
                 $synced++;
+                $this->schedulerLogs->forShop(
+                    self::COMMAND,
+                    'success',
+                    sprintf(
+                        'Review sync ok (%d synced, %d new, %d updated).',
+                        (int) ($result['synced'] ?? 0),
+                        (int) ($result['created'] ?? 0),
+                        (int) ($result['updated'] ?? 0),
+                    ),
+                    $connection,
+                    'LowRatingReviewAlertService',
+                    [
+                        'synced' => $result['synced'] ?? 0,
+                        'created' => $result['created'] ?? 0,
+                        'updated' => $result['updated'] ?? 0,
+                    ],
+                    'Review shop sync',
+                );
             } catch (Throwable $exception) {
                 $failed++;
-                Log::warning('Low-rating review sync failed for shop connection.', [
-                    'marketplace_shop_connection_id' => $connection->id,
-                    'platform' => $connection->platform,
-                    'shop_name' => $connection->shop_name,
-                    'message' => $exception->getMessage(),
-                ]);
+                $failureLogs += $this->cookieAlerts->recordFailure(
+                    $connection,
+                    $exception,
+                    'reviews',
+                    self::COMMAND,
+                    'LowRatingReviewAlertService',
+                );
             }
         }
 
-        return [$synced, $failed];
+        return [$synced, $failed, $failureLogs];
     }
 
     /**

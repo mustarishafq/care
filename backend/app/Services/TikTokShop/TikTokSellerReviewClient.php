@@ -8,6 +8,7 @@ use App\Support\MarketplacePlatform;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -168,6 +169,61 @@ class TikTokSellerReviewClient
     }
 
     /**
+     * Order APIs require a fresh SELLER_TOKEN; review APIs often still work on session cookies alone.
+     */
+    public static function assertCookieSupportsOrders(string $cookie): void
+    {
+        $token = self::cookieValue($cookie, 'SELLER_TOKEN');
+        if ($token === '') {
+            $token = self::cookieValue($cookie, 'UNIFIED_SELLER_TOKEN');
+        }
+
+        if ($token === '') {
+            throw new RuntimeException(
+                'This TikTok cookie is missing SELLER_TOKEN (needed for order sync). Open Seller Center → Orders, then paste a fresh Cookie header under Marketplace → TikTok Shop.',
+            );
+        }
+
+        $payload = self::decodeJwtPayload($token);
+        $exp = isset($payload['exp']) ? (int) $payload['exp'] : 0;
+        if ($exp > 0 && $exp <= time() + 60) {
+            throw new RuntimeException(
+                'TikTok SELLER_TOKEN expired. Reviews may still work, but orders need a fresh cookie — open seller-my.tiktok.com/order, then re-copy the Cookie header for this shop.',
+            );
+        }
+
+        $session = self::cookieValue($cookie, 'sessionid_tiktokseller');
+        if ($session === '') {
+            $session = self::cookieValue($cookie, 'sid_tt_tiktokseller');
+        }
+        if ($session === '') {
+            throw new RuntimeException(
+                'TikTok Seller Center cookie expired or is invalid. Paste a fresh cookie for this shop and try again.',
+            );
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function decodeJwtPayload(string $jwt): array
+    {
+        $parts = explode('.', $jwt);
+        if (count($parts) < 2) {
+            return [];
+        }
+
+        $payload = base64_decode(strtr($parts[1], '-_', '+/'), true);
+        if ($payload === false) {
+            return [];
+        }
+
+        $decoded = json_decode($payload, true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
      * @return array{list: list<array<string, mixed>>, total: int, next_page: int|null, page: int, size: int}
      */
     public function listReviews(
@@ -229,13 +285,208 @@ class TikTokSellerReviewClient
     }
 
     /**
-     * @param  array<string, mixed>  $body
+     * List seller orders for a create-time window (Unix seconds).
+     *
+     * @return array{
+     *   list: list<array<string, mixed>>,
+     *   total: int,
+     *   offset: int,
+     *   count: int,
+     *   has_more: bool,
+     *   search_cursor: string
+     * }
+     */
+    public function listOrders(
+        string $sellerId,
+        int $createTimeStart,
+        int $createTimeEnd,
+        int $offset = 0,
+        int $count = 20,
+        string $searchCursor = '',
+        string $sortInfo = '6',
+    ): array {
+        self::assertCookieSupportsOrders($this->cookie);
+
+        $count = min(max($count, 1), 50);
+        $offset = max(0, $offset);
+        $startMs = (string) ((int) $createTimeStart * 1000);
+        $endMs = (string) ((int) $createTimeEnd * 1000);
+
+        $payload = $this->request(
+            'POST',
+            '/api/fulfillment/order/list',
+            $sellerId,
+            [
+                'search_condition' => [
+                    'condition_list' => [
+                        'time_order_created' => [
+                            'value' => [$startMs, $endMs],
+                        ],
+                    ],
+                ],
+                'offset' => $offset,
+                'count' => $count,
+                'sort_info' => $sortInfo,
+                'search_cursor' => $searchCursor,
+                'pagination_type' => 0,
+            ],
+            '/order?selected_sort=6&tab=all&shop_region='.$this->region,
+            true,
+        );
+
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        $list = is_array($data['main_orders'] ?? null) ? array_values($data['main_orders']) : [];
+
+        return [
+            'list' => $list,
+            'total' => (int) ($data['total_count'] ?? count($list)),
+            'offset' => (int) ($data['offset'] ?? $offset),
+            'count' => (int) ($data['count'] ?? count($list)),
+            'has_more' => (bool) ($data['has_more'] ?? $data['search_next_has_more'] ?? false),
+            'search_cursor' => (string) (
+                $data['search_next_cursor']
+                ?? $data['next_cursor_token']
+                ?? ''
+            ),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
-    private function request(string $method, string $path, string $sellerId, array $body = []): array
+    public function getOrder(string $sellerId, string $mainOrderId): array
     {
+        self::assertCookieSupportsOrders($this->cookie);
+
+        $payload = $this->request(
+            'POST',
+            '/api/fulfillment/order/get',
+            $sellerId,
+            ['main_order_id' => [$mainOrderId]],
+            '/order/detail?order_no='.$mainOrderId.'&shop_region='.$this->region,
+            true,
+        );
+
+        $data = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+        $orders = is_array($data['main_order'] ?? null) ? $data['main_order'] : [];
+
+        return is_array($orders[0] ?? null) ? $orders[0] : $data;
+    }
+
+    /**
+     * Buyer contact reveal: 0 = name, 1 = address, 2 = phone.
+     *
+     * @return array<string, mixed>
+     */
+    public function getBuyerContactInfo(string $sellerId, string $mainOrderId, int $contactInfoType): array
+    {
+        self::assertCookieSupportsOrders($this->cookie);
+
+        $payload = $this->request(
+            'POST',
+            '/api/fulfillment/orders/buyer_contact_info/get',
+            $sellerId,
+            [
+                'main_order_id' => $mainOrderId,
+                'contact_info_type' => $contactInfoType,
+            ],
+            '/order/detail?order_no='.$mainOrderId.'&shop_region='.$this->region,
+            true,
+        );
+
+        return is_array($payload['data'] ?? null) ? $payload['data'] : [];
+    }
+
+    /**
+     * Parallel buyer contact reveals. Keys results as "{orderId}:{type}".
+     *
+     * @param  list<array{order_id: string, type: int}>  $jobs
+     * @return array<string, array<string, mixed>>
+     */
+    public function getBuyerContactInfoMany(string $sellerId, array $jobs): array
+    {
+        self::assertCookieSupportsOrders($this->cookie);
+
+        if ($jobs === []) {
+            return [];
+        }
+
+        $responses = Http::pool(function ($pool) use ($sellerId, $jobs) {
+            foreach ($jobs as $job) {
+                $orderId = (string) ($job['order_id'] ?? '');
+                $type = (int) ($job['type'] ?? -1);
+                if ($orderId === '' || ! in_array($type, [0, 1, 2], true)) {
+                    continue;
+                }
+
+                $built = $this->buildRequest(
+                    'POST',
+                    '/api/fulfillment/orders/buyer_contact_info/get',
+                    $sellerId,
+                    [
+                        'main_order_id' => $orderId,
+                        'contact_info_type' => $type,
+                    ],
+                    '/order/detail?order_no='.$orderId.'&shop_region='.$this->region,
+                    true,
+                );
+
+                $pool->as($orderId.':'.$type)
+                    ->withHeaders($built['headers'])
+                    ->timeout(45)
+                    ->send('POST', $built['url'], ['json' => $built['body']]);
+            }
+        });
+
+        $out = [];
+        foreach ($responses as $key => $response) {
+            if ($response instanceof \Throwable) {
+                Log::warning('marketplace.tiktok.contact_pool_exception', [
+                    'key' => (string) $key,
+                    'message' => $response->getMessage(),
+                ]);
+                continue;
+            }
+
+            if (! $response instanceof Response) {
+                continue;
+            }
+
+            try {
+                $payload = $this->unwrap($response);
+                $out[(string) $key] = is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            } catch (RuntimeException $exception) {
+                Log::warning('marketplace.tiktok.contact_pool_failed', [
+                    'key' => (string) $key,
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array{url: string, headers: array<string, string>, body: array<string, mixed>}
+     */
+    private function buildRequest(
+        string $method,
+        string $path,
+        string $sellerId,
+        array $body = [],
+        ?string $refererPath = null,
+        bool $desktopUserAgent = false,
+    ): array {
         $host = sprintf('https://seller-%s.tiktok.com', strtolower($this->region));
         $csrf = self::cookieValue($this->cookie, 'tt_csrf_token');
+        if ($csrf === '') {
+            $csrf = self::cookieValue($this->cookie, 'passport_csrf_token');
+        }
+        $referer = $host.($refererPath ?: '/product/rating?shop_region='.$this->region);
+        $userAgent = $desktopUserAgent
+            ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+            : 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36';
 
         $query = array_filter([
             'locale' => 'en',
@@ -250,7 +501,9 @@ class TikTokSellerReviewClient
             'browser_language' => 'en-GB',
             'browser_platform' => 'MacIntel',
             'browser_name' => 'Mozilla',
-            'browser_version' => '5.0',
+            'browser_version' => $desktopUserAgent
+                ? '5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+                : '5.0',
             'browser_online' => 'true',
             'timezone_name' => 'Asia/Kuala_Lumpur',
             'X-Tts-Oec-Bsid' => $this->oecBsid,
@@ -260,8 +513,8 @@ class TikTokSellerReviewClient
             'accept' => '*/*',
             'content-type' => 'application/json',
             'origin' => $host,
-            'referer' => $host.'/product/rating?shop_region='.$this->region,
-            'user-agent' => 'Mozilla/5.0 (Linux; Android 15; Pixel 9) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Mobile Safari/537.36',
+            'referer' => $referer,
+            'user-agent' => $userAgent,
             'x-tt-oec-region' => $this->region,
             'Cookie' => $this->cookie,
         ];
@@ -270,15 +523,35 @@ class TikTokSellerReviewClient
             $headers['x-tt-csrf-token'] = $csrf;
         }
 
-        $pending = Http::withHeaders($headers)->timeout(45);
-        $url = $host.$path.'?'.http_build_query($query);
+        return [
+            'url' => $host.$path.'?'.http_build_query($query),
+            'headers' => $headers,
+            'body' => $body,
+            'method' => $method,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function request(
+        string $method,
+        string $path,
+        string $sellerId,
+        array $body = [],
+        ?string $refererPath = null,
+        bool $desktopUserAgent = false,
+    ): array {
+        $built = $this->buildRequest($method, $path, $sellerId, $body, $refererPath, $desktopUserAgent);
+        $pending = Http::withHeaders($built['headers'])->timeout(45);
         $attempts = 0;
         $lastException = null;
 
         while ($attempts < 3) {
             $attempts++;
             try {
-                $response = $pending->send($method, $url, ['json' => $body]);
+                $response = $pending->send($method, $built['url'], ['json' => $built['body']]);
 
                 return $this->unwrap($response);
             } catch (RuntimeException $exception) {
@@ -292,11 +565,11 @@ class TikTokSellerReviewClient
                     throw $exception;
                 }
 
-                usleep(250000 * $attempts);
+                usleep(150000 * $attempts);
             }
         }
 
-        throw $lastException ?? new RuntimeException('TikTok seller review request failed.');
+        throw $lastException ?? new RuntimeException('TikTok seller request failed.');
     }
 
     /**
@@ -312,20 +585,29 @@ class TikTokSellerReviewClient
             );
         }
 
-        $code = $json['code'] ?? -1;
-        if ((int) $code !== 0) {
-            $message = (string) ($json['message'] ?? 'TikTok seller review request failed.');
+        $code = (int) ($json['code'] ?? -1);
+        if ($code !== 0) {
+            $message = trim((string) ($json['message'] ?? $json['msg'] ?? ''));
 
-            if ($this->looksLikeAuthFailure($response->status(), $message, $json)) {
+            if ($this->looksLikeAuthFailure($response->status(), $message, $json, $code)) {
                 throw new RuntimeException(
-                    'TikTok Seller Center cookie expired or is invalid. Paste a fresh cookie for this shop and try again.',
-                    (int) $code,
+                    'TikTok Seller Center cookie expired or is invalid. Open Seller Center → Orders, then paste a fresh Cookie header for this shop and try again.',
+                    $code,
+                );
+            }
+
+            if ($code === 10000) {
+                throw new RuntimeException(
+                    'TikTok blocked the order request (security check). Open seller-my.tiktok.com/order in your browser, then re-copy a fresh Cookie header under Marketplace → TikTok Shop.',
+                    $code,
                 );
             }
 
             throw new RuntimeException(
-                'TikTok Seller Center could not complete that request. Please try again.',
-                (int) $code,
+                $message !== ''
+                    ? 'TikTok Seller Center: '.$message
+                    : 'TikTok Seller Center could not complete that request. Please try again.',
+                $code,
             );
         }
 
@@ -335,9 +617,13 @@ class TikTokSellerReviewClient
     /**
      * @param  array<string, mixed>  $json
      */
-    private function looksLikeAuthFailure(int $status, string $message, array $json): bool
+    private function looksLikeAuthFailure(int $status, string $message, array $json, ?int $code = null): bool
     {
         if (in_array($status, [401, 403], true)) {
+            return true;
+        }
+
+        if (in_array($code, [98001002, 10102], true)) {
             return true;
         }
 

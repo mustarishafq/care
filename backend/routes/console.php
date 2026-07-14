@@ -12,4 +12,6 @@ Schedule::command('complaints:auto-close-delivered')->hourly();
 Schedule::command('complaints:stale-alerts')->hourly();
 Schedule::command('marketplace:refresh-tokens')->everyTenMinutes();
 Schedule::command('marketplace:low-rating-alerts')->dailyAt('08:00');
+Schedule::command('marketplace:sync-orders')->twiceDaily(0, 12);
+Schedule::command('marketplace:reveal-order-phones')->twiceDailyAt(0, 12, 30);
 

@@ -19,11 +19,13 @@ use App\Http\Controllers\Api\V1\TicketActivityController;
 use App\Http\Controllers\Api\V1\UnitOfMeasurementController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\MarketplacePlatformController;
+use App\Http\Controllers\Api\V1\MarketplaceOrderController;
 use App\Http\Controllers\Api\V1\MarketplaceReviewController;
 use App\Http\Controllers\Api\V1\MarketplaceWebhookController;
 use App\Http\Controllers\Api\V1\ShopeeController;
 use App\Http\Controllers\Api\V1\TikTokShopController;
 use App\Http\Controllers\Api\V1\WebhookController;
+use App\Http\Controllers\Api\V1\SchedulerLogController;
 use App\Http\Middleware\EnsureUserIsApproved;
 use Illuminate\Support\Facades\Route;
 
@@ -81,6 +83,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('system-configs', SystemConfigController::class);
 
         Route::get('users', [UserController::class, 'index']);
+        Route::get('scheduler-logs', [SchedulerLogController::class, 'index']);
         Route::post('users', [UserController::class, 'store']);
         Route::patch('users/{id}', [UserController::class, 'update']);
         Route::post('users/invite', [UserController::class, 'invite']);
@@ -115,8 +118,14 @@ Route::prefix('v1')->group(function () {
         Route::patch('marketplace/platforms/{platform}', [MarketplacePlatformController::class, 'update']);
         Route::get('marketplace/shops', [MarketplaceReviewController::class, 'shops']);
         Route::get('marketplace/reviews', [MarketplaceReviewController::class, 'index']);
+        Route::get('marketplace/reviews/export', [MarketplaceReviewController::class, 'export']);
         Route::get('marketplace/reviews/{id}', [MarketplaceReviewController::class, 'show']);
         Route::post('marketplace/reviews/sync', [MarketplaceReviewController::class, 'sync']);
         Route::post('marketplace/reviews/{id}/reply', [MarketplaceReviewController::class, 'reply']);
+        Route::get('marketplace/orders', [MarketplaceOrderController::class, 'index']);
+        Route::get('marketplace/orders/export', [MarketplaceOrderController::class, 'export']);
+        Route::get('marketplace/orders/{id}', [MarketplaceOrderController::class, 'show']);
+        Route::post('marketplace/orders/sync', [MarketplaceOrderController::class, 'sync']);
+        Route::post('marketplace/orders/reveal-phones', [MarketplaceOrderController::class, 'revealPhones']);
     });
 });

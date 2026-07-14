@@ -423,6 +423,38 @@ class MarketplaceReviewSyncService
     }
 
     /**
+     * All reviews matching the list filters (uncapped pagination) for exports.
+     *
+     * @return Builder<MarketplaceProductReview>
+     */
+    public function filteredReviewsForExport(
+        ?string $platform = null,
+        ?int $connectionId = null,
+        ?int $minRating = null,
+        ?int $maxRating = null,
+        ?string $replyStatus = null,
+        ?Carbon $startAt = null,
+        ?Carbon $endAt = null,
+        ?string $productName = null,
+        ?string $reviewerName = null,
+    ): Builder {
+        return $this->filteredReviewsQuery(
+            $platform,
+            $connectionId,
+            $minRating,
+            $maxRating,
+            $replyStatus,
+            $startAt,
+            $endAt,
+            $productName,
+            $reviewerName,
+        )
+            ->with('shopConnection')
+            ->orderByDesc('review_created_at')
+            ->orderByDesc('id');
+    }
+
+    /**
      * Aggregate counts for the same filters as the review list (all matching rows, not just the page).
      *
      * @return array{total: int, unreplied: int, replied: int, low: int}

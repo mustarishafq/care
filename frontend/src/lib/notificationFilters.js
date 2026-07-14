@@ -12,6 +12,7 @@ export const NOTIFICATION_TYPE_OPTIONS = [
   { value: 'ticket_assigned', label: 'Ticket assigned' },
   { value: 'status_changed', label: 'Status changed' },
   { value: 'sla_warning', label: 'SLA warning' },
+  { value: 'low_rating_review', label: 'Low rating review' },
   { value: 'overdue', label: 'Overdue' },
   { value: 'mention', label: 'Mention' },
   { value: 'general', label: 'General' },

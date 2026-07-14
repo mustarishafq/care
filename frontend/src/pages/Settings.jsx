@@ -63,6 +63,7 @@ import {
   DISPLAY_FORMAT_CONFIG_KEY,
   DISPLAY_FORMAT_DEFAULT,
   LOCALE_PRESETS,
+  PHONE_COUNTRY_CODE_PRESETS,
   createDisplayFormatters,
   normalizeDisplayFormat,
 } from '@/lib/displayFormat';
@@ -533,9 +534,8 @@ export default function Settings() {
                     Display &amp; format
                   </CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Workspace-wide number, money, and date formats used across Care.
-                  </p>
-                </div>
+                    Workspace-wide number, money, date, and phone formats used across Care.
+                  </p>                </div>
                 {canManage && (
                   <Button
                     size="sm"
@@ -559,6 +559,7 @@ export default function Settings() {
                       updateDisplayFormatForm({
                         locale: value,
                         ...(preset?.currency ? { currency_code: preset.currency } : {}),
+                        ...(preset?.phone ? { phone_country_code: preset.phone } : {}),
                       });
                     }}
                     disabled={!canManage}
@@ -647,9 +648,31 @@ export default function Settings() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label className="text-xs text-muted-foreground">Phone country code</Label>
+                  <Select
+                    value={displayFormatForm.phone_country_code}
+                    onValueChange={(value) => updateDisplayFormatForm({ phone_country_code: value })}
+                    disabled={!canManage}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PHONE_COUNTRY_CODE_PRESETS.map((preset) => (
+                        <SelectItem key={preset.value} value={preset.value}>
+                          {preset.label} · {preset.sample}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Marketplace numbers are stored as international format, e.g. +60139989571.
+                  </p>
+                </div>
               </div>
 
-              <div className="rounded-xl border border-border bg-muted/30 p-3 grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+              <div className="rounded-xl border border-border bg-muted/30 p-3 grid grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Number</p>
                   <p className="font-medium tabular-nums mt-0.5">{displayFormatPreview.formatNumber(12139)}</p>
@@ -665,6 +688,10 @@ export default function Settings() {
                 <div>
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Date &amp; time</p>
                   <p className="font-medium mt-0.5">{displayFormatPreview.formatDateTime(previewNow)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Phone</p>
+                  <p className="font-medium tabular-nums mt-0.5">{displayFormatPreview.formatPhone('0139989571')}</p>
                 </div>
               </div>
             </CardContent>

@@ -8,14 +8,26 @@ export const DISPLAY_FORMAT_DEFAULT = {
   currency_decimals: 2,
   date_format: 'dd/MM/yyyy',
   datetime_format: 'dd/MM/yyyy HH:mm',
+  phone_country_code: '+60',
 };
 
 export const LOCALE_PRESETS = [
-  { value: 'en-MY', label: 'Malaysia (English)', currency: 'MYR', sample: '1,000.00' },
-  { value: 'en-US', label: 'United States', currency: 'USD', sample: '1,000.00' },
-  { value: 'en-GB', label: 'United Kingdom', currency: 'GBP', sample: '1,000.00' },
-  { value: 'id-ID', label: 'Indonesia', currency: 'IDR', sample: '1.000,00' },
-  { value: 'de-DE', label: 'Germany', currency: 'EUR', sample: '1.000,00' },
+  { value: 'en-MY', label: 'Malaysia (English)', currency: 'MYR', phone: '+60', sample: '1,000.00' },
+  { value: 'en-US', label: 'United States', currency: 'USD', phone: '+1', sample: '1,000.00' },
+  { value: 'en-GB', label: 'United Kingdom', currency: 'GBP', phone: '+44', sample: '1,000.00' },
+  { value: 'id-ID', label: 'Indonesia', currency: 'IDR', phone: '+62', sample: '1.000,00' },
+  { value: 'de-DE', label: 'Germany', currency: 'EUR', phone: '+49', sample: '1.000,00' },
+];
+
+export const PHONE_COUNTRY_CODE_PRESETS = [
+  { value: '+60', label: 'Malaysia (+60)', sample: '+60139989571' },
+  { value: '+65', label: 'Singapore (+65)', sample: '+6591234567' },
+  { value: '+62', label: 'Indonesia (+62)', sample: '+628123456789' },
+  { value: '+66', label: 'Thailand (+66)', sample: '+66812345678' },
+  { value: '+63', label: 'Philippines (+63)', sample: '+639123456789' },
+  { value: '+84', label: 'Vietnam (+84)', sample: '+84912345678' },
+  { value: '+1', label: 'United States (+1)', sample: '+12025550123' },
+  { value: '+44', label: 'United Kingdom (+44)', sample: '+447911123456' },
 ];
 
 export const DATE_FORMAT_PRESETS = [
@@ -52,7 +64,36 @@ export function normalizeDisplayFormat(raw) {
     datetime_format: typeof src.datetime_format === 'string' && src.datetime_format.trim()
       ? src.datetime_format.trim()
       : DISPLAY_FORMAT_DEFAULT.datetime_format,
+    phone_country_code: normalizePhoneCountryCode(src.phone_country_code),
   };
+}
+
+export function normalizePhoneCountryCode(value) {
+  const raw = typeof value === 'string' ? value.trim() : '';
+  const cleaned = raw.replace(/[^\d+]/g, '');
+  if (!cleaned) return DISPLAY_FORMAT_DEFAULT.phone_country_code;
+  const withPlus = cleaned.startsWith('+') ? cleaned : `+${cleaned}`;
+  const digits = withPlus.replace(/\D/g, '');
+  return digits ? `+${digits}` : DISPLAY_FORMAT_DEFAULT.phone_country_code;
+}
+
+/** Format local/raw phones to +60139989571 using configured country code. */
+export function formatPhoneNumber(value, settings = DISPLAY_FORMAT_DEFAULT, options = {}) {
+  if (value === null || value === undefined || value === '') return options.empty ?? '—';
+  const cfg = normalizeDisplayFormat(settings);
+  const cc = cfg.phone_country_code;
+  const ccDigits = cc.replace(/\D/g, '');
+  const digits = String(value).replace(/\D/g, '');
+  if (!digits) return options.empty ?? '—';
+
+  let local;
+  if (ccDigits && digits.startsWith(ccDigits)) {
+    local = digits.slice(ccDigits.length);
+  } else {
+    local = digits.replace(/^0+/, '');
+  }
+  if (!local) return options.empty ?? '—';
+  return `${cc}${local}`;
 }
 
 function toNumber(value) {
@@ -151,5 +192,6 @@ export function createDisplayFormatters(settings = DISPLAY_FORMAT_DEFAULT) {
     formatMoney: (value, options) => formatMoney(value, cfg, options),
     formatDate: (value, options) => formatDate(value, cfg, options),
     formatDateTime: (value, options) => formatDateTime(value, cfg, options),
+    formatPhone: (value, options) => formatPhoneNumber(value, cfg, options),
   };
 }

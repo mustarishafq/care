@@ -76,4 +76,13 @@ class MarketplaceShopConnection extends Model
             'token_refresh_failed_at' => null,
         ]);
     }
+
+    public function usesSellerCookie(): bool
+    {
+        $metadata = is_array($this->metadata) ? $this->metadata : [];
+
+        return ($metadata['auth_mode'] ?? null) === 'seller_cookie'
+            || $this->access_token === 'seller_cookie'
+            || $this->shop_cipher === 'seller_cookie';
+    }
 }

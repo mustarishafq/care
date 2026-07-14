@@ -142,12 +142,69 @@ async function request(method, path, { body, formData, params } = {}) {
   return data;
 }
 
+function filenameFromContentDisposition(header) {
+  if (!header) return null;
+  const utfMatch = header.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+  if (utfMatch?.[1]) {
+    try {
+      return decodeURIComponent(utfMatch[1].trim().replace(/['"]/g, ''));
+    } catch {
+      return utfMatch[1].trim().replace(/['"]/g, '');
+    }
+  }
+  const plainMatch = header.match(/filename\s*=\s*("?)([^";]+)\1/i);
+  return plainMatch?.[2]?.trim() || null;
+}
+
+async function download(path, params = {}, fallbackFilename = 'download.xlsx') {
+  const url = new URL(`${API_BASE}${path}`, window.location.origin);
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
+  });
+
+  const headers = {
+    Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+  };
+
+  const token = getToken();
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  const response = await fetch(url.toString(), { method: 'GET', headers });
+
+  if (!response.ok) {
+    const { data, raw } = await readResponseBody(response);
+    const message = getApiErrorMessage(data, response.status || 500, raw);
+    throw new ApiError(message, response.status || 500, data);
+  }
+
+  const blob = await response.blob();
+  const filename = filenameFromContentDisposition(response.headers.get('content-disposition'))
+    || fallbackFilename;
+
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(objectUrl);
+
+  return { filename };
+}
+
 export const http = {
   get: (path, params) => request('GET', path, { params }),
   post: (path, body) => request('POST', path, { body }),
   patch: (path, body) => request('PATCH', path, { body }),
   delete: (path) => request('DELETE', path),
   upload: (path, formData) => request('POST', path, { formData }),
+  download,
 };
 
 export { ApiError };

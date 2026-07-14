@@ -20,6 +20,7 @@ import Users from '@/pages/Users';
 import Settings from '@/pages/Settings';
 import Products from '@/pages/Products';
 import RolesPermissions from '@/pages/RolesPermissions';
+import SchedulerLogs from '@/pages/SchedulerLogs';
 import Marketplace from '@/pages/Marketplace';
 import MarketplaceReviews from '@/pages/MarketplaceReviews';
 import SsoNexus from '@/pages/SsoNexus';
@@ -72,12 +73,15 @@ const AppRoutes = () => (
       <Route path="/settings" element={<Settings />} />
       <Route path="/products" element={<Products />} />
       <Route path="/roles" element={<RolesPermissions />} />
+      <Route path="/scheduler-logs" element={<SchedulerLogs />} />
       <Route path="/integrations" element={<Navigate to="/settings?tab=integrations" replace />} />
       <Route path="/marketplace" element={<Navigate to="/marketplace/tiktok-shop" replace />} />
+      <Route path="/marketplace/orders" element={<Navigate to="/marketplace/tiktok-shop?tab=orders" replace />} />
       <Route path="/marketplace/:platform" element={<Marketplace />} />
       <Route path="/tiktok-shop" element={<Navigate to="/marketplace/tiktok-shop" replace />} />
       <Route path="/shopee" element={<Navigate to="/marketplace/shopee" replace />} />
       <Route path="/marketplace-reviews" element={<MarketplaceReviews />} />
+      <Route path="/marketplace-orders" element={<Navigate to="/marketplace/tiktok-shop?tab=orders" replace />} />
       <Route path="/oms" element={<Navigate to="/settings?tab=integrations" replace />} />
     </Route>
     <Route path="*" element={<PageNotFound />} />

@@ -22,6 +22,9 @@ class SendLowRatingReviewAlerts extends Command
 
         if ($sync) {
             $this->info("Synced {$result['synced_shops']} shop(s); {$result['failed_shops']} failed.");
+            if (($result['failure_logs'] ?? 0) > 0) {
+                $this->warn("Logged {$result['failure_logs']} shop failure(s) to Scheduler Logs.");
+            }
         }
 
         $this->info("Found {$result['reviews']} low-rating review(s) (≤ {$maxRating}).");
