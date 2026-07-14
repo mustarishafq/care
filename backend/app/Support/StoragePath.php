@@ -46,6 +46,28 @@ class StoragePath
         return rtrim(config('app.url'), '/').'/storage/'.self::normalize($path);
     }
 
+    /**
+     * Resolve a stored avatar for API clients.
+     * Absolute URLs pass through; relative /storage paths become APP_URL-based URLs.
+     */
+    public static function resolveAvatarUrl(?string $avatarUrl): ?string
+    {
+        if ($avatarUrl === null) {
+            return null;
+        }
+
+        $avatarUrl = trim($avatarUrl);
+        if ($avatarUrl === '') {
+            return null;
+        }
+
+        if (Str::startsWith($avatarUrl, ['http://', 'https://'])) {
+            return $avatarUrl;
+        }
+
+        return self::url($avatarUrl);
+    }
+
     /** @param  array<int, string>|null  $paths */
     public static function urlMany(?array $paths): array
     {

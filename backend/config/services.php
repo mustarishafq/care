@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'nexus' => [
+        // Nexus API / storage host (not the Brain SPA). Used to resolve profile-picture URLs.
+        'base_url' => env('NEXUS_BASE_URL'),
+    ],
+
 ];

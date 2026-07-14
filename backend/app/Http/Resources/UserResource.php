@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Http\Resources\Concerns\HasLegacyDates;
 use App\Support\Permissions;
+use App\Support\StoragePath;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,6 +21,7 @@ class UserResource extends JsonResource
             'email' => $this->email,
             'nexus_sso_id' => $this->nexus_sso_id,
             'full_name' => $this->full_name ?? $this->name,
+            'avatar_url' => StoragePath::resolveAvatarUrl($this->avatar_url),
             'phone' => $this->phone,
             'role_id' => $this->role_id ? (string) $this->role_id : null,
             'role_label' => $this->resource->getRoleLabel(),

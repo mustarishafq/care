@@ -280,7 +280,7 @@ Verified in `backend/app/Services/NexusJwtService.php`.
 |-------|---------|
 | `iss` | Must match configured issuer if issuer is set |
 | `name` | Display name; falls back to email (`users.full_name`) |
-| `profile_picture` | Absolute URL to the user's Nexus avatar. Synced to `users.avatar_url` on every SSO login (see [Profile Picture Syncing](#profile-picture-syncing)). |
+| `profile_picture` | URL (absolute or relative) to the user's Nexus avatar. Downloaded and cached locally on every SSO login (see [Profile Picture Syncing](#profile-picture-syncing)). |
 | `redirect_to` | Post-login redirect within this app (sanitized against `FRONTEND_URL`) |
 | `return_to` | Post-logout redirect back to Nexus (sanitized against Expected Issuer URL) |
 
@@ -288,15 +288,16 @@ Verified in `backend/app/Services/NexusJwtService.php`.
 
 ## User Provisioning
 
-On successful verification (`POST /api/sso/nexus/verify`):
+On successful verification (`POST /api/sso/nexus/verify` or this app’s `POST /api/auth/sso/nexus`):
 
-1. Lookup by `nexus_sso_id` (`sub` claim).
+1. Lookup by `nexus_sso_id` / `sso_subject` (`sub` claim).
 2. If not found, lookup by `email`.
-3. If found: update `nexus_sso_id`, `full_name`, and `email`.
+3. If found: update SSO subject / name / email as your app’s rules allow, and sync avatar when a profile-picture claim is present (see [Profile Picture Syncing](#profile-picture-syncing)).
 4. If not found: create user with:
    - Random password hash (not used for SSO login)
-   - `approved`: `1` (skips manual admin approval)
-   - Role from `default_role_id` / `default_role` in config, else built-in `user`
+   - `approved`: `1` (skips manual admin approval) — or `status: active` if your app uses status instead
+   - Role from `default_role_id` / `default_role` in config, else built-in default
+   - `avatar_url` from the synced profile picture when present
 
 Existing users who are not approved (`approved = 0`) fail with `403 User account is not active.`
 
@@ -306,56 +307,158 @@ SSO sign-in and auto-registration are written to the audit log as `sso_login` an
 
 ## Profile Picture Syncing
 
-When a Nexus user has a profile picture, the SSO JWT includes a `profile_picture` claim containing a URL to their avatar image hosted on Nexus. The claim may be an absolute URL (`https://nexus.example.com/storage/profile-pictures/abc.jpg`) or a relative path (`/storage/profile-pictures/abc.jpg`).
+When a Nexus user has a profile picture, the SSO JWT includes a `profile_picture` claim with a URL to their avatar on Nexus. Satellite apps should **download and cache** that image locally (not hotlink Nexus storage forever). This app does that on every SSO login and exposes a stable `avatar_url` on the user payload for UI display.
 
-### How it works
+Use this section as the portable contract when wiring the same behavior into another EMZI satellite.
 
-On every SSO login (`POST /api/auth/sso/nexus`):
+### Claim shapes Nexus may send
 
-1. The backend reads the `profile_picture` claim from the decoded JWT.
-2. **Relative paths are resolved** — if the claim starts with `/` (e.g. `/storage/profile-pictures/abc.jpg`), the backend prepends the JWT issuer URL (or the configured Expected Issuer) to form a full URL before storing it.
-3. If the claim is present and non-empty, the resolved URL is stored in `users.avatar_url`.
-4. If the claim is absent, the existing `avatar_url` is **not** cleared — the user may not have set a picture in Nexus.
-4. The `avatar_url` is returned in the user payload from the API, and displayed in the **TopBar** avatar and **Profile** page.
+Accept any of these JWT claims (first non-empty wins):
 
-This means the avatar updates automatically on each SSO login — whenever the user changes their profile picture in Nexus, the next SSO launch propagates the new URL.
+| Claim | Notes |
+|-------|--------|
+| `profile_picture` | Preferred Nexus claim |
+| `profilePicture` | Camel-case alias |
+| `avatar_url` / `picture` / `avatar` | Defensive aliases |
+
+Value may be:
+
+| Form | Example |
+|------|---------|
+| Absolute URL | `https://emzinexus.com/storage/profile-pictures/abc.jpg` |
+| Relative path | `/storage/profile-pictures/abc.jpg` |
+
+**Important:** Nexus profile files usually live on the **Nexus API / storage host**, not the Brain SPA issuer host. An absolute URL whose path starts with `/storage/` should be rehosted against `NEXUS_BASE_URL` (e.g. `https://brainapi.emzinexus.com/storage/...`) before fetch.
+
+### Recommended flow (portable)
+
+```
+Nexus JWT claim                  Your satellite backend
+───────────────                  ──────────────────────
+profile_picture = URL/path  ──►  Resolve to absolute fetch URL
+                                      │
+                                      ▼
+                                 HTTP GET image (timeout ~10s)
+                                      │
+                         success? ────┴──── fail?
+                            │                 │
+                            ▼                 ▼
+                 Validate bytes are image    Store resolved remote URL
+                 Save to local public disk   as fallback in avatar_url
+                 Store local path in DB
+                            │
+                            ▼
+                 API returns absolute avatar_url
+                 Frontend renders <img> / Avatar with initials fallback
+```
+
+On every successful SSO verify / login:
+
+1. **Extract** the profile-picture claim (table above).
+2. **Resolve** a fetchable absolute source URL:
+   - Already `http(s)://…` → use as-is, unless path is `/storage/…` then rewrite origin to `NEXUS_BASE_URL`.
+   - Relative `/storage/…` → `{NEXUS_BASE_URL}/storage/…`.
+   - Other relative paths → `{issuer or Expected Issuer}/{path}` , else `NEXUS_BASE_URL`.
+3. **Download** the image from that URL.
+4. **Validate** response body is a real image (`jpeg` / `png` / `gif` / `webp`), reasonably sized (skip tiny/empty payloads).
+5. **Save** under your public storage disk, e.g. `profile-pictures/{random40}.{ext}`, and store **`/storage/profile-pictures/...`** in `users.avatar_url`.
+6. **Fallback:** if download or validation fails, store the resolved **remote** URL so the avatar still displays.
+7. **Do not clear** `avatar_url` when the claim is missing — preserve the last known picture.
+8. On **create** and **refresh** of SSO users, set `avatar_url` only when step 5/6 produced a non-empty value.
+
+Avatars refresh on each SSO login: after a user changes their picture in Nexus, the next launch re-fetches and replaces the local cache path.
 
 ### Schema
 
-The `avatar_url` column (`VARCHAR(2048)`, nullable) is added to the `users` table by migration `2026_07_04_000004_add_avatar_url_to_users_table`.
+Add a nullable column on users:
+
+```sql
+ALTER TABLE users ADD COLUMN avatar_url VARCHAR(2048) NULL;
+```
+
+Reference migration in this app: `backend/database/migrations/2026_07_04_000004_add_avatar_url_to_users_table.php`.
+
+Ensure the public disk is web-accessible (Laravel: `php artisan storage:link` so `/storage/...` maps to `storage/app/public/...`).
+
+### API response — always return a displayable URL
+
+Store relative paths in the DB when possible (`/storage/profile-pictures/...`). When serializing the user for the frontend, resolve to an absolute URL:
+
+| Stored `avatar_url` | Returned to client |
+|---------------------|--------------------|
+| `https://…` | unchanged |
+| `/storage/profile-pictures/….jpg` | `{APP_URL}/storage/profile-pictures/….jpg` |
+| empty / null | `null` |
+
+This app does that in `ApiSerializer::resolveAvatarUrl()` using `config('app.url')`.
 
 ### Frontend display
 
-The `avatar_url` field (when present) is rendered using `<AvatarImage>` from the Radix UI avatar component. If the URL is missing or fails to load, the component falls back to the user's initials.
+Contract for any satellite UI:
 
-Components that display the SSO-synced avatar:
+1. Prefer `user.avatar_url` from the auth/user API payload.
+2. Render it as an image (`<img>` or Radix/shadcn `Avatar` + `AvatarImage`).
+3. On missing URL or load error, fall back to **initials** from `full_name` / `email`.
 
-| Component | Location |
-|-----------|----------|
-| TopBar (desktop account menu) | `frontend/src/components/layout/TopBar.jsx` |
-| Profile page (hero avatar) | `frontend/src/pages/ProfilePage.js` |
+This app’s shared component is `frontend/src/components/UserAvatar.jsx` (`src = avatarUrl ?? user?.avatar_url`).
 
-### Important notes
+| Surface | Location |
+|---------|----------|
+| TopBar account menu | `frontend/src/components/layout/TopBar.jsx` |
+| Profile hero | `frontend/src/pages/ProfilePage.js` |
+| Pickers / recognition feeds | any consumer of `UserAvatar` |
 
-- The URL points to Nexus storage — no need to download or re-upload the image.
-- The avatar is **only** synced during SSO login. Manually created accounts (password login) are not affected.
-- If the `profile_picture` claim is omitted (e.g. the user launches with an additional SSO email), the existing avatar is preserved.
+### Backend implementation (this app)
+
+| Step | Where |
+|------|--------|
+| Extract + resolve + download + store | `AuthController` — `extractProfilePictureClaim`, `resolveProfilePictureSourceUrl`, `syncProfilePicture` |
+| Persist on provision / refresh | `provisionSsoUser`, `refreshSsoUser` (`avatar_url` only if non-empty) |
+| Absolute URL in API JSON | `backend/app/Services/ApiSerializer.php` → `resolveAvatarUrl` |
+| Nexus storage base | `NEXUS_BASE_URL` → `config('management.nexus_base_url')` |
+
+Pseudo-flow matching this codebase:
+
+```php
+$claim = extractProfilePictureClaim($payload); // profile_picture, …
+$localOrRemote = syncProfilePicture($claim, $issuer); // returns /storage/... or https://...
+if ($localOrRemote !== '') {
+    $user->avatar_url = $localOrRemote;
+}
+// API:
+'avatar_url' => resolveAvatarUrl($user->avatar_url); // make /storage absolute via APP_URL
+```
+
+### Rules for other systems
+
+- Sync **only** on SSO login (or an explicit refresh you add later)—not on every page load.
+- Prefer **local cache** so your UI does not depend on Nexus being reachable for every avatar request.
+- Accept relative and absolute claims; rewrite `/storage/` URLs onto the Nexus **API** base, not the SPA issuer.
+- Never wipe an existing avatar when Nexus omits the claim.
+- Keep stored values ≤ ~2048 characters; random filenames avoid collisions and stale CDN paths.
+- Password-only / manually created users are unchanged unless they later sign in via SSO with a picture claim.
 
 ---
 
 ## Backend Environment
 
-Ensure these are set for correct redirects and CORS in production:
+Ensure these are set for correct redirects, CORS, and avatar fetch in production:
 
 ```env
 JWT_SECRET=<long-random-string>
 JWT_EXPIRES_IN=7d
 FRONTEND_URL=https://{frontend-domain}
+APP_URL=https://{api-domain}
+NEXUS_BASE_URL=https://{nexus-api-domain}
 ```
 
-`FRONTEND_URL` supports comma-separated origins for CORS and is used when sanitizing absolute `redirect_to` URLs. It is **not** used for `return_to`; that uses the **Expected Issuer URL** from SSO settings instead.
+| Variable | Purpose |
+|----------|---------|
+| `FRONTEND_URL` | CORS + sanitizing absolute `redirect_to` URLs (not used for `return_to`; that uses Expected Issuer). |
+| `APP_URL` | API origin used to turn `/storage/...` avatar paths into absolute URLs in JSON. |
+| `NEXUS_BASE_URL` | Nexus API/storage host used when resolving `/storage/...` profile-picture URLs before download. |
 
-(Laravel apps may also set `APP_URL` to the API origin; Node apps may use `PORT` — framework-specific vars do not change the SSO contract.)
+(Laravel apps may also set other framework vars; Node apps may use `PORT` — those do not change the SSO contract.)
 
 ---
 
@@ -387,20 +490,26 @@ Verify endpoint is rate-limited to **10 requests/minute** per IP.
 | Sign out lands on Nexus root with `?return_to=` in the URL | Nexus passed a full absolute URL and an older build used query-param-only logout | Rebuild frontend; prefer relative paths like `/applications` on SSO launch; current builds navigate directly to Nexus paths/URLs on the same origin |
 | Brief flash of login page on SSO sign-out | React auth state cleared before navigation (fixed in current builds) | Rebuild frontend; logout now calls `window.location.replace()` before clearing auth state |
 | API errors from SSO page | Wrong API base URL or CORS | Set `VITE_API_BASE_URL` and backend `FRONTEND_URL` for production |
+| Avatar missing after SSO | Claim omitted, or download failed and no fallback URL | Confirm JWT includes `profile_picture`; set `NEXUS_BASE_URL`; ensure `storage:link` and public disk writable |
+| Avatar URL 404 in UI | Relative `/storage/...` not resolved or symlink missing | Set `APP_URL`; run `php artisan storage:link`; check `ApiSerializer::resolveAvatarUrl` |
+| Avatar still shows old Nexus host | Cached remotely only / hotlinked | Prefer local cache path from `syncProfilePicture`; re-login via SSO to refresh |
 
 ---
 
-## Related Code (Linkly reference)
+## Related Code (Linkly / management reference)
 
 | Area | Location |
 |------|----------|
-| SSO verification route | `backend/app/Http/Controllers/SsoController.php` |
+| SSO verification route | `backend/app/Http/Controllers/SsoController.php` (Linkly) / `AuthController::ssoNexus` (this app: `POST /api/auth/sso/nexus`) |
 | JWT verification | `backend/app/Services/NexusJwtService.php` |
 | Redirect sanitization | `backend/app/Services/SsoRedirectService.php` |
-| SSO landing page | `frontend/src/pages/SsoNexus.jsx` |
+| SSO landing page | `frontend/src/pages/SsoNexus.jsx` / `frontend/src/pages/SSONexusCallback.js` |
 | Admin settings UI | `frontend/src/pages/Settings.jsx` (`NexusSsoSettings`) |
 | Frontend redirect / logout helpers | `frontend/src/lib/ssoRedirect.js`, `frontend/src/lib/AuthContext.jsx` |
 | Nexus Brain URL / logout redirect | `frontend/src/lib/nexusBrain.js` |
+| Profile picture download + cache | `AuthController` — `syncProfilePicture` / `resolveProfilePictureSourceUrl` |
+| Avatar URL in API payload | `backend/app/Services/ApiSerializer.php` (`resolveAvatarUrl`) |
+| Avatar UI component | `frontend/src/components/UserAvatar.jsx` |
 | Database schema | `backend/database/migrations/` |
 | Avatar URL column | `backend/database/migrations/2026_07_04_000004_add_avatar_url_to_users_table.php` |
 | Default SSO settings | `backend/database/seeders/SettingsSeeder.php` |

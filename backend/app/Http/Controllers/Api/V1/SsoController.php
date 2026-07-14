@@ -7,6 +7,7 @@ use App\Http\Resources\UserResource;
 use App\Models\Role;
 use App\Models\SystemConfig;
 use App\Models\User;
+use App\Services\ProfilePictureSyncService;
 use App\Support\SsoRedirect;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,10 @@ use Illuminate\Support\Facades\Hash;
 
 class SsoController extends Controller
 {
+    public function __construct(
+        private readonly ProfilePictureSyncService $profilePictures,
+    ) {}
+
     public function verify(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -75,6 +80,15 @@ class SsoController extends Controller
             $displayName = $email;
         }
 
+        $issuer = ! empty($ssoSettings['issuer'])
+            ? (string) $ssoSettings['issuer']
+            : (isset($claims['iss']) ? (string) $claims['iss'] : null);
+
+        $pictureClaim = $this->profilePictures->extractClaim($claims);
+        $syncedAvatar = $pictureClaim !== ''
+            ? $this->profilePictures->sync($pictureClaim, $issuer)
+            : '';
+
         $user = User::where('nexus_sso_id', $ssoId)->first();
 
         if (! $user) {
@@ -82,12 +96,16 @@ class SsoController extends Controller
         }
 
         if ($user) {
-            $user->update([
+            $attributes = [
                 'nexus_sso_id' => $ssoId,
                 'name' => $displayName,
                 'full_name' => $displayName,
                 'email' => $email,
-            ]);
+            ];
+            if ($syncedAvatar !== '') {
+                $attributes['avatar_url'] = $syncedAvatar;
+            }
+            $user->update($attributes);
         } else {
             $user = User::create([
                 'email' => $email,
@@ -98,6 +116,7 @@ class SsoController extends Controller
                 'role_id' => $defaultRoleId,
                 'status' => User::STATUS_ACTIVE,
                 'approval_status' => User::APPROVAL_APPROVED,
+                'avatar_url' => $syncedAvatar !== '' ? $syncedAvatar : null,
             ]);
         }
 

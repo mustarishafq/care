@@ -2,7 +2,7 @@ import { db } from '@/api/db';
 
 import React, { useState } from 'react';
 import { useAuth } from '@/lib/AuthContext';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import UserAvatar from '@/components/UserAvatar';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,10 +25,6 @@ export default function ProfileMenu({ user }) {
   const [showCurrentPass, setShowCurrentPass] = useState(false);
   const [showNewPass, setShowNewPass] = useState(false);
   const [saving, setSaving] = useState(false);
-
-  const initials = user?.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : '??';
 
   const resetPasswordForm = () => {
     setPasswordForm({ current: '', password: '', confirm: '' });
@@ -86,9 +82,11 @@ export default function ProfileMenu({ user }) {
             <span className="text-sm font-medium leading-none text-foreground truncate max-w-[160px] hidden md:inline">
               {user?.full_name || 'Loading...'}
             </span>
-            <Avatar className="h-8 w-8 rounded-lg shrink-0">
-              <AvatarFallback className="rounded-lg bg-primary/10 text-sm font-semibold text-primary">{initials}</AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              user={user}
+              className="h-8 w-8 rounded-lg shrink-0"
+              fallbackClassName="rounded-lg bg-primary/10 text-sm font-semibold text-primary"
+            />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
@@ -110,9 +108,11 @@ export default function ProfileMenu({ user }) {
         <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>Edit Profile</DialogTitle></DialogHeader>
           <div className="flex justify-center mb-2">
-            <Avatar className="w-16 h-16 bg-primary/10 border-2 border-primary/20">
-              <AvatarFallback className="text-xl font-bold text-primary bg-transparent">{initials}</AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              user={user}
+              className="w-16 h-16 bg-primary/10 border-2 border-primary/20"
+              fallbackClassName="text-xl font-bold text-primary bg-transparent"
+            />
           </div>
           <div className="space-y-3">
             <div className="space-y-1.5">

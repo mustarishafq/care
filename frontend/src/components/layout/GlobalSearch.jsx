@@ -16,16 +16,10 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import UserAvatar from '@/components/UserAvatar';
 
 const DEBOUNCE_MS = 250;
-
-function userInitials(user) {
-  return user.full_name
-    ? user.full_name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
-    : '??';
-}
 
 function departmentLabel(user) {
   const names = (user.departments ?? []).map((d) => d.name).filter(Boolean);
@@ -214,11 +208,11 @@ function GlobalSearchDialog({ open, onOpenChange }) {
                 onSelect={handleSelectUser}
                 className="gap-3"
               >
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarFallback className="bg-primary/10 text-xs font-semibold text-primary">
-                    {userInitials(user)}
-                  </AvatarFallback>
-                </Avatar>
+                <UserAvatar
+                  user={user}
+                  className="h-8 w-8 shrink-0"
+                  fallbackClassName="bg-primary/10 text-xs font-semibold text-primary"
+                />
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{user.full_name}</p>
                   {departmentLabel(user) && (

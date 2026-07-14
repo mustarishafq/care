@@ -10,7 +10,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,14 +32,9 @@ import PageContent from '@/components/layout/PageContent';
 import { getRoleLabel } from '@/lib/roles';
 import { usePermissions } from '@/lib/usePermissions';
 import StatCard from '@/components/dashboard/StatCard';
+import UserAvatar from '@/components/UserAvatar';
 
 const EMPTY_FILTERS = { search: '', role: '', status: '', department: '', approval: '' };
-
-function userInitials(user) {
-  return user.full_name
-    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-    : '??';
-}
 
 export default function Users() {
   const { user: currentUser } = useCurrentUser();
@@ -398,9 +392,11 @@ export default function Users() {
                   <TableRow key={u.id} className={isPending ? 'bg-amber-50/50 dark:bg-amber-900/10' : undefined}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback className="text-[10px] font-bold">{userInitials(u)}</AvatarFallback>
-                        </Avatar>
+                        <UserAvatar
+                          user={u}
+                          className="w-8 h-8"
+                          fallbackClassName="text-[10px] font-bold"
+                        />
                         <div>
                           <p className="font-medium text-sm">{u.full_name || 'Unnamed'}</p>
                           {u.phone && <p className="text-xs text-muted-foreground">{u.phone}</p>}

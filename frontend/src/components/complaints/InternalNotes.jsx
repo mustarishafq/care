@@ -6,16 +6,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getUserDepartmentIds } from '@/lib/useDepartments';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import UserAvatar from '@/components/UserAvatar';
 import { format } from 'date-fns';
 import { Send, Loader2, AtSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { findMentionedUsers, invalidateNotificationQueries, parseMentionSegments } from '@/lib/notifications';
-
-function initials(name) {
-  if (!name) return '??';
-  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-}
 
 /** Render note content with @mentions highlighted */
 function NoteContent({ content, users }) {
@@ -154,9 +149,11 @@ export default function InternalNotes({ notes, complaintId, canAddNotes = false 
                       className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted text-left transition-colors"
                       onMouseDown={e => { e.preventDefault(); insertMention(u); }}
                     >
-                      <Avatar className="w-6 h-6 shrink-0">
-                        <AvatarFallback className="text-[9px] font-bold">{initials(u.full_name)}</AvatarFallback>
-                      </Avatar>
+                      <UserAvatar
+                        user={u}
+                        className="w-6 h-6 shrink-0"
+                        fallbackClassName="text-[9px] font-bold"
+                      />
                       <div className="min-w-0">
                         <p className="text-sm font-medium truncate">{u.full_name}</p>
                         <p className="text-[10px] text-muted-foreground truncate">{u.email}</p>
@@ -178,9 +175,12 @@ export default function InternalNotes({ notes, complaintId, canAddNotes = false 
       <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
         {[...notes].reverse().map(note => (
           <div key={note.id} className="flex gap-3 p-3 rounded-lg bg-muted/50 border border-transparent hover:border-border transition-colors">
-            <Avatar className="w-8 h-8 shrink-0 mt-0.5">
-              <AvatarFallback className="text-[10px] font-bold">{initials(note.author_name)}</AvatarFallback>
-            </Avatar>
+            <UserAvatar
+              name={note.author_name}
+              avatarUrl={note.author_avatar_url}
+              className="w-8 h-8 shrink-0 mt-0.5"
+              fallbackClassName="text-[10px] font-bold"
+            />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-sm font-medium">{note.author_name || 'Unknown'}</span>
