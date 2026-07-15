@@ -13,8 +13,10 @@ use App\Support\MarketplacePlatform;
 use App\Support\SimpleXlsxWriter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Throwable;
 
 class MarketplaceOrderController extends Controller
 {
@@ -197,10 +199,11 @@ class MarketplaceOrderController extends Controller
 
             $formatter = app(DisplayFormatService::class);
             $phoneCountryCode = $formatter->phoneCountryCode();
+            $shopNames = MarketplaceShopConnection::query()->pluck('shop_name', 'id');
 
-            // lazyById supports eager loads safely; cursor()+with() can hit MySQL unbuffered query errors.
-            // Reorder by id so keyset paging stays complete (export column order is still newest-first in the sheet via query defaults otherwise).
-            $rows = (function () use ($query, $platformLabels, $formatter, $phoneCountryCode) {
+            // Resolve shop names from a map (no relation queries during iteration).
+            // cursor()+shopConnection caused MySQL PDO 2014 on production.
+            $rows = (function () use ($query, $platformLabels, $formatter, $phoneCountryCode, $shopNames) {
                 foreach ($query->reorder()->orderBy('id')->lazyById(200) as $order) {
                     $addressRaw = is_array($order->buyer_address_raw) ? $order->buyer_address_raw : null;
                     $parts = $formatter->parseAddressParts($addressRaw);
@@ -214,7 +217,7 @@ class MarketplaceOrderController extends Controller
 
                     yield [
                         $platformLabels[$order->platform] ?? $order->platform,
-                        $order->shopConnection?->shop_name ?? '',
+                        (string) ($shopNames[$order->marketplace_shop_connection_id] ?? ''),
                         $order->external_order_id ?? '',
                         $order->order_status_label ?? (string) ($order->order_status ?? ''),
                         $order->buyer_nickname ?? '',
@@ -237,9 +240,9 @@ class MarketplaceOrderController extends Controller
                 }
             })();
 
-            $path = SimpleXlsxWriter::toTempFile($headers, $rows);
-        } catch (\Throwable $exception) {
-            \Illuminate\Support\Facades\Log::error('marketplace.orders.export_failed', [
+            $path = SimpleXlsxWriter::toTempFile($headers, $rows, 'Orders');
+        } catch (Throwable $exception) {
+            Log::error('marketplace.orders.export_failed', [
                 'message' => $exception->getMessage(),
                 'exception' => $exception::class,
             ]);

@@ -449,7 +449,6 @@ class MarketplaceReviewSyncService
             $productName,
             $reviewerName,
         )
-            ->with('shopConnection')
             ->orderByDesc('review_created_at')
             ->orderByDesc('id');
     }

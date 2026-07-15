@@ -14,7 +14,7 @@ class SimpleXlsxWriter
      * @param  list<string>  $headers
      * @param  iterable<int, list<string|int|float|null>>  $rows
      */
-    public static function toTempFile(array $headers, iterable $rows): string
+    public static function toTempFile(array $headers, iterable $rows, string $sheetName = 'Export'): string
     {
         if (! class_exists(ZipArchive::class)) {
             throw new RuntimeException('Excel export requires the PHP zip extension.');
@@ -32,9 +32,40 @@ class SimpleXlsxWriter
             throw new RuntimeException('Unable to prepare the export file.');
         }
 
+        $sheetPath = tempnam(sys_get_temp_dir(), 'care-sheet-');
+        if ($sheetPath === false) {
+            @unlink($xlsxPath);
+            throw new RuntimeException('Unable to create a temporary sheet file.');
+        }
+
+        $sheetHandle = fopen($sheetPath, 'wb');
+        if ($sheetHandle === false) {
+            @unlink($xlsxPath);
+            @unlink($sheetPath);
+            throw new RuntimeException('Unable to open the temporary sheet file.');
+        }
+
+        try {
+            fwrite($sheetHandle, '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                .'<sheetData>');
+            fwrite($sheetHandle, self::rowXml(1, $headers));
+
+            $rowIndex = 2;
+            foreach ($rows as $row) {
+                fwrite($sheetHandle, self::rowXml($rowIndex, $row));
+                $rowIndex++;
+            }
+
+            fwrite($sheetHandle, '</sheetData></worksheet>');
+        } finally {
+            fclose($sheetHandle);
+        }
+
         $zip = new ZipArchive;
         if ($zip->open($xlsxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             @unlink($xlsxPath);
+            @unlink($sheetPath);
             throw new RuntimeException('Unable to open the export archive.');
         }
 
@@ -64,11 +95,12 @@ XML);
 </Relationships>
 XML);
 
-        $zip->addFromString('xl/workbook.xml', <<<'XML'
+        $safeSheetName = self::escape(mb_substr($sheetName !== '' ? $sheetName : 'Export', 0, 31));
+        $zip->addFromString('xl/workbook.xml', <<<XML
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>
-    <sheet name="Reviews" sheetId="1" r:id="rId1"/>
+    <sheet name="{$safeSheetName}" sheetId="1" r:id="rId1"/>
   </sheets>
 </workbook>
 XML);
@@ -84,24 +116,20 @@ XML);
 </styleSheet>
 XML);
 
-        $sheet = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            .'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-            .'<sheetData>';
-
-        $sheet .= self::rowXml(1, $headers);
-        $rowIndex = 2;
-        foreach ($rows as $row) {
-            $sheet .= self::rowXml($rowIndex, $row);
-            $rowIndex++;
+        if (! $zip->addFile($sheetPath, 'xl/worksheets/sheet1.xml')) {
+            $zip->close();
+            @unlink($xlsxPath);
+            @unlink($sheetPath);
+            throw new RuntimeException('Unable to add the worksheet to the export archive.');
         }
-
-        $sheet .= '</sheetData></worksheet>';
-        $zip->addFromString('xl/worksheets/sheet1.xml', $sheet);
 
         if (! $zip->close()) {
             @unlink($xlsxPath);
+            @unlink($sheetPath);
             throw new RuntimeException('Unable to finalize the export archive.');
         }
+
+        @unlink($sheetPath);
 
         return $xlsxPath;
     }
@@ -142,7 +170,7 @@ XML);
     {
         return htmlspecialchars(
             preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value) ?? '',
-            ENT_QUOTES | ENT_XML1,
+            ENT_QUOTES | ENT_XML1 | ENT_SUBSTITUTE,
             'UTF-8',
         );
     }

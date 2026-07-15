@@ -226,14 +226,16 @@ class MarketplaceReviewController extends Controller
             'shopee' => 'Shopee',
         ];
 
-        $rows = (function () use ($query, $platformLabels) {
-            foreach ($query->cursor() as $review) {
+        $shopNames = MarketplaceShopConnection::query()->pluck('shop_name', 'id');
+
+        $rows = (function () use ($query, $platformLabels, $shopNames) {
+            foreach ($query->reorder()->orderBy('id')->lazyById(200) as $review) {
                 $hasReply = filled($review->seller_reply)
                     || (int) (data_get($review->raw_metadata, 'reply_count', 0)) > 0;
 
                 yield [
                     $platformLabels[$review->platform] ?? $review->platform,
-                    $review->shopConnection?->shop_name ?? '',
+                    (string) ($shopNames[$review->marketplace_shop_connection_id] ?? ''),
                     $review->product_name ?? '',
                     $review->external_product_id ?? '',
                     $review->rating ?? '',
@@ -250,7 +252,7 @@ class MarketplaceReviewController extends Controller
         })();
 
         try {
-            $path = SimpleXlsxWriter::toTempFile($headers, $rows);
+            $path = SimpleXlsxWriter::toTempFile($headers, $rows, 'Reviews');
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 500);
         }
