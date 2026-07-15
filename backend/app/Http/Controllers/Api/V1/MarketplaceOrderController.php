@@ -118,6 +118,10 @@ class MarketplaceOrderController extends Controller
     {
         $this->ensurePermission($request->user(), 'orders.view');
 
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
+        }
+
         $validated = $request->validate([
             'platform' => ['sometimes', 'nullable', 'string', 'max:32'],
             'shop_connection_id' => ['sometimes', 'nullable', 'integer'],
@@ -151,86 +155,100 @@ class MarketplaceOrderController extends Controller
             return response()->json(['message' => 'Unsupported order status filter.'], 422);
         }
 
-        $query = $this->orderSync->filteredOrdersForExport(
-            $validated['platform'] ?? null,
-            $validated['shop_connection_id'] ?? null,
-            $orderId !== '' ? $orderId : null,
-            $buyer !== '' ? $buyer : null,
-            $productName !== '' ? $productName : null,
-            $startAt,
-            $endAt,
-            $orderStatuses,
-        );
-
-        $headers = [
-            'Platform',
-            'Shop',
-            'Order ID',
-            'Status',
-            'Buyer nickname',
-            'Buyer name',
-            'Buyer phone',
-            'Address',
-            'City',
-            'Postcode',
-            'State',
-            'Country',
-            'Products',
-            'Item count',
-            'Grand total',
-            'Currency',
-            'Pay method',
-            'Ordered at',
-            'Paid at',
-            'Contact synced at',
-        ];
-
-        $platformLabels = [
-            'tiktok_shop' => 'TikTok Shop',
-            'shopee' => 'Shopee',
-        ];
-
-        $formatter = app(DisplayFormatService::class);
-
-        $rows = (function () use ($query, $platformLabels, $formatter) {
-            foreach ($query->cursor() as $order) {
-                $addressRaw = is_array($order->buyer_address_raw) ? $order->buyer_address_raw : null;
-                $parts = $formatter->parseAddressParts($addressRaw);
-                // Fallback when only the flattened string is stored.
-                if ($parts['address'] === '' && filled($order->buyer_address)) {
-                    $parts['address'] = (string) $order->buyer_address;
-                }
-                $phone = $formatter->normalizePhone($order->buyer_phone) ?? $order->buyer_phone ?? '';
-
-                yield [
-                    $platformLabels[$order->platform] ?? $order->platform,
-                    $order->shopConnection?->shop_name ?? '',
-                    $order->external_order_id ?? '',
-                    $order->order_status_label ?? (string) ($order->order_status ?? ''),
-                    $order->buyer_nickname ?? '',
-                    $order->buyer_name ?? '',
-                    $phone,
-                    $parts['address'],
-                    $parts['city'],
-                    $parts['postcode'],
-                    $parts['state'],
-                    $parts['country'],
-                    $order->product_summary ?? '',
-                    $order->item_count ?? 0,
-                    $order->grand_total !== null ? (string) $order->grand_total : '',
-                    $order->currency ?? '',
-                    $order->pay_method ?? '',
-                    $order->order_created_at?->format('Y-m-d H:i:s') ?? '',
-                    $order->paid_at?->format('Y-m-d H:i:s') ?? '',
-                    $order->contact_synced_at?->format('Y-m-d H:i:s') ?? '',
-                ];
-            }
-        })();
-
         try {
+            $query = $this->orderSync->filteredOrdersForExport(
+                $validated['platform'] ?? null,
+                $validated['shop_connection_id'] ?? null,
+                $orderId !== '' ? $orderId : null,
+                $buyer !== '' ? $buyer : null,
+                $productName !== '' ? $productName : null,
+                $startAt,
+                $endAt,
+                $orderStatuses,
+            );
+
+            $headers = [
+                'Platform',
+                'Shop',
+                'Order ID',
+                'Status',
+                'Buyer nickname',
+                'Buyer name',
+                'Buyer phone',
+                'Address',
+                'City',
+                'Postcode',
+                'State',
+                'Country',
+                'Products',
+                'Item count',
+                'Grand total',
+                'Currency',
+                'Pay method',
+                'Ordered at',
+                'Paid at',
+                'Contact synced at',
+            ];
+
+            $platformLabels = [
+                'tiktok_shop' => 'TikTok Shop',
+                'shopee' => 'Shopee',
+            ];
+
+            $formatter = app(DisplayFormatService::class);
+            $phoneCountryCode = $formatter->phoneCountryCode();
+
+            // lazyById supports eager loads safely; cursor()+with() can hit MySQL unbuffered query errors.
+            // Reorder by id so keyset paging stays complete (export column order is still newest-first in the sheet via query defaults otherwise).
+            $rows = (function () use ($query, $platformLabels, $formatter, $phoneCountryCode) {
+                foreach ($query->reorder()->orderBy('id')->lazyById(200) as $order) {
+                    $addressRaw = is_array($order->buyer_address_raw) ? $order->buyer_address_raw : null;
+                    $parts = $formatter->parseAddressParts($addressRaw);
+                    // Fallback when only the flattened string is stored.
+                    if ($parts['address'] === '' && filled($order->buyer_address)) {
+                        $parts['address'] = (string) $order->buyer_address;
+                    }
+                    $phone = $formatter->normalizePhone($order->buyer_phone, $phoneCountryCode)
+                        ?? $order->buyer_phone
+                        ?? '';
+
+                    yield [
+                        $platformLabels[$order->platform] ?? $order->platform,
+                        $order->shopConnection?->shop_name ?? '',
+                        $order->external_order_id ?? '',
+                        $order->order_status_label ?? (string) ($order->order_status ?? ''),
+                        $order->buyer_nickname ?? '',
+                        $order->buyer_name ?? '',
+                        $phone,
+                        $parts['address'],
+                        $parts['city'],
+                        $parts['postcode'],
+                        $parts['state'],
+                        $parts['country'],
+                        $order->product_summary ?? '',
+                        $order->item_count ?? 0,
+                        $order->grand_total !== null ? (string) $order->grand_total : '',
+                        $order->currency ?? '',
+                        $order->pay_method ?? '',
+                        $order->order_created_at?->format('Y-m-d H:i:s') ?? '',
+                        $order->paid_at?->format('Y-m-d H:i:s') ?? '',
+                        $order->contact_synced_at?->format('Y-m-d H:i:s') ?? '',
+                    ];
+                }
+            })();
+
             $path = SimpleXlsxWriter::toTempFile($headers, $rows);
-        } catch (RuntimeException $exception) {
-            return response()->json(['message' => $exception->getMessage()], 500);
+        } catch (\Throwable $exception) {
+            \Illuminate\Support\Facades\Log::error('marketplace.orders.export_failed', [
+                'message' => $exception->getMessage(),
+                'exception' => $exception::class,
+            ]);
+
+            $message = $exception instanceof RuntimeException
+                ? $exception->getMessage()
+                : 'Unable to export marketplace orders.';
+
+            return response()->json(['message' => $message], 500);
         }
 
         $filename = 'marketplace-orders-'.now()->format('Y-m-d-His').'.xlsx';

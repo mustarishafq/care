@@ -62,6 +62,7 @@ function isTechnicalMessage(message) {
 
   return (
     /request failed\s*\(\s*\d+\s*\)/i.test(trimmed)
+    || /^server error\.?$/i.test(trimmed)
     || /\bHTTP\s*\d{3}\b/i.test(trimmed)
     || /\bstatus\s*[:=]?\s*\d{3}\b/i.test(trimmed)
     || /\bECONNREFUSED\b|\bETIMEDOUT\b|\bENOTFOUND\b/i.test(trimmed)

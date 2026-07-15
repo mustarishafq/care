@@ -166,7 +166,8 @@ async function download(path, params = {}, fallbackFilename = 'download.xlsx') {
   });
 
   const headers = {
-    Accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/json',
+    // Prefer JSON so Laravel returns parseable API errors instead of opaque "Server Error".
+    Accept: 'application/json, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   };
 
   const token = getToken();

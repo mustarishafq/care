@@ -16,6 +16,10 @@ class SimpleXlsxWriter
      */
     public static function toTempFile(array $headers, iterable $rows): string
     {
+        if (! class_exists(ZipArchive::class)) {
+            throw new RuntimeException('Excel export requires the PHP zip extension.');
+        }
+
         $path = tempnam(sys_get_temp_dir(), 'care-xlsx-');
         if ($path === false) {
             throw new RuntimeException('Unable to create a temporary export file.');
