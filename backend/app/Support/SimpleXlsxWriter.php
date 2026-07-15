@@ -20,19 +20,21 @@ class SimpleXlsxWriter
             throw new RuntimeException('Excel export requires the PHP zip extension.');
         }
 
-        $path = tempnam(sys_get_temp_dir(), 'care-xlsx-');
-        if ($path === false) {
+        $tempDir = self::writableTempDir();
+        $xlsxPath = tempnam($tempDir, 'care-xlsx-');
+        if ($xlsxPath === false) {
             throw new RuntimeException('Unable to create a temporary export file.');
         }
 
         // ZipArchive needs a real path ending in .xlsx for reliable MIME/download names.
-        $xlsxPath = $path.'.xlsx';
-        if (! @rename($path, $xlsxPath)) {
-            @unlink($path);
+        $finalPath = $xlsxPath.'.xlsx';
+        if (! @rename($xlsxPath, $finalPath)) {
+            @unlink($xlsxPath);
             throw new RuntimeException('Unable to prepare the export file.');
         }
+        $xlsxPath = $finalPath;
 
-        $sheetPath = tempnam(sys_get_temp_dir(), 'care-sheet-');
+        $sheetPath = tempnam($tempDir, 'care-sheet-');
         if ($sheetPath === false) {
             @unlink($xlsxPath);
             throw new RuntimeException('Unable to create a temporary sheet file.');
@@ -62,10 +64,16 @@ class SimpleXlsxWriter
             fclose($sheetHandle);
         }
 
+        $sheetXml = file_get_contents($sheetPath);
+        @unlink($sheetPath);
+        if ($sheetXml === false) {
+            @unlink($xlsxPath);
+            throw new RuntimeException('Unable to read the temporary worksheet.');
+        }
+
         $zip = new ZipArchive;
         if ($zip->open($xlsxPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
             @unlink($xlsxPath);
-            @unlink($sheetPath);
             throw new RuntimeException('Unable to open the export archive.');
         }
 
@@ -116,22 +124,45 @@ XML);
 </styleSheet>
 XML);
 
-        if (! $zip->addFile($sheetPath, 'xl/worksheets/sheet1.xml')) {
-            $zip->close();
-            @unlink($xlsxPath);
-            @unlink($sheetPath);
-            throw new RuntimeException('Unable to add the worksheet to the export archive.');
-        }
+        // Prefer addFromString over addFile — ZipArchive::addFile + /tmp often fails under
+        // Forge open_basedir / permission constraints when close() later re-reads the path.
+        $zip->addFromString('xl/worksheets/sheet1.xml', $sheetXml);
 
         if (! $zip->close()) {
             @unlink($xlsxPath);
-            @unlink($sheetPath);
             throw new RuntimeException('Unable to finalize the export archive.');
         }
 
-        @unlink($sheetPath);
-
         return $xlsxPath;
+    }
+
+    private static function writableTempDir(): string
+    {
+        $candidates = [];
+
+        if (function_exists('storage_path')) {
+            $candidates[] = storage_path('app/tmp');
+        }
+
+        $candidates[] = sys_get_temp_dir();
+
+        foreach ($candidates as $dir) {
+            if ($dir === '' || $dir === false) {
+                continue;
+            }
+
+            if (! is_dir($dir) && ! @mkdir($dir, 0775, true) && ! is_dir($dir)) {
+                continue;
+            }
+
+            if (! is_writable($dir)) {
+                continue;
+            }
+
+            return $dir;
+        }
+
+        throw new RuntimeException('Unable to find a writable temporary directory for exports.');
     }
 
     /**
