@@ -459,10 +459,11 @@ class MarketplaceOrderSyncService
                     })
                     ->orWhere(function (Builder $q) {
                         $q->whereNull('buyer_address')->orWhere('buyer_address', '');
-                    })
-                    ->orWhere(function (Builder $q) {
-                        $q->whereNull('buyer_phone')->orWhere('buyer_phone', '');
                     });
+                    // Phone reveal (type 2) temporarily disabled.
+                    // ->orWhere(function (Builder $q) {
+                    //     $q->whereNull('buyer_phone')->orWhere('buyer_phone', '');
+                    // });
             })
             ->when($startAt, fn (Builder $q) => $q->where('order_created_at', '>=', $startAt->copy()->startOfDay()))
             ->when($endAt, fn (Builder $q) => $q->where('order_created_at', '<=', $endAt->copy()->endOfDay()))
@@ -497,12 +498,13 @@ class MarketplaceOrderSyncService
                 if (! $this->hasText($order->buyer_address)) {
                     $jobs[] = ['order_id' => $order->external_order_id, 'type' => 1];
                 }
-                if (
-                    ! $this->hasText($order->buyer_phone)
-                    && ($order->order_status === null || ! in_array((int) $order->order_status, $blockedStatuses, true))
-                ) {
-                    $jobs[] = ['order_id' => $order->external_order_id, 'type' => 2];
-                }
+                // Phone reveal (type 2) temporarily disabled.
+                // if (
+                //     ! $this->hasText($order->buyer_phone)
+                //     && ($order->order_status === null || ! in_array((int) $order->order_status, $blockedStatuses, true))
+                // ) {
+                //     $jobs[] = ['order_id' => $order->external_order_id, 'type' => 2];
+                // }
             }
 
             if ($jobs === []) {
@@ -568,19 +570,20 @@ class MarketplaceOrderSyncService
                     }
                 }
 
-                $phoneData = $results[$orderId.':2'] ?? null;
-                if (is_array($phoneData) && ! $this->hasText($phone)) {
-                    if ($this->isContactRevealRejected($phoneData)) {
-                        $blocked++;
-                    } else {
-                        $extracted = $this->extractPhoneNumber($phoneData, $addressRaw);
-                        if ($extracted !== null) {
-                            $phone = $extracted;
-                            $phonesRevealed++;
-                            $changed = true;
-                        }
-                    }
-                }
+                // Phone reveal (type 2) temporarily disabled.
+                // $phoneData = $results[$orderId.':2'] ?? null;
+                // if (is_array($phoneData) && ! $this->hasText($phone)) {
+                //     if ($this->isContactRevealRejected($phoneData)) {
+                //         $blocked++;
+                //     } else {
+                //         $extracted = $this->extractPhoneNumber($phoneData, $addressRaw);
+                //         if ($extracted !== null) {
+                //             $phone = $extracted;
+                //             $phonesRevealed++;
+                //             $changed = true;
+                //         }
+                //     }
+                // }
 
                 if ($changed) {
                     $order->forceFill([
