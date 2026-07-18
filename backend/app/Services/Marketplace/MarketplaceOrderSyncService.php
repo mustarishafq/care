@@ -964,8 +964,8 @@ class MarketplaceOrderSyncService
         ?Carbon $endAt = null,
         ?array $orderStatuses = null,
     ): Builder {
-        // No eager loads here — exports iterate with lazyById/chunk and resolve shop
-        // names separately to avoid MySQL PDO 2014 (unbuffered query) failures.
+        // No eager loads / heavy JSON columns — exports iterate with lazyById and
+        // resolve shop names separately (avoids PDO 2014 + production OOM).
         return $this->filteredOrdersQuery(
             $platform,
             $shopConnectionId,
@@ -976,6 +976,27 @@ class MarketplaceOrderSyncService
             $endAt,
             $orderStatuses,
         )
+            ->select([
+                'id',
+                'platform',
+                'marketplace_shop_connection_id',
+                'external_order_id',
+                'order_status',
+                'order_status_label',
+                'buyer_nickname',
+                'buyer_name',
+                'buyer_phone',
+                'buyer_address',
+                'buyer_address_raw',
+                'product_summary',
+                'item_count',
+                'grand_total',
+                'currency',
+                'pay_method',
+                'order_created_at',
+                'paid_at',
+                'contact_synced_at',
+            ])
             ->orderByDesc('order_created_at')
             ->orderByDesc('id');
     }

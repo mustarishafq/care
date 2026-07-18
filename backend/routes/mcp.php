@@ -3,6 +3,7 @@
 use App\Http\Controllers\Mcp\V1\CatalogController;
 use App\Http\Controllers\Mcp\V1\ComplaintController;
 use App\Http\Controllers\Mcp\V1\ComplaintStatusController;
+use App\Http\Controllers\Mcp\V1\ReviewController;
 use App\Http\Controllers\Mcp\V1\WebhookController;
 use App\Http\Middleware\AuthenticateMcpClient;
 use App\Http\Middleware\LogMcpRequest;
@@ -19,6 +20,10 @@ Route::middleware([
     Route::get('complaints/{id}', [ComplaintController::class, 'show']);
 
     Route::get('complaint-statuses', [ComplaintStatusController::class, 'index']);
+
+    Route::get('reviews', [ReviewController::class, 'index']);
+    Route::get('reviews/{id}', [ReviewController::class, 'show']);
+    Route::post('reviews/{id}/reply', [ReviewController::class, 'reply']);
 
     Route::post('webhooks/tracking-update', [WebhookController::class, 'trackingUpdate']);
 });

@@ -205,7 +205,7 @@ class MarketplaceOrderController extends Controller
             // cursor()+shopConnection caused MySQL PDO 2014 on production.
             $rows = (function () use ($query, $platformLabels, $formatter, $phoneCountryCode, $shopNames) {
                 foreach ($query->reorder()->orderBy('id')->lazyById(200) as $order) {
-                    $addressRaw = is_array($order->buyer_address_raw) ? $order->buyer_address_raw : null;
+                    $addressRaw = self::decodeAddressRaw($order->getAttributes()['buyer_address_raw'] ?? null);
                     $parts = $formatter->parseAddressParts($addressRaw);
                     // Fallback when only the flattened string is stored.
                     if ($parts['address'] === '' && filled($order->buyer_address)) {
@@ -241,10 +241,22 @@ class MarketplaceOrderController extends Controller
             })();
 
             $path = SimpleXlsxWriter::toTempFile($headers, $rows, 'Orders');
+
+            $filename = 'marketplace-orders-'.now()->format('Y-m-d-His').'.xlsx';
+
+            return response()->download(
+                $path,
+                $filename,
+                [
+                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                ],
+            )->deleteFileAfterSend(true);
         } catch (Throwable $exception) {
             Log::error('marketplace.orders.export_failed', [
                 'message' => $exception->getMessage(),
                 'exception' => $exception::class,
+                'file' => $exception->getFile(),
+                'line' => $exception->getLine(),
             ]);
 
             $message = $exception instanceof RuntimeException
@@ -253,16 +265,32 @@ class MarketplaceOrderController extends Controller
 
             return response()->json(['message' => $message], 500);
         }
+    }
 
-        $filename = 'marketplace-orders-'.now()->format('Y-m-d-His').'.xlsx';
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function decodeAddressRaw(mixed $raw): ?array
+    {
+        if ($raw === null || $raw === '') {
+            return null;
+        }
 
-        return response()->download(
-            $path,
-            $filename,
-            [
-                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            ],
-        )->deleteFileAfterSend(true);
+        if (is_array($raw)) {
+            return $raw;
+        }
+
+        if (! is_string($raw)) {
+            return null;
+        }
+
+        try {
+            $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable) {
+            return null;
+        }
+
+        return is_array($decoded) ? $decoded : null;
     }
 
     public function sync(Request $request): JsonResponse

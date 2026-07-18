@@ -417,7 +417,7 @@ class MarketplaceReviewSyncService
             ->orderByDesc('review_created_at')
             ->orderByDesc('id')
             ->paginate(
-                perPage: min(max($perPage, 1), 100),
+                perPage: min(max($perPage, 1), 200),
                 page: max(1, $page),
             );
     }
@@ -449,6 +449,22 @@ class MarketplaceReviewSyncService
             $productName,
             $reviewerName,
         )
+            ->select([
+                'id',
+                'platform',
+                'marketplace_shop_connection_id',
+                'product_name',
+                'external_product_id',
+                'rating',
+                'review_text',
+                'reviewer_name',
+                'review_created_at',
+                'seller_reply',
+                'seller_replied_at',
+                'complaint_id',
+                'external_review_id',
+                'raw_metadata',
+            ])
             ->orderByDesc('review_created_at')
             ->orderByDesc('id');
     }

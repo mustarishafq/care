@@ -56,6 +56,9 @@ class McpCatalogTest extends TestCase
 
         $this->assertTrue($paths->contains('/api/mcp/v1/catalog'));
         $this->assertTrue($paths->contains('/api/mcp/v1/complaints'));
+        $this->assertTrue($paths->contains('/api/mcp/v1/reviews'));
+        $this->assertTrue($paths->contains('/api/mcp/v1/reviews/{id}'));
+        $this->assertTrue($paths->contains('/api/mcp/v1/reviews/{id}/reply'));
         $this->assertTrue($paths->contains('/api/v1/sso/nexus/verify'));
     }
 
@@ -102,6 +105,28 @@ class McpCatalogTest extends TestCase
     {
         $this->withHeader('X-API-Key', self::API_KEY)
             ->getJson('/api/mcp/v1/complaints?per_page=500')
+            ->assertUnprocessable()
+            ->assertJson([
+                'success' => false,
+                'message' => 'The given data was invalid.',
+            ]);
+    }
+
+    public function test_reviews_index_validates_query_parameters_without_database(): void
+    {
+        $this->withHeader('X-API-Key', self::API_KEY)
+            ->getJson('/api/mcp/v1/reviews?per_page=500')
+            ->assertUnprocessable()
+            ->assertJson([
+                'success' => false,
+                'message' => 'The given data was invalid.',
+            ]);
+    }
+
+    public function test_reviews_reply_validates_body_without_database(): void
+    {
+        $this->withHeader('X-API-Key', self::API_KEY)
+            ->postJson('/api/mcp/v1/reviews/1/reply', [])
             ->assertUnprocessable()
             ->assertJson([
                 'success' => false,

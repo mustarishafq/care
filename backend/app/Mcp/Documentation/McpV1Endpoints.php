@@ -18,6 +18,9 @@ class McpV1Endpoints
             self::listComplaints(),
             self::showComplaint(),
             self::listComplaintStatuses(),
+            self::listReviews(),
+            self::showReview(),
+            self::replyToReview(),
             self::trackingUpdate(),
             self::ssoVerify(),
         ];
@@ -143,6 +146,125 @@ class McpV1Endpoints
             ],
             'error_examples' => [
                 ['status' => 401, 'message' => 'Invalid or missing credentials.'],
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function listReviews(): array
+    {
+        return [
+            'method' => 'GET',
+            'path' => '/api/mcp/v1/reviews',
+            'description' => 'List or filter marketplace product reviews (TikTok Shop, Shopee) with pagination and aggregate stats.',
+            'auth' => self::serverAuth(),
+            'params' => [
+                ['name' => 'platform', 'in' => 'query', 'type' => 'string', 'required' => false, 'description' => 'Filter by platform: tiktok_shop or shopee'],
+                ['name' => 'shop_connection_id', 'in' => 'query', 'type' => 'integer', 'required' => false, 'description' => 'Filter by marketplace shop connection ID'],
+                ['name' => 'product_name', 'in' => 'query', 'type' => 'string', 'required' => false, 'description' => 'Filter by product name (partial match)'],
+                ['name' => 'reviewer_name', 'in' => 'query', 'type' => 'string', 'required' => false, 'description' => 'Filter by reviewer name (partial match)'],
+                ['name' => 'min_rating', 'in' => 'query', 'type' => 'integer', 'required' => false, 'rules' => 'min:1|max:5', 'description' => 'Minimum star rating'],
+                ['name' => 'max_rating', 'in' => 'query', 'type' => 'integer', 'required' => false, 'rules' => 'min:1|max:5', 'description' => 'Maximum star rating'],
+                ['name' => 'reply_status', 'in' => 'query', 'type' => 'string', 'required' => false, 'description' => 'replied or unreplied'],
+                ['name' => 'start_date', 'in' => 'query', 'type' => 'string', 'required' => false, 'description' => 'Review created on or after (Y-m-d)'],
+                ['name' => 'end_date', 'in' => 'query', 'type' => 'string', 'required' => false, 'description' => 'Review created on or before (Y-m-d)'],
+                ['name' => 'page', 'in' => 'query', 'type' => 'integer', 'required' => false, 'description' => 'Page number'],
+                ['name' => 'per_page', 'in' => 'query', 'type' => 'integer', 'required' => false, 'rules' => 'min:1|max:200', 'description' => 'Results per page (default 50)'],
+            ],
+            'request_example' => 'GET /api/mcp/v1/reviews?max_rating=3&reply_status=unreplied&page=1&per_page=50',
+            'response_example' => [
+                'success' => true,
+                'message' => null,
+                'data' => [
+                    [
+                        'id' => '12',
+                        'platform' => 'shopee',
+                        'product_name' => 'Vitamin C Serum',
+                        'rating' => 2,
+                        'review_text' => 'Arrived damaged',
+                        'reviewer_name' => 'Jane D.',
+                        'has_seller_reply' => false,
+                        'shop_name' => 'EMZI Official',
+                    ],
+                ],
+                'meta' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 50,
+                    'total' => 1,
+                    'stats' => ['total' => 1, 'replied' => 0, 'unreplied' => 1, 'low' => 1],
+                ],
+            ],
+            'error_examples' => [
+                ['status' => 401, 'message' => 'Invalid or missing credentials.'],
+                ['status' => 422, 'message' => 'The given data was invalid.'],
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function showReview(): array
+    {
+        return [
+            'method' => 'GET',
+            'path' => '/api/mcp/v1/reviews/{id}',
+            'description' => 'Fetch a single marketplace product review by numeric ID, including shop name and seller reply.',
+            'auth' => self::serverAuth(),
+            'params' => [
+                ['name' => 'id', 'in' => 'path', 'type' => 'integer', 'required' => true, 'description' => 'Review ID'],
+            ],
+            'request_example' => 'GET /api/mcp/v1/reviews/12',
+            'response_example' => [
+                'success' => true,
+                'message' => null,
+                'data' => [
+                    'id' => '12',
+                    'platform' => 'shopee',
+                    'product_name' => 'Vitamin C Serum',
+                    'rating' => 2,
+                    'review_text' => 'Arrived damaged',
+                    'reviewer_name' => 'Jane D.',
+                    'seller_reply' => null,
+                    'has_seller_reply' => false,
+                    'complaint_id' => '42',
+                    'shop_name' => 'EMZI Official',
+                ],
+                'meta' => new \stdClass,
+            ],
+            'error_examples' => [
+                ['status' => 401, 'message' => 'Invalid or missing credentials.'],
+                ['status' => 404, 'message' => 'No query results for model [App\\Models\\MarketplaceProductReview].'],
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private static function replyToReview(): array
+    {
+        return [
+            'method' => 'POST',
+            'path' => '/api/mcp/v1/reviews/{id}/reply',
+            'description' => 'Post a seller reply to a marketplace product review on TikTok Shop or Shopee.',
+            'auth' => self::serverAuth(),
+            'params' => [
+                ['name' => 'id', 'in' => 'path', 'type' => 'integer', 'required' => true, 'description' => 'Review ID'],
+                ['name' => 'content', 'in' => 'body', 'type' => 'string', 'required' => true, 'description' => 'Seller reply text (max 2000 characters)'],
+            ],
+            'request_example' => 'POST /api/mcp/v1/reviews/12/reply {"content":"We are sorry about the damage — please share your order number so we can help."}',
+            'response_example' => [
+                'success' => true,
+                'message' => 'Reply posted to review.',
+                'data' => [
+                    'id' => '12',
+                    'seller_reply' => 'We are sorry about the damage — please share your order number so we can help.',
+                    'has_seller_reply' => true,
+                ],
+                'meta' => new \stdClass,
+            ],
+            'error_examples' => [
+                ['status' => 401, 'message' => 'Invalid or missing credentials.'],
+                ['status' => 404, 'message' => 'No query results for model [App\\Models\\MarketplaceProductReview].'],
+                ['status' => 422, 'message' => 'The given data was invalid.'],
             ],
         ];
     }
