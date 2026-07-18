@@ -13,10 +13,11 @@ use App\Services\Marketplace\MarketplaceReviewSyncService;
 use App\Services\TikTokShop\TikTokSellerReviewClient;
 use App\Support\MarketplacePlatform;
 use App\Support\SimpleXlsxWriter;
+use App\Support\TempFileDownload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class MarketplaceReviewController extends Controller
 {
@@ -152,7 +153,7 @@ class MarketplaceReviewController extends Controller
         ]);
     }
 
-    public function export(Request $request): BinaryFileResponse|JsonResponse
+    public function export(Request $request): StreamedResponse|JsonResponse
     {
         $this->ensurePermission($request->user(), 'reviews.view');
 
@@ -253,19 +254,16 @@ class MarketplaceReviewController extends Controller
 
         try {
             $path = SimpleXlsxWriter::toTempFile($headers, $rows, 'Reviews');
+            $filename = 'marketplace-reviews-'.now()->format('Y-m-d-His').'.xlsx';
+
+            return TempFileDownload::streamAndDelete(
+                $path,
+                $filename,
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            );
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 500);
         }
-
-        $filename = 'marketplace-reviews-'.now()->format('Y-m-d-His').'.xlsx';
-
-        return response()->download(
-            $path,
-            $filename,
-            [
-                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            ],
-        )->deleteFileAfterSend(true);
     }
 
     public function sync(Request $request): JsonResponse

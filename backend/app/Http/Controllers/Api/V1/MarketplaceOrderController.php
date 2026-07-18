@@ -11,11 +11,12 @@ use App\Services\DisplayFormatService;
 use App\Services\Marketplace\MarketplaceOrderSyncService;
 use App\Support\MarketplacePlatform;
 use App\Support\SimpleXlsxWriter;
+use App\Support\TempFileDownload;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Throwable;
 
 class MarketplaceOrderController extends Controller
@@ -116,7 +117,7 @@ class MarketplaceOrderController extends Controller
         ]);
     }
 
-    public function export(Request $request): BinaryFileResponse|JsonResponse
+    public function export(Request $request): StreamedResponse|JsonResponse
     {
         $this->ensurePermission($request->user(), 'orders.view');
 
@@ -241,16 +242,13 @@ class MarketplaceOrderController extends Controller
             })();
 
             $path = SimpleXlsxWriter::toTempFile($headers, $rows, 'Orders');
-
             $filename = 'marketplace-orders-'.now()->format('Y-m-d-His').'.xlsx';
 
-            return response()->download(
+            return TempFileDownload::streamAndDelete(
                 $path,
                 $filename,
-                [
-                    'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                ],
-            )->deleteFileAfterSend(true);
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            );
         } catch (Throwable $exception) {
             Log::error('marketplace.orders.export_failed', [
                 'message' => $exception->getMessage(),
