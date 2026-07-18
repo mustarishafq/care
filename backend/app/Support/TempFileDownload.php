@@ -7,9 +7,8 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * Stream a temp file as an attachment without Symfony BinaryFileResponse.
  *
- * RunCloud (and some hosts) disable ignore_user_abort(), which BinaryFileResponse
- * calls unconditionally and fatals with:
- * "Call to undefined function Symfony\Component\HttpFoundation\ignore_user_abort()".
+ * RunCloud (and some hosts) disable ignore_user_abort() and fpassthru().
+ * BinaryFileResponse needs the former; avoid both and stream with fread/echo.
  */
 class TempFileDownload
 {
@@ -23,18 +22,25 @@ class TempFileDownload
                 return;
             }
 
-            $handle = fopen($path, 'rb');
+            $handle = \fopen($path, 'rb');
             if ($handle === false) {
-                @unlink($path);
+                @\unlink($path);
 
                 return;
             }
 
             try {
-                fpassthru($handle);
+                // Do not use fpassthru() — often in disable_functions on RunCloud.
+                while (! \feof($handle)) {
+                    $chunk = \fread($handle, 8192);
+                    if ($chunk === false || $chunk === '') {
+                        break;
+                    }
+                    echo $chunk;
+                }
             } finally {
-                fclose($handle);
-                @unlink($path);
+                \fclose($handle);
+                @\unlink($path);
             }
         }, $filename, [
             'Content-Type' => $contentType,
