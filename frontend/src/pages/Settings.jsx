@@ -1162,7 +1162,7 @@ export default function Settings() {
                 disabled={!preResolvedForm.enabled}
                 onCheckedChange={(checked) => setPreResolvedForm((p) => ({ ...p, require_closure_proof: !!checked }))}
               />
-              Require closure proof on create
+              Require closure proof on create (image or notes)
             </label>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox

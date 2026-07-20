@@ -71,9 +71,10 @@ class PreResolvedComplaintService
 
         if ($settings['require_closure_proof']) {
             $proofFiles = StoragePath::normalizeClosureProofMany($data['closure_proof_files'] ?? []);
+            $proofNotes = trim((string) ($data['closure_proof_notes'] ?? ''));
 
-            if ($proofFiles === []) {
-                abort(422, 'At least one closure proof image is required for pre-resolved complaints.');
+            if ($proofFiles === [] && $proofNotes === '') {
+                abort(422, 'Closure proof (image or notes) is required for pre-resolved complaints.');
             }
         }
 

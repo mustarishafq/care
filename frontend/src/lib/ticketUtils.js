@@ -41,7 +41,9 @@ export function requiresClosureProof(status) {
 }
 
 export function hasClosureProof(complaint) {
-  return Array.isArray(complaint?.closure_proof_files) && complaint.closure_proof_files.length > 0;
+  const hasFiles = Array.isArray(complaint?.closure_proof_files) && complaint.closure_proof_files.length > 0;
+  const hasNotes = typeof complaint?.closure_proof_notes === 'string' && complaint.closure_proof_notes.trim() !== '';
+  return hasFiles || hasNotes;
 }
 
 /** @deprecated Use getStatusColorStyles() with complaint statuses from the API. */

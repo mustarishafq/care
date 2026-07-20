@@ -114,7 +114,7 @@ export default function ComplaintDetail() {
 
   const handleStatusChange = async (newStatus) => {
     if (requiresClosureProof(newStatus) && !hasClosureProof(complaint)) {
-      toast.error('Add and save at least one closure proof before closing this ticket.');
+      toast.error('Add and save closure proof (image or notes) before closing this ticket.');
       return;
     }
 

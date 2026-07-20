@@ -183,7 +183,7 @@ export default function Kanban() {
     if (!complaint) return;
 
     if (requiresClosureProof(newStatus) && !hasClosureProof(complaint)) {
-      toast.error('Add and save closure proof on the ticket before closing.');
+      toast.error('Add and save closure proof (image or notes) on the ticket before closing.');
       return;
     }
 

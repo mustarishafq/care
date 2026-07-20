@@ -237,8 +237,12 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     setInvalidFields([]);
 
     if (form.pre_resolved) {
-      if (preResolved.require_closure_proof && form.closure_proof_files.length === 0) {
-        toast.error('Add at least one vendor closure proof before creating this ticket.');
+      if (
+        preResolved.require_closure_proof
+        && form.closure_proof_files.length === 0
+        && !form.closure_proof_notes?.trim()
+      ) {
+        toast.error('Add vendor closure proof (image or notes) before creating this ticket.');
         return;
       }
       if (preResolved.require_resolution_notes && !form.resolution_notes?.trim()) {
@@ -494,6 +498,9 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
                   <Label className="text-xs font-medium">
                     Vendor Closure Proof{preResolved.require_closure_proof ? ' *' : ''}
                   </Label>
+                  {preResolved.require_closure_proof && (
+                    <p className="text-xs text-muted-foreground">Image or notes — either one is enough.</p>
+                  )}
                   <div className="space-y-3">
                     <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-dashed border-border hover:border-primary cursor-pointer text-sm text-muted-foreground hover:text-primary transition-colors">
                       {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
@@ -512,7 +519,11 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
                   <Textarea
                     value={form.closure_proof_notes}
                     onChange={(e) => update('closure_proof_notes', e.target.value)}
-                    placeholder="Optional notes about the vendor proof"
+                    placeholder={
+                      preResolved.require_closure_proof
+                        ? 'Notes or an image — either one is enough'
+                        : 'Optional notes about the vendor proof'
+                    }
                     rows={2}
                   />
                 </div>

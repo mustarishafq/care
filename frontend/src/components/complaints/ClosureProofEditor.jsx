@@ -145,7 +145,7 @@ export default function ClosureProofEditor({
         </CardTitle>
         <CardDescription>
           Upload proof images anytime (e.g. delivery photo, customer chat, vendor screenshot).
-          At least one saved image is required before this ticket can be closed.
+          A saved image or notes are required before this ticket can be closed.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -176,7 +176,7 @@ export default function ClosureProofEditor({
         />
 
         <div className="space-y-2">
-          <Label htmlFor="closure-notes">Notes {readOnly ? '' : '(optional)'}</Label>
+          <Label htmlFor="closure-notes">Notes</Label>
           {readOnly ? (
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">
               {notes || '—'}

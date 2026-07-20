@@ -164,8 +164,12 @@ class ComplaintInput
             ? StoragePath::normalizeClosureProofMany($data['closure_proof_files'])
             : StoragePath::normalizeClosureProofMany($complaint->closure_proof_files);
 
-        if ($proofFiles === []) {
-            abort(422, 'At least one closure proof image is required before closing this ticket.');
+        $proofNotes = array_key_exists('closure_proof_notes', $data)
+            ? trim((string) ($data['closure_proof_notes'] ?? ''))
+            : trim((string) ($complaint->closure_proof_notes ?? ''));
+
+        if ($proofFiles === [] && $proofNotes === '') {
+            abort(422, 'Closure proof (image or notes) is required before closing this ticket.');
         }
     }
 

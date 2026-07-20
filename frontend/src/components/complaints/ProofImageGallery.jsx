@@ -92,7 +92,12 @@ export default function ProofImageGallery({
     if (!viewerOpen) return undefined;
 
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') setViewerOpen(false);
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setViewerOpen(false);
+        return;
+      }
       if (e.key === 'ArrowLeft') {
         setActiveIndex((i) => (i <= 0 ? normalized.length - 1 : i - 1));
       }
@@ -102,11 +107,11 @@ export default function ProofImageGallery({
     };
 
     document.body.style.overflow = 'hidden';
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
 
     return () => {
       document.body.style.overflow = '';
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
     };
   }, [viewerOpen, normalized.length]);
 
@@ -162,7 +167,10 @@ export default function ProofImageGallery({
       </div>
 
       {viewerOpen && createPortal(
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8">
+        <div
+          data-proof-lightbox
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8"
+        >
           <button
             type="button"
             className="absolute inset-0 bg-background/70 backdrop-blur-xl"
