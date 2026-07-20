@@ -10,6 +10,7 @@ export const NOTIFICATION_STATUS_FILTERS = [
 export const NOTIFICATION_TYPE_OPTIONS = [
   { value: 'all', label: 'All Types' },
   { value: 'ticket_assigned', label: 'Ticket assigned' },
+  { value: 'department_assigned', label: 'Department assigned' },
   { value: 'status_changed', label: 'Status changed' },
   { value: 'sla_warning', label: 'SLA warning' },
   { value: 'low_rating_review', label: 'Low rating review' },

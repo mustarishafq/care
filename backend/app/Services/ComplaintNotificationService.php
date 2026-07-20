@@ -84,6 +84,38 @@ class ComplaintNotificationService
         ], $assigner?->id, [$assignee->id]);
     }
 
+    public function notifyDepartmentAssigned(Complaint $complaint, ?User $actor): int
+    {
+        $complaint->loadMissing('assignedDepartment.users');
+        $department = $complaint->assignedDepartment;
+
+        if (! $department) {
+            return 0;
+        }
+
+        $actorName = $actor?->full_name ?? $actor?->name ?? 'Someone';
+        $departmentName = $department->name;
+        $count = 0;
+
+        foreach ($department->users as $user) {
+            if ($actor && $user->id === $actor->id) {
+                continue;
+            }
+
+            Notification::create(NotificationPayload::normalize([
+                'recipient_user_id' => $user->id,
+                'title' => 'Ticket assigned to your department',
+                'message' => "{$actorName} assigned ticket {$complaint->ticket_id} to {$departmentName}.",
+                'type' => 'department_assigned',
+                'complaint_id' => $complaint->id,
+                'is_read' => false,
+            ]));
+            $count++;
+        }
+
+        return $count;
+    }
+
     public function notifyMention(Complaint $complaint, User $mentioned, User $author, string $content): int
     {
         if ($author->id === $mentioned->id) {

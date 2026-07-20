@@ -47,6 +47,7 @@ class NotificationPayload
     {
         return match ($eventType) {
             'ticket_assigned' => ['severity' => 'info', 'category' => 'task'],
+            'department_assigned' => ['severity' => 'info', 'category' => 'task'],
             'status_changed' => ['severity' => 'info', 'category' => 'task'],
             'mention' => ['severity' => 'info', 'category' => 'task'],
             'sla_warning' => ['severity' => 'warning', 'category' => 'system'],

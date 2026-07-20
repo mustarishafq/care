@@ -19,6 +19,7 @@ export const LOOKUP_SECTIONS = [
 
 export const NOTIFICATION_TRIGGERS = [
   { event: 'Ticket Assigned', when: 'A complaint is assigned to a user', type: 'ticket_assigned' },
+  { event: 'Department Assigned', when: 'A complaint is assigned to a department', type: 'department_assigned' },
   { event: 'Status Changed', when: 'Complaint status is updated', type: 'status_changed' },
   { event: 'SLA Warning', when: '80% of SLA deadline reached', type: 'sla_warning' },
   { event: 'Overdue', when: 'SLA deadline has passed', type: 'overdue' },

@@ -185,6 +185,11 @@ class ComplaintController extends Controller
         }
 
         $complaint = $complaint->load($this->complaintRelations());
+
+        if ($complaint->assigned_department_id) {
+            $this->complaintNotifications->notifyDepartmentAssigned($complaint, $request->user());
+        }
+
         $this->outgoingWebhook->dispatchComplaint('complaint.created', $complaint);
 
         return new ComplaintResource($complaint);
@@ -207,6 +212,7 @@ class ComplaintController extends Controller
         $this->ensureCanViewComplaint($request->user(), $complaint);
 
         $oldStatusName = $complaint->complaintStatus?->name ?? '';
+        $oldDepartmentId = $complaint->assigned_department_id;
 
         $data = $request->validate([
             'customer_name' => ['sometimes', 'string', 'max:255'],
@@ -313,6 +319,11 @@ class ComplaintController extends Controller
                 $oldStatusName,
                 $newStatusName,
             );
+        }
+
+        $newDepartmentId = $complaint->assigned_department_id;
+        if ($newDepartmentId && (int) $newDepartmentId !== (int) $oldDepartmentId) {
+            $this->complaintNotifications->notifyDepartmentAssigned($complaint, $request->user());
         }
 
         $this->outgoingWebhook->dispatchComplaint(

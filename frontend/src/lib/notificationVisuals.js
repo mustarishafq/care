@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   AtSign,
   Bell,
+  Building2,
   Calendar,
   CheckCircle2,
   Clock,
@@ -16,6 +17,7 @@ import {
 
 const TYPE_META = {
   ticket_assigned: { severity: 'info', category: 'task', priority: 'medium', icon: UserPlus },
+  department_assigned: { severity: 'info', category: 'task', priority: 'medium', icon: Building2 },
   status_changed: { severity: 'info', category: 'task', priority: 'medium', icon: RefreshCw },
   mention: { severity: 'info', category: 'task', priority: 'medium', icon: AtSign },
   sla_warning: { severity: 'warning', category: 'system', priority: 'high', icon: AlertTriangle },

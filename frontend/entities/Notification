@@ -18,6 +18,7 @@
       "type": "string",
       "enum": [
         "ticket_assigned",
+        "department_assigned",
         "status_changed",
         "sla_warning",
         "overdue",
