@@ -4,8 +4,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Plus, Search, Users, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, Plus, Search, Users, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const EMPTY_FORM = {
   id: null,
@@ -15,6 +17,13 @@ const EMPTY_FORM = {
   member_ids: [],
   sort_order: 0,
 };
+
+function userMatchesQuery(user, query) {
+  if (!query) return true;
+  const name = (user.full_name || '').toLowerCase();
+  const email = (user.email || '').toLowerCase();
+  return name.includes(query) || email.includes(query);
+}
 
 export default function TeamEditDialog({
   open,
@@ -30,8 +39,13 @@ export default function TeamEditDialog({
 }) {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState(null);
+  const [leadPickerOpen, setLeadPickerOpen] = useState(false);
+  const [leadSearch, setLeadSearch] = useState('');
+  const [memberSearch, setMemberSearch] = useState('');
 
   const normalizedSearch = search.trim().toLowerCase();
+  const normalizedLeadSearch = leadSearch.trim().toLowerCase();
+  const normalizedMemberSearch = memberSearch.trim().toLowerCase();
 
   const visibleTeams = useMemo(() => {
     if (!normalizedSearch) return teams;
@@ -41,9 +55,31 @@ export default function TeamEditDialog({
     });
   }, [teams, normalizedSearch]);
 
+  const filteredLeadUsers = useMemo(
+    () => users.filter((u) => userMatchesQuery(u, normalizedLeadSearch)),
+    [users, normalizedLeadSearch],
+  );
+
+  const filteredMemberUsers = useMemo(
+    () => users.filter((u) => userMatchesQuery(u, normalizedMemberSearch)),
+    [users, normalizedMemberSearch],
+  );
+
+  const selectedLead = useMemo(
+    () => users.find((u) => String(u.id) === String(editing?.lead_user_id)),
+    [users, editing?.lead_user_id],
+  );
+
   const departmentName = (id) => departments.find((d) => String(d.id) === String(id))?.name || '—';
 
+  const resetUserFilters = () => {
+    setLeadPickerOpen(false);
+    setLeadSearch('');
+    setMemberSearch('');
+  };
+
   const startCreate = () => {
+    resetUserFilters();
     setEditing({
       ...EMPTY_FORM,
       department_id: departments[0]?.id ? String(departments[0].id) : '',
@@ -52,6 +88,7 @@ export default function TeamEditDialog({
   };
 
   const startEdit = (team) => {
+    resetUserFilters();
     setEditing({
       id: team.id,
       name: team.name || '',
@@ -60,6 +97,22 @@ export default function TeamEditDialog({
       member_ids: (team.member_ids || []).map(String),
       sort_order: team.sort_order ?? 0,
     });
+  };
+
+  const selectLead = (value) => {
+    setEditing((prev) => {
+      if (!prev) return prev;
+      const lead_user_id = value === 'none' ? '' : value;
+      return {
+        ...prev,
+        lead_user_id,
+        member_ids: lead_user_id && !prev.member_ids.includes(lead_user_id)
+          ? [...prev.member_ids, lead_user_id]
+          : prev.member_ids,
+      };
+    });
+    setLeadPickerOpen(false);
+    setLeadSearch('');
   };
 
   const toggleMember = (userId) => {
@@ -92,12 +145,14 @@ export default function TeamEditDialog({
       sort_order: Number(editing.sort_order) || 0,
       is_active: true,
     });
+    resetUserFilters();
     setEditing(null);
   };
 
   const handleOpenChange = (next) => {
     if (!next) {
       setSearch('');
+      resetUserFilters();
       setEditing(null);
     }
     onOpenChange(next);
@@ -149,33 +204,96 @@ export default function TeamEditDialog({
             </div>
             <div className="space-y-2">
               <Label>Team lead</Label>
-              <Select
-                value={editing.lead_user_id || 'none'}
-                onValueChange={(v) => setEditing((p) => ({
-                  ...p,
-                  lead_user_id: v === 'none' ? '' : v,
-                  member_ids: v !== 'none' && !p.member_ids.includes(v)
-                    ? [...p.member_ids, v]
-                    : p.member_ids,
-                }))}
+              <Popover
+                open={leadPickerOpen}
+                onOpenChange={(next) => {
+                  setLeadPickerOpen(next);
+                  if (!next) setLeadSearch('');
+                }}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select lead" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No lead</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={String(u.id)}>
-                      {u.full_name || u.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={leadPickerOpen}
+                    className="w-full justify-between font-normal h-9"
+                  >
+                    <span className={cn('truncate', !selectedLead && 'text-muted-foreground')}>
+                      {selectedLead
+                        ? (selectedLead.full_name || selectedLead.email)
+                        : 'Select lead'}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[var(--radix-popover-trigger-width)] p-2 z-[100]"
+                  align="start"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  <div className="relative mb-2">
+                    <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      value={leadSearch}
+                      onChange={(e) => setLeadSearch(e.target.value)}
+                      placeholder="Search users…"
+                      className="h-9 pl-8"
+                    />
+                  </div>
+                  <div
+                    className="max-h-56 overflow-y-auto overscroll-contain space-y-0.5"
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-left hover:bg-muted',
+                        !editing.lead_user_id && 'bg-muted',
+                      )}
+                      onClick={() => selectLead('none')}
+                    >
+                      <Check className={cn('h-4 w-4 shrink-0', editing.lead_user_id ? 'opacity-0' : 'opacity-100')} />
+                      <span>No lead</span>
+                    </button>
+                    {filteredLeadUsers.length === 0 ? (
+                      <p className="py-4 text-center text-sm text-muted-foreground">No users found.</p>
+                    ) : (
+                      filteredLeadUsers.map((u) => {
+                        const id = String(u.id);
+                        const selected = editing.lead_user_id === id;
+                        return (
+                          <button
+                            key={u.id}
+                            type="button"
+                            className={cn(
+                              'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm text-left hover:bg-muted',
+                              selected && 'bg-muted',
+                            )}
+                            onClick={() => selectLead(id)}
+                          >
+                            <Check className={cn('h-4 w-4 shrink-0', selected ? 'opacity-100' : 'opacity-0')} />
+                            <span className="truncate">{u.full_name || u.email}</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label>Members</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={memberSearch}
+                  onChange={(e) => setMemberSearch(e.target.value)}
+                  placeholder="Search members…"
+                  className="pl-8 h-9"
+                />
+              </div>
               <div className="max-h-48 overflow-y-auto rounded-md border p-2 space-y-1.5">
-                {users.map((u) => (
+                {filteredMemberUsers.map((u) => (
                   <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer">
                     <Checkbox
                       checked={editing.member_ids.includes(String(u.id))}
@@ -184,9 +302,11 @@ export default function TeamEditDialog({
                     <span className="truncate">{u.full_name || u.email}</span>
                   </label>
                 ))}
-                {users.length === 0 && (
+                {users.length === 0 ? (
                   <p className="text-xs text-muted-foreground py-2">No users available.</p>
-                )}
+                ) : filteredMemberUsers.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-2">No members found.</p>
+                ) : null}
               </div>
             </div>
           </div>
@@ -250,7 +370,16 @@ export default function TeamEditDialog({
         <DialogFooter className="gap-2 sm:gap-0">
           {editing ? (
             <>
-              <Button variant="outline" onClick={() => setEditing(null)} disabled={saving}>Back</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  resetUserFilters();
+                  setEditing(null);
+                }}
+                disabled={saving}
+              >
+                Back
+              </Button>
               <Button onClick={handleSave} disabled={saving || !editing.name.trim() || !editing.department_id}>
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save team'}
               </Button>
