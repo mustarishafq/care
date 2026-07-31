@@ -132,6 +132,16 @@ export function filterVisibleComplaints(user, complaints) {
   return complaints.filter((c) => canViewComplaint(user, c));
 }
 
+/**
+ * Visible complaints, optionally narrowed to team-only tickets for team leads.
+ * @param {'all'|'team'} scope
+ */
+export function filterComplaintsByScope(user, complaints, scope = 'all') {
+  const visible = filterVisibleComplaints(user, complaints);
+  if (scope !== 'team') return visible;
+  return visible.filter((c) => isTeamTicket(user, c));
+}
+
 export function filterVisibleActivities(user, activities, complaints) {
   if (getComplaintVisibility(user) === COMPLAINT_VISIBILITY_ALL) return activities;
 

@@ -6,16 +6,19 @@ import { useSearchParams } from 'react-router-dom';
 import { isToday, isThisMonth } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, FileText, ChevronLeft, ChevronRight, Users } from 'lucide-react';
+import { Plus, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
 import ComplaintFilters from '@/components/complaints/ComplaintFilters';
 import ComplaintTable from '@/components/complaints/ComplaintTable';
 import CreateComplaintDialog from '@/components/complaints/CreateComplaintDialog';
+import TeamScopeTabs from '@/components/complaints/TeamScopeTabs';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
-import { canViewComplaint, isTeamLead, isTeamTicket } from '@/lib/complaintVisibility';
+import {
+  filterComplaintsByScope,
+  isTeamLead,
+} from '@/lib/complaintVisibility';
 import { useSlaSettings } from '@/lib/useSlaSettings';
 import { parseComplaintFilters } from '@/lib/complaintFilterParams';
 
@@ -52,10 +55,13 @@ export default function Complaints() {
     queryFn: () => db.entities.Complaint.list('-created_date', 500),
   });
 
+  const scopedComplaints = useMemo(
+    () => filterComplaintsByScope(currentUser, complaints, scope),
+    [currentUser, complaints, scope],
+  );
+
   const filtered = useMemo(() => {
-    return complaints.filter(c => {
-      if (!canViewComplaint(currentUser, c)) return false;
-      if (scope === 'team' && !isTeamTicket(currentUser, c)) return false;
+    return scopedComplaints.filter(c => {
       if (filters.preset === 'today' && !isToday(new Date(c.created_date))) return false;
       if (filters.preset === 'month' && !isThisMonth(new Date(c.created_date))) return false;
       if (filters.preset === 'open' && resolvedStatusNames.includes(c.status)) return false;
@@ -72,11 +78,11 @@ export default function Complaints() {
       }
       return true;
     });
-  }, [complaints, filters, currentUser, resolvedStatusNames, scope]);
+  }, [scopedComplaints, filters, resolvedStatusNames]);
 
   const teamCount = useMemo(() => {
     if (!showTeamTab) return 0;
-    return complaints.filter((c) => canViewComplaint(currentUser, c) && isTeamTicket(currentUser, c)).length;
+    return filterComplaintsByScope(currentUser, complaints, 'team').length;
   }, [complaints, currentUser, showTeamTab]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -136,18 +142,12 @@ export default function Complaints() {
       />
 
       <PageContent>
-      {showTeamTab && (
-        <Tabs value={scope} onValueChange={setScope}>
-          <TabsList>
-            <TabsTrigger value="all">All</TabsTrigger>
-            <TabsTrigger value="team" className="gap-1.5">
-              <Users className="w-3.5 h-3.5" />
-              Team
-              <span className="text-muted-foreground tabular-nums">({teamCount})</span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      )}
+      <TeamScopeTabs
+        user={currentUser}
+        value={scope}
+        onValueChange={setScope}
+        teamCount={teamCount}
+      />
       <ComplaintFilters filters={filters} setFilters={setFilters} />
       <ComplaintTable complaints={paged} />
       {filtered.length > 0 && (

@@ -1,10 +1,10 @@
 import { db } from '@/api/db';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { getStatusColors, buildStatusChangeUpdates, buildStatusOrder, requiresClosureProof, hasClosureProof } from '@/lib/ticketUtils';
-import { filterVisibleComplaints } from '@/lib/complaintVisibility';
+import { filterComplaintsByScope, isTeamLead } from '@/lib/complaintVisibility';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
 import { Link } from 'react-router-dom';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import PriorityBadge from '@/components/complaints/PriorityBadge';
 import SlaTimer from '@/components/complaints/SlaTimer';
+import TeamScopeTabs from '@/components/complaints/TeamScopeTabs';
 import ColumnOrderDialog from '@/components/kanban/ColumnOrderDialog';
 import { format } from 'date-fns';
 import { Clock, ArrowUpDown, Columns, Columns3 } from 'lucide-react';
@@ -88,6 +89,7 @@ export default function Kanban() {
   const canChangeStatus = hasPermission('complaints.change_status');
   const queryClient = useQueryClient();
   const [columnSorts, setColumnSorts] = useState({});
+  const [scope, setScope] = useState('all');
   const boardRef = useRef(null);
   const pointerRef = useRef({ x: 0, y: 0 });
   const autoScrollRaf = useRef(null);
@@ -97,6 +99,7 @@ export default function Kanban() {
   const { triggerStatusName: autoCloseTriggerStatusName } = useAutoCloseSettings();
   const [columnOrder, setColumnOrder] = useState([]);
   const [columnOrderOpen, setColumnOrderOpen] = useState(false);
+  const showTeamTab = isTeamLead(user);
 
   const saveColumnOrder = (order) => {
     setColumnOrder(order);
@@ -111,7 +114,15 @@ export default function Kanban() {
     queryFn: () => db.entities.Complaint.list('-created_date', 500),
   });
 
-  const visibleComplaints = filterVisibleComplaints(user, complaints);
+  const visibleComplaints = useMemo(
+    () => filterComplaintsByScope(user, complaints, scope),
+    [user, complaints, scope],
+  );
+
+  const teamCount = useMemo(() => {
+    if (!showTeamTab) return 0;
+    return filterComplaintsByScope(user, complaints, 'team').length;
+  }, [user, complaints, showTeamTab]);
 
   const statusOrder = React.useMemo(() => {
     const inUseStatuses = [...new Set(visibleComplaints.map((c) => c.status).filter(Boolean))];
@@ -265,6 +276,12 @@ export default function Kanban() {
       />
 
       <PageContent>
+      <TeamScopeTabs
+        user={user}
+        value={scope}
+        onValueChange={setScope}
+        teamCount={teamCount}
+      />
       <ColumnOrderDialog
         open={columnOrderOpen}
         onOpenChange={setColumnOrderOpen}

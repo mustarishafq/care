@@ -26,8 +26,9 @@ import SlaReport from '@/components/reports/SlaReport';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
 import { useSlaSettings } from '@/lib/useSlaSettings';
-import { filterVisibleComplaints } from '@/lib/complaintVisibility';
+import { filterComplaintsByScope, isTeamLead } from '@/lib/complaintVisibility';
 import { buildComplaintsUrl } from '@/lib/complaintFilterParams';
+import TeamScopeTabs from '@/components/complaints/TeamScopeTabs';
 import {
   getRangeDates,
   filterByCreatedRange,
@@ -68,6 +69,8 @@ export default function Analytics() {
   const [range, setRange] = useState('30');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [scope, setScope] = useState('all');
+  const showTeamTab = isTeamLead(user);
 
   const { from, to } = useMemo(
     () => getRangeDates(range, customFrom, customTo),
@@ -85,9 +88,14 @@ export default function Analytics() {
   });
 
   const visibleComplaints = useMemo(
-    () => filterVisibleComplaints(user, complaints),
-    [user, complaints],
+    () => filterComplaintsByScope(user, complaints, scope),
+    [user, complaints, scope],
   );
+
+  const teamCount = useMemo(() => {
+    if (!showTeamTab) return 0;
+    return filterComplaintsByScope(user, complaints, 'team').length;
+  }, [user, complaints, showTeamTab]);
 
   const filtered = useMemo(
     () => filterByCreatedRange(visibleComplaints, from, to),
@@ -178,6 +186,12 @@ export default function Analytics() {
       />
 
       <PageContent className="space-y-6">
+        <TeamScopeTabs
+          user={user}
+          value={scope}
+          onValueChange={setScope}
+          teamCount={teamCount}
+        />
         <div className="flex flex-wrap items-center gap-2">
           <Select value={range} onValueChange={setRange}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>

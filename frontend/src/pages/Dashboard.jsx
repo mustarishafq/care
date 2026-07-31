@@ -18,6 +18,7 @@ import TopIssuesCard from '@/components/dashboard/TopIssuesCard';
 import SectionLabel from '@/components/dashboard/SectionLabel';
 import AnalyticsSnapshot from '@/components/dashboard/AnalyticsSnapshot';
 import AssignAgentDialog from '@/components/complaints/AssignAgentDialog';
+import TeamScopeTabs from '@/components/complaints/TeamScopeTabs';
 import PageHeader from '@/components/layout/PageHeader';
 import AnimatedSection from '@/components/layout/AnimatedSection';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -26,7 +27,11 @@ import { Badge } from '@/components/ui/badge';
 import StatusBadge from '@/components/complaints/StatusBadge';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
-import { filterVisibleComplaints, filterVisibleActivities } from '@/lib/complaintVisibility';
+import {
+  filterComplaintsByScope,
+  filterVisibleActivities,
+  isTeamLead,
+} from '@/lib/complaintVisibility';
 import { hasAssignedAgents } from '@/lib/assignedAgents';
 import { buildComplaintsUrl } from '@/lib/complaintFilterParams';
 
@@ -34,9 +39,11 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [assignTarget, setAssignTarget] = useState(null);
+  const [scope, setScope] = useState('all');
   const { user } = useCurrentUser();
   const { hasPermission } = usePermissions();
   const canViewReviews = hasPermission('reviews.view');
+  const showTeamTab = isTeamLead(user);
 
   const goToComplaints = (filters) => navigate(buildComplaintsUrl(filters));
   const goToReviews = () => navigate('/marketplace-reviews');
@@ -47,19 +54,29 @@ export default function Dashboard() {
   });
 
   const visibleComplaints = useMemo(
-    () => filterVisibleComplaints(user, complaints),
-    [user, complaints],
+    () => filterComplaintsByScope(user, complaints, scope),
+    [user, complaints, scope],
   );
+
+  const teamCount = useMemo(() => {
+    if (!showTeamTab) return 0;
+    return filterComplaintsByScope(user, complaints, 'team').length;
+  }, [user, complaints, showTeamTab]);
 
   const { data: activities = [] } = useQuery({
     queryKey: ['activities-recent'],
     queryFn: () => db.entities.TicketActivity.list('-created_date', 50),
   });
 
-  const visibleActivities = useMemo(
-    () => filterVisibleActivities(user, activities, complaints).slice(0, 20),
-    [user, activities, complaints],
-  );
+  const visibleActivities = useMemo(() => {
+    if (scope === 'team') {
+      const ids = new Set(visibleComplaints.map((c) => String(c.id)));
+      return activities
+        .filter((a) => a.complaint_id && ids.has(String(a.complaint_id)))
+        .slice(0, 20);
+    }
+    return filterVisibleActivities(user, activities, complaints).slice(0, 20);
+  }, [user, activities, complaints, visibleComplaints, scope]);
 
   const { data: reviewStatsResponse, isLoading: loadingReviewStats } = useQuery({
     queryKey: ['marketplace-reviews-dashboard-stats'],
@@ -145,6 +162,13 @@ export default function Dashboard() {
         icon={LayoutDashboard}
         title="Dashboard"
         description="Operations overview, reviews, and management analytics"
+      />
+
+      <TeamScopeTabs
+        user={user}
+        value={scope}
+        onValueChange={setScope}
+        teamCount={teamCount}
       />
 
       <AnimatedSection delay={0.05} className="space-y-3">

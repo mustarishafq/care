@@ -22,10 +22,11 @@ import TopInsightsCards from '@/components/reports/TopInsightsCards';
 import ResolutionTimeChart from '@/components/reports/ResolutionTimeChart';
 import { useDepartments } from '@/lib/useDepartments';
 import { useCurrentUser } from '@/lib/useCurrentUser';
-import { filterVisibleComplaints } from '@/lib/complaintVisibility';
+import { filterComplaintsByScope, isTeamLead } from '@/lib/complaintVisibility';
 import { CalendarDays, BarChart3 } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
+import TeamScopeTabs from '@/components/complaints/TeamScopeTabs';
 import { chartTooltipProps } from '@/lib/chartTooltip';
 
 const CHART_COLORS = ['#0ea5e9', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#64748b', '#14b8a6'];
@@ -46,7 +47,9 @@ export default function Reports() {
   const [range, setRange] = useState('30');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
+  const [scope, setScope] = useState('all');
   const { user } = useCurrentUser();
+  const showTeamTab = isTeamLead(user);
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
@@ -54,9 +57,14 @@ export default function Reports() {
   });
 
   const visibleComplaints = useMemo(
-    () => filterVisibleComplaints(user, complaints),
-    [user, complaints],
+    () => filterComplaintsByScope(user, complaints, scope),
+    [user, complaints, scope],
   );
+
+  const teamCount = useMemo(() => {
+    if (!showTeamTab) return 0;
+    return filterComplaintsByScope(user, complaints, 'team').length;
+  }, [user, complaints, showTeamTab]);
 
   const { data: departments = [] } = useDepartments();
   const { data: complaintTypes = [] } = useComplaintTypes();
@@ -131,6 +139,12 @@ export default function Reports() {
       />
 
       <PageContent>
+      <TeamScopeTabs
+        user={user}
+        value={scope}
+        onValueChange={setScope}
+        teamCount={teamCount}
+      />
       <div className="flex flex-wrap items-center gap-2">
           <Select value={range} onValueChange={v => setRange(v)}>
             <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
