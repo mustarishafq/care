@@ -6,7 +6,8 @@ import { useSearchParams } from 'react-router-dom';
 import { isToday, isThisMonth } from 'date-fns';
 
 import { Button } from '@/components/ui/button';
-import { Plus, FileText } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, FileText, ChevronLeft, ChevronRight, Users } from 'lucide-react';
 import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
 import ComplaintFilters from '@/components/complaints/ComplaintFilters';
@@ -14,22 +15,37 @@ import ComplaintTable from '@/components/complaints/ComplaintTable';
 import CreateComplaintDialog from '@/components/complaints/CreateComplaintDialog';
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { usePermissions } from '@/lib/usePermissions';
-import { canViewComplaint } from '@/lib/complaintVisibility';
+import { canViewComplaint, isTeamLead, isTeamTicket } from '@/lib/complaintVisibility';
 import { useSlaSettings } from '@/lib/useSlaSettings';
 import { parseComplaintFilters } from '@/lib/complaintFilterParams';
+
+const PAGE_SIZE = 25;
 
 export default function Complaints() {
   const [searchParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
   const [filters, setFilters] = useState(() => parseComplaintFilters(searchParams));
+  const [scope, setScope] = useState('all');
+  const [page, setPage] = useState(1);
   const { user: currentUser, loading: userLoading } = useCurrentUser();
   const { hasPermission, loading: permLoading } = usePermissions();
   const { resolvedStatusNames } = useSlaSettings();
   const canCreate = hasPermission('complaints.create');
+  const showTeamTab = isTeamLead(currentUser);
 
   useEffect(() => {
     setFilters(parseComplaintFilters(searchParams));
   }, [searchParams]);
+
+  useEffect(() => {
+    if (!showTeamTab && scope === 'team') {
+      setScope('all');
+    }
+  }, [showTeamTab, scope]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filters, scope]);
 
   const { data: complaints = [], isLoading } = useQuery({
     queryKey: ['complaints'],
@@ -39,6 +55,7 @@ export default function Complaints() {
   const filtered = useMemo(() => {
     return complaints.filter(c => {
       if (!canViewComplaint(currentUser, c)) return false;
+      if (scope === 'team' && !isTeamTicket(currentUser, c)) return false;
       if (filters.preset === 'today' && !isToday(new Date(c.created_date))) return false;
       if (filters.preset === 'month' && !isThisMonth(new Date(c.created_date))) return false;
       if (filters.preset === 'open' && resolvedStatusNames.includes(c.status)) return false;
@@ -55,7 +72,22 @@ export default function Complaints() {
       }
       return true;
     });
-  }, [complaints, filters, currentUser, resolvedStatusNames]);
+  }, [complaints, filters, currentUser, resolvedStatusNames, scope]);
+
+  const teamCount = useMemo(() => {
+    if (!showTeamTab) return 0;
+    return complaints.filter((c) => canViewComplaint(currentUser, c) && isTeamTicket(currentUser, c)).length;
+  }, [complaints, currentUser, showTeamTab]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paged = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, currentPage]);
+
+  const rangeStart = filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   if (isLoading || userLoading || permLoading) {
     return (
@@ -104,8 +136,52 @@ export default function Complaints() {
       />
 
       <PageContent>
+      {showTeamTab && (
+        <Tabs value={scope} onValueChange={setScope}>
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="team" className="gap-1.5">
+              <Users className="w-3.5 h-3.5" />
+              Team
+              <span className="text-muted-foreground tabular-nums">({teamCount})</span>
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
       <ComplaintFilters filters={filters} setFilters={setFilters} />
-      <ComplaintTable complaints={filtered} />
+      <ComplaintTable complaints={paged} />
+      {filtered.length > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+          <p className="text-xs text-muted-foreground">
+            Showing {rangeStart}–{rangeEnd} of {filtered.length}
+            {totalPages > 1 ? ` · Page ${currentPage} of ${totalPages}` : ''}
+          </p>
+          {totalPages > 1 && (
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="w-4 h-4" />
+                <span className="sr-only sm:not-sr-only sm:ml-1">Previous</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              >
+                <span className="sr-only sm:not-sr-only sm:mr-1">Next</span>
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       {canCreate && <CreateComplaintDialog open={createOpen} onOpenChange={setCreateOpen} />}
       </PageContent>
     </div>

@@ -44,10 +44,10 @@ export function getComplaintVisibility(user) {
   return user.is_admin ? COMPLAINT_VISIBILITY_ALL : COMPLAINT_VISIBILITY_DEPARTMENT;
 }
 
-function getLedTeamMemberIds(user) {
+export function getLedTeamMemberIds(user) {
   if (!user) return [];
 
-  // Prefer explicit member ids when the API provides them later.
+  // Prefer explicit member ids when the API provides them.
   if (Array.isArray(user.led_team_member_ids) && user.led_team_member_ids.length) {
     return user.led_team_member_ids.map(String);
   }
@@ -72,7 +72,14 @@ function getLedTeamMemberIds(user) {
   return [...memberIds];
 }
 
-function isTeamLeadTicket(user, complaint) {
+export function isTeamLead(user) {
+  if (!user) return false;
+  if (user.is_team_lead) return true;
+  return getLedTeamMemberIds(user).length > 0;
+}
+
+/** Ticket assigned to or created by a member of a team this user leads. */
+export function isTeamTicket(user, complaint) {
   const memberIds = getLedTeamMemberIds(user);
   if (!memberIds.length) return false;
 
@@ -115,7 +122,7 @@ export function canViewComplaint(user, complaint) {
     }
   }
 
-  if (isTeamLeadTicket(user, complaint)) return true;
+  if (isTeamTicket(user, complaint)) return true;
 
   return false;
 }

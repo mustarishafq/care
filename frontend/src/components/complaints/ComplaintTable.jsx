@@ -68,6 +68,9 @@ export default function ComplaintTable({ complaints }) {
                   <SlaTimer complaint={c} />
                   <span className="text-xs text-muted-foreground truncate">{c.assigned_department || '—'}</span>
                 </div>
+                <p className="text-xs text-muted-foreground truncate">
+                  Created by {c.created_by || '—'}
+                </p>
               </div>
             </Link>
           );
@@ -86,6 +89,7 @@ export default function ComplaintTable({ complaints }) {
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">SLA</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Assigned</TableHead>
+              <TableHead className="font-semibold text-xs uppercase tracking-wider">Created by</TableHead>
               <TableHead className="font-semibold text-xs uppercase tracking-wider">Date</TableHead>
               <TableHead className="w-8" />
             </TableRow>
@@ -112,6 +116,9 @@ export default function ComplaintTable({ complaints }) {
                 <TableCell><StatusBadge status={c.status} /></TableCell>
                 <TableCell><SlaTimer complaint={c} /></TableCell>
                 <TableCell className="text-sm text-muted-foreground">{c.assigned_department || '—'}</TableCell>
+                <TableCell className="text-sm text-muted-foreground max-w-[140px] truncate">
+                  {c.created_by || '—'}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {format(new Date(c.created_date), 'MMM dd, yyyy')}
                 </TableCell>
