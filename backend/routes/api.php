@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\ProductController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\SsoController;
 use App\Http\Controllers\Api\V1\SystemConfigController;
+use App\Http\Controllers\Api\V1\TeamController;
 use App\Http\Controllers\Api\V1\TicketActivityController;
 use App\Http\Controllers\Api\V1\UnitOfMeasurementController;
 use App\Http\Controllers\Api\V1\UserController;
@@ -64,6 +65,7 @@ Route::prefix('v1')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
 
         Route::apiResource('departments', DepartmentController::class);
+        Route::apiResource('teams', TeamController::class);
         Route::apiResource('complaint-types', ComplaintTypeController::class);
         Route::apiResource('complaint-statuses', ComplaintStatusController::class)->except(['index']);
         Route::apiResource('couriers', CourierController::class);

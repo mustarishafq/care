@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useCurrentUser } from '@/lib/useCurrentUser';
 import { useDepartments } from '@/lib/useDepartments';
+import { useTeams } from '@/lib/useTeams';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -47,10 +48,10 @@ export default function Users() {
   const [addOpen, setAddOpen] = useState(false);
   const [editUserOpen, setEditUserOpen] = useState(false);
   const [editUserTarget, setEditUserTarget] = useState(null);
-  const [editUserForm, setEditUserForm] = useState({ full_name: '', phone: '', status: 'active', department_ids: [], role_id: '' });
+  const [editUserForm, setEditUserForm] = useState({ full_name: '', phone: '', status: 'active', department_ids: [], team_ids: [], role_id: '' });
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRoleId, setInviteRoleId] = useState('');
-  const [addForm, setAddForm] = useState({ email: '', full_name: '', password: '', role_id: '', department_ids: [] });
+  const [addForm, setAddForm] = useState({ email: '', full_name: '', password: '', role_id: '', department_ids: [], team_ids: [] });
   const [inviting, setInviting] = useState(false);
   const [adding, setAdding] = useState(false);
   const [savingUser, setSavingUser] = useState(false);
@@ -62,6 +63,7 @@ export default function Users() {
   });
 
   const { data: departments = [] } = useDepartments();
+  const { data: teams = [] } = useTeams();
 
   const { data: roles = [] } = useQuery({
     queryKey: ['roles'],
@@ -105,6 +107,7 @@ export default function Users() {
       role_id: u.role_id || defaultRoleId,
       status: u.status || 'active',
       department_ids: u.department_ids || u.departments?.map((d) => d.id) || [],
+      team_ids: u.team_ids || u.teams?.map((t) => t.id) || [],
     });
     setEditUserOpen(true);
   };
@@ -118,6 +121,15 @@ export default function Users() {
     }));
   };
 
+  const toggleTeam = (teamId) => {
+    setEditUserForm(p => ({
+      ...p,
+      team_ids: p.team_ids.includes(teamId)
+        ? p.team_ids.filter(id => id !== teamId)
+        : [...p.team_ids, teamId],
+    }));
+  };
+
   const toggleAddDept = (deptId) => {
     setAddForm(p => ({
       ...p,
@@ -127,8 +139,17 @@ export default function Users() {
     }));
   };
 
+  const toggleAddTeam = (teamId) => {
+    setAddForm(p => ({
+      ...p,
+      team_ids: p.team_ids.includes(teamId)
+        ? p.team_ids.filter(id => id !== teamId)
+        : [...p.team_ids, teamId],
+    }));
+  };
+
   const openAddUser = () => {
-    setAddForm({ email: '', full_name: '', password: '', role_id: defaultRoleId, department_ids: [] });
+    setAddForm({ email: '', full_name: '', password: '', role_id: defaultRoleId, department_ids: [], team_ids: [] });
     setAddOpen(true);
   };
 
@@ -143,6 +164,7 @@ export default function Users() {
         role_id: editUserForm.role_id,
         status: editUserForm.status,
         department_ids: editUserForm.department_ids,
+        team_ids: editUserForm.team_ids,
       });
       invalidateUsers();
       toast.success('User updated');
@@ -243,6 +265,7 @@ export default function Users() {
         password: addForm.password,
         role_id: addForm.role_id || defaultRoleId,
         department_ids: addForm.department_ids,
+        team_ids: addForm.team_ids,
       });
       invalidateUsers();
       toast.success(`User ${addForm.email} created`);
@@ -378,6 +401,7 @@ export default function Users() {
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Email</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Role</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Departments</TableHead>
+                <TableHead className="font-semibold text-xs uppercase tracking-wider">Teams</TableHead>
                 <TableHead className="font-semibold text-xs uppercase tracking-wider">Status</TableHead>
                 {canManage && <TableHead className="font-semibold text-xs uppercase tracking-wider w-28">Actions</TableHead>}
               </TableRow>
@@ -385,6 +409,7 @@ export default function Users() {
             <TableBody>
               {filteredUsers.map(u => {
                 const userDepts = u.departments || [];
+                const userTeams = u.teams || [];
                 const isSelf = u.id === currentUser?.id;
                 const isPending = u.approval_status === 'pending';
                 const isBusy = actionUserId === u.id;
@@ -414,6 +439,14 @@ export default function Users() {
                       <div className="flex flex-wrap gap-1">
                         {userDepts.length > 0
                           ? userDepts.map(d => <Badge key={d.id} variant="outline" className="text-[10px]">{d.name}</Badge>)
+                          : <span className="text-sm text-muted-foreground">—</span>
+                        }
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {userTeams.length > 0
+                          ? userTeams.map(t => <Badge key={t.id} variant="outline" className="text-[10px]">{t.name}</Badge>)
                           : <span className="text-sm text-muted-foreground">—</span>
                         }
                       </div>
@@ -568,6 +601,27 @@ export default function Users() {
                 ))}
               </div>
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Teams</Label>
+              <div className="space-y-1 max-h-36 overflow-y-auto">
+                {teams.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground px-1.5">No teams configured yet.</p>
+                ) : teams.map(team => (
+                  <label key={team.id} className="flex items-center gap-3 cursor-pointer p-1.5 rounded hover:bg-muted/50">
+                    <Checkbox
+                      checked={editUserForm.team_ids.includes(team.id)}
+                      onCheckedChange={() => toggleTeam(team.id)}
+                    />
+                    <span className="text-sm">
+                      {team.name}
+                      <span className="text-muted-foreground text-xs ml-1">
+                        ({team.department || departments.find(d => String(d.id) === String(team.department_id))?.name || '—'})
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
             {editUserTarget?.id !== currentUser?.id && (
               <div className="border rounded-lg p-3 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800">
                 <p className="text-xs font-medium text-amber-800 dark:text-amber-300 mb-1">Force Password Reset</p>
@@ -630,6 +684,22 @@ export default function Users() {
                       onCheckedChange={() => toggleAddDept(dept.id)}
                     />
                     <span className="text-sm">{dept.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Teams</Label>
+              <div className="space-y-1 max-h-36 overflow-y-auto">
+                {teams.length === 0 ? (
+                  <p className="text-[10px] text-muted-foreground px-1.5">No teams configured yet.</p>
+                ) : teams.map(team => (
+                  <label key={team.id} className="flex items-center gap-3 cursor-pointer p-1.5 rounded hover:bg-muted/50">
+                    <Checkbox
+                      checked={addForm.team_ids.includes(team.id)}
+                      onCheckedChange={() => toggleAddTeam(team.id)}
+                    />
+                    <span className="text-sm">{team.name}</span>
                   </label>
                 ))}
               </div>

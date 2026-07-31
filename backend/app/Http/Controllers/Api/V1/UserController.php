@@ -28,7 +28,7 @@ class UserController extends Controller
             $this->ensurePermission($user, 'users.view');
         }
 
-        $query = User::with(['departments', 'role'])->orderBy('full_name');
+        $query = User::with(['departments', 'teams', 'ledTeams', 'role'])->orderBy('full_name');
 
         if ($search = $request->query('search')) {
             $term = '%'.addcslashes($search, '%_\\').'%';
@@ -60,6 +60,8 @@ class UserController extends Controller
             'status' => ['sometimes', 'in:active,inactive'],
             'department_ids' => ['nullable', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
+            'team_ids' => ['nullable', 'array'],
+            'team_ids.*' => ['integer', 'exists:teams,id'],
             'must_change_password' => ['sometimes', 'boolean'],
         ]);
 
@@ -72,7 +74,8 @@ class UserController extends Controller
         }
 
         $departmentIds = $data['department_ids'] ?? null;
-        unset($data['department_ids']);
+        $teamIds = $data['team_ids'] ?? null;
+        unset($data['department_ids'], $data['team_ids']);
 
         $user->update($data);
 
@@ -80,7 +83,11 @@ class UserController extends Controller
             $user->departments()->sync($departmentIds);
         }
 
-        return new UserResource($user->fresh()->load(['departments', 'role']));
+        if ($teamIds !== null) {
+            $this->syncUserTeams($user, $teamIds);
+        }
+
+        return new UserResource($user->fresh()->load(['departments', 'teams', 'ledTeams', 'role']));
     }
 
     public function store(Request $request): JsonResponse
@@ -96,11 +103,14 @@ class UserController extends Controller
             'status' => ['sometimes', 'in:active,inactive'],
             'department_ids' => ['nullable', 'array'],
             'department_ids.*' => ['integer', 'exists:departments,id'],
+            'team_ids' => ['nullable', 'array'],
+            'team_ids.*' => ['integer', 'exists:teams,id'],
         ]);
 
         $fullName = $data['full_name'] ?: $data['email'];
         $roleId = $data['role_id'] ?? Role::defaultId();
         $departmentIds = $data['department_ids'] ?? [];
+        $teamIds = $data['team_ids'] ?? [];
 
         $user = User::create([
             'name' => $fullName,
@@ -117,10 +127,39 @@ class UserController extends Controller
             $user->departments()->sync($departmentIds);
         }
 
+        if ($teamIds !== []) {
+            $this->syncUserTeams($user, $teamIds);
+        }
+
         return response()->json([
             'message' => 'User created successfully.',
-            'user' => new UserResource($user->load(['departments', 'role'])),
+            'user' => new UserResource($user->load(['departments', 'teams', 'ledTeams', 'role'])),
         ], 201);
+    }
+
+    /**
+     * @param  list<int|string>  $teamIds
+     */
+    private function syncUserTeams(User $user, array $teamIds): void
+    {
+        $ids = collect($teamIds)->map(fn ($id) => (int) $id)->filter()->unique()->values()->all();
+        $user->teams()->sync($ids);
+
+        if ($ids === []) {
+            return;
+        }
+
+        $departmentIds = \App\Models\Team::query()
+            ->whereIn('id', $ids)
+            ->pluck('department_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($departmentIds !== []) {
+            $user->departments()->syncWithoutDetaching($departmentIds);
+        }
     }
 
     public function invite(Request $request): JsonResponse
@@ -156,7 +195,7 @@ class UserController extends Controller
 
         return response()->json([
             'message' => 'Invitation sent successfully.',
-            'user' => new UserResource($user->load(['departments', 'role'])),
+            'user' => new UserResource($user->load(['departments', 'teams', 'ledTeams', 'role'])),
         ], 201);
     }
 
@@ -170,7 +209,7 @@ class UserController extends Controller
             'status' => User::STATUS_ACTIVE,
         ]);
 
-        return new UserResource($user->fresh()->load(['departments', 'role']));
+        return new UserResource($user->fresh()->load(['departments', 'teams', 'ledTeams', 'role']));
     }
 
     public function reject(Request $request, string $id): UserResource
@@ -183,7 +222,7 @@ class UserController extends Controller
             'status' => User::STATUS_INACTIVE,
         ]);
 
-        return new UserResource($user->fresh()->load(['departments', 'role']));
+        return new UserResource($user->fresh()->load(['departments', 'teams', 'ledTeams', 'role']));
     }
 
     public function disable(Request $request, string $id): UserResource
@@ -193,6 +232,6 @@ class UserController extends Controller
         $user = User::findOrFail($id);
         $user->update(['status' => User::STATUS_INACTIVE]);
 
-        return new UserResource($user->fresh()->load(['departments', 'role']));
+        return new UserResource($user->fresh()->load(['departments', 'teams', 'ledTeams', 'role']));
     }
 }

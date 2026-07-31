@@ -54,6 +54,24 @@ return new class extends Migration
             $table->primary(['department_id', 'user_id']);
         });
 
+        Schema::create('teams', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('department_id')->constrained('departments')->cascadeOnDelete();
+            $table->string('name');
+            $table->foreignId('lead_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->boolean('is_active')->default(true);
+            $table->unsignedSmallInteger('sort_order')->default(0);
+            $table->timestamps();
+
+            $table->unique(['department_id', 'name']);
+        });
+
+        Schema::create('team_user', function (Blueprint $table) {
+            $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
+            $table->primary(['team_id', 'user_id']);
+        });
+
         Schema::create('complaint_types', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
@@ -99,6 +117,7 @@ return new class extends Migration
             $table->foreignId('status_id')->nullable()->constrained('complaint_statuses')->nullOnDelete();
             $table->foreignId('assigned_department_id')->nullable()->constrained('departments')->nullOnDelete();
             $table->foreignId('assigned_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });
 
@@ -167,6 +186,8 @@ return new class extends Migration
         Schema::dropIfExists('products');
         Schema::dropIfExists('complaint_statuses');
         Schema::dropIfExists('complaint_types');
+        Schema::dropIfExists('team_user');
+        Schema::dropIfExists('teams');
         Schema::dropIfExists('department_user');
         Schema::dropIfExists('departments');
         Schema::dropIfExists('users');

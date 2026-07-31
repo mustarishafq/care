@@ -23,6 +23,8 @@ class Permissions
             ['key' => 'users.view', 'label' => 'View Users', 'group' => 'Users'],
             ['key' => 'users.invite', 'label' => 'Invite Users', 'group' => 'Users'],
             ['key' => 'users.manage', 'label' => 'Manage Users & Roles', 'group' => 'Users'],
+            ['key' => 'teams.view', 'label' => 'View Teams', 'group' => 'Teams'],
+            ['key' => 'teams.manage', 'label' => 'Manage Teams', 'group' => 'Teams'],
             ['key' => 'products.view', 'label' => 'View Products', 'group' => 'Products'],
             ['key' => 'products.manage', 'label' => 'Manage Products', 'group' => 'Products'],
             ['key' => 'settings.view', 'label' => 'View Settings', 'group' => 'Settings'],

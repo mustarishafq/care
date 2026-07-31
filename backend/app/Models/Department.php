@@ -26,6 +26,11 @@ class Department extends Model
         return $this->belongsToMany(User::class);
     }
 
+    public function teams(): HasMany
+    {
+        return $this->hasMany(Team::class)->orderBy('sort_order');
+    }
+
     public function complaints(): HasMany
     {
         return $this->hasMany(Complaint::class, 'assigned_department_id');

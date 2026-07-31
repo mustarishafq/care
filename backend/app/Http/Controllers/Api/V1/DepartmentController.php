@@ -35,7 +35,7 @@ class DepartmentController extends Controller
 
     public function store(Request $request): DepartmentResource
     {
-        $this->ensurePermission($request->user(), 'settings.manage');
+        $this->ensureSettingsManageOrTeamLead($request->user());
 
         $name = trim((string) $request->input('name', ''));
         $existing = $name !== '' ? Department::where('name', $name)->first() : null;
@@ -64,7 +64,7 @@ class DepartmentController extends Controller
 
     public function update(Request $request, string $id): DepartmentResource
     {
-        $this->ensurePermission($request->user(), 'settings.manage');
+        $this->ensureSettingsManageOrTeamLead($request->user());
 
         $department = Department::findOrFail($id);
         $department->update($request->validate([
@@ -78,7 +78,7 @@ class DepartmentController extends Controller
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'settings.manage');
+        $this->ensureSettingsManageOrTeamLead($request->user());
 
         $department = Department::findOrFail($id);
         $department->update(['is_active' => false]);

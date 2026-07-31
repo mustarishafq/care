@@ -5,17 +5,25 @@ import { useState, useEffect } from 'react';
 export function usePermissions() {
   const [permissions, setPermissions] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isTeamLead, setIsTeamLead] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
         const user = await db.auth.me();
-        setPermissions(user?.permissions ?? []);
+        const perms = Array.isArray(user?.permissions) ? [...user.permissions] : [];
+        // Team leads need Settings nav access for lookup management.
+        if (user?.is_team_lead && !perms.includes('settings.view') && !user?.is_admin) {
+          perms.push('settings.view');
+        }
+        setPermissions(perms);
         setIsAdmin(!!user?.is_admin);
+        setIsTeamLead(!!user?.is_team_lead);
       } catch {
         setPermissions([]);
         setIsAdmin(false);
+        setIsTeamLead(false);
       } finally {
         setLoading(false);
       }
@@ -36,5 +44,12 @@ export function usePermissions() {
 
   const canView = (section) => hasPermission(`${section}.view`) || hasPermission(`${section}.manage`);
 
-  return { permissions, isAdmin, hasPermission, canView, loading: loading || permissions === null };
+  return {
+    permissions,
+    isAdmin,
+    isTeamLead,
+    hasPermission,
+    canView,
+    loading: loading || permissions === null,
+  };
 }

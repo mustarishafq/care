@@ -173,6 +173,10 @@ class ComplaintController extends Controller
             $data['assigned_user_id'] = $request->user()->id;
         }
 
+        if ($request->user()) {
+            $data['created_by_user_id'] = $request->user()->id;
+        }
+
         if (isset($data['proof_files'])) {
             $data['proof_files'] = StoragePath::normalizeMany($data['proof_files']);
         }
@@ -390,6 +394,7 @@ class ComplaintController extends Controller
             'assignedDepartment',
             'assignedUser',
             'assignedUsers',
+            'createdBy',
             'complaintStatus',
             'complaintType',
             'courier',

@@ -54,6 +54,9 @@ class ComplaintResource extends JsonResource
             'assigned_user' => $this->assignedUser?->email,
             'assigned_user_name' => $this->assignedUser?->full_name ?? $this->assignedUser?->name,
             'assigned_user_avatar_url' => UserSummary::avatarUrl($this->assignedUser),
+            'created_by_user_id' => $this->created_by_user_id ? (string) $this->created_by_user_id : null,
+            'created_by' => $this->createdBy?->full_name ?? $this->createdBy?->name,
+            'created_by_user' => $this->whenLoaded('createdBy', fn () => UserSummary::from($this->createdBy)),
             'assigned_agents' => $this->whenLoaded('assignedUsers', fn () => $this->assignedUsers
                 ->map(fn ($user) => UserSummary::from($user))
                 ->filter()

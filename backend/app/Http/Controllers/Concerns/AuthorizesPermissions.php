@@ -18,6 +18,20 @@ trait AuthorizesPermissions
     }
 
     /**
+     * Settings lookups may be managed by settings.manage or by an active team lead.
+     */
+    protected function ensureSettingsManageOrTeamLead(User $user): void
+    {
+        if ($user->hasPermission('settings.manage') || $user->isTeamLead()) {
+            return;
+        }
+
+        throw new HttpResponseException(response()->json([
+            'message' => 'You do not have permission to perform this action.',
+        ], 403));
+    }
+
+    /**
      * @param  array<string, mixed>  $data
      */
     protected function ensureComplaintUpdatePermissions(User $user, array $data): void

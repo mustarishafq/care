@@ -17,7 +17,10 @@ class SystemConfigController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $this->ensurePermission($request->user(), 'settings.view');
+        $user = $request->user();
+        if (! $user->hasPermission('settings.view') && ! $user->isTeamLead()) {
+            $this->ensurePermission($user, 'settings.view');
+        }
 
         $query = SystemConfig::query();
         $this->applyFilters($query, $request->except(['sort', 'limit']));

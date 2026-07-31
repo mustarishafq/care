@@ -22,22 +22,29 @@ trait ScopesComplaintVisibility
             return $query;
         }
 
-        // Assigned agents always retain access to their tickets.
-        if ($visibility === Permissions::COMPLAINT_VISIBILITY_ASSIGNED) {
-            return $query->whereHas(
+        $ledMemberIds = $user->ledTeamMemberIds();
+
+        return $query->where(function (Builder $outer) use ($user, $visibility, $ledMemberIds) {
+            // Assigned agents always retain access to their tickets.
+            $outer->whereHas(
                 'assignedUsers',
                 fn (Builder $sub) => $sub->where('users.id', $user->id)
             );
-        }
 
-        // Department: tickets in the user's department(s), plus any assigned to them.
-        $departmentIds = $user->departments()->pluck('departments.id');
+            if ($visibility === Permissions::COMPLAINT_VISIBILITY_DEPARTMENT) {
+                $departmentIds = $user->departments()->pluck('departments.id');
 
-        return $query->where(function (Builder $q) use ($user, $departmentIds) {
-            $q->whereHas('assignedUsers', fn (Builder $sub) => $sub->where('users.id', $user->id));
+                if ($departmentIds->isNotEmpty()) {
+                    $outer->orWhereIn('assigned_department_id', $departmentIds);
+                }
+            }
 
-            if ($departmentIds->isNotEmpty()) {
-                $q->orWhereIn('assigned_department_id', $departmentIds);
+            // Team leads see tickets assigned to or created by their team members.
+            if ($ledMemberIds !== []) {
+                $outer->orWhereHas(
+                    'assignedUsers',
+                    fn (Builder $sub) => $sub->whereIn('users.id', $ledMemberIds)
+                )->orWhereIn('created_by_user_id', $ledMemberIds);
             }
         });
     }
@@ -54,16 +61,24 @@ trait ScopesComplaintVisibility
             return;
         }
 
-        if ($visibility === Permissions::COMPLAINT_VISIBILITY_ASSIGNED) {
-            throw new HttpResponseException(response()->json([
-                'message' => 'You do not have permission to view this ticket.',
-            ], 403));
+        if ($visibility === Permissions::COMPLAINT_VISIBILITY_DEPARTMENT) {
+            $departmentIds = $user->departments()->pluck('departments.id');
+
+            if ($complaint->assigned_department_id && $departmentIds->contains($complaint->assigned_department_id)) {
+                return;
+            }
         }
 
-        $departmentIds = $user->departments()->pluck('departments.id');
+        $ledMemberIds = $user->ledTeamMemberIds();
 
-        if ($complaint->assigned_department_id && $departmentIds->contains($complaint->assigned_department_id)) {
-            return;
+        if ($ledMemberIds !== []) {
+            if ($complaint->created_by_user_id && in_array((int) $complaint->created_by_user_id, $ledMemberIds, true)) {
+                return;
+            }
+
+            if ($complaint->assignedUsers()->whereIn('users.id', $ledMemberIds)->exists()) {
+                return;
+            }
         }
 
         throw new HttpResponseException(response()->json([

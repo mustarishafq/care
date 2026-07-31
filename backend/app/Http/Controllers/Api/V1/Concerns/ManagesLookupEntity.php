@@ -50,7 +50,7 @@ trait ManagesLookupEntity
 
     public function store(Request $request): JsonResource
     {
-        $this->ensurePermission($request->user(), 'settings.manage');
+        $this->ensureSettingsManageOrTeamLead($request->user());
 
         $resource = $this->lookupResource();
         $name = trim((string) $request->input('name', ''));
@@ -72,7 +72,7 @@ trait ManagesLookupEntity
 
     public function update(Request $request, string $id): JsonResource
     {
-        $this->ensurePermission($request->user(), 'settings.manage');
+        $this->ensureSettingsManageOrTeamLead($request->user());
 
         $model = $this->lookupModel()::findOrFail($id);
         $model->update($request->validate($this->updateRules($model)));
@@ -83,7 +83,7 @@ trait ManagesLookupEntity
 
     public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->ensurePermission($request->user(), 'settings.manage');
+        $this->ensureSettingsManageOrTeamLead($request->user());
 
         $this->lookupModel()::findOrFail($id)->update(['is_active' => false]);
 

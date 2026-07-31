@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -61,9 +62,52 @@ class User extends Authenticatable
         return $this->belongsToMany(Department::class);
     }
 
+    public function teams(): BelongsToMany
+    {
+        return $this->belongsToMany(Team::class);
+    }
+
+    public function ledTeams(): HasMany
+    {
+        return $this->hasMany(Team::class, 'lead_user_id');
+    }
+
     public function isAdmin(): bool
     {
         return (bool) $this->role?->is_admin;
+    }
+
+    public function isTeamLead(): bool
+    {
+        if ($this->relationLoaded('ledTeams')) {
+            return $this->ledTeams->contains(fn (Team $team) => $team->is_active);
+        }
+
+        return $this->ledTeams()->where('is_active', true)->exists();
+    }
+
+    /**
+     * User IDs of members on active teams this user leads (includes the lead).
+     *
+     * @return list<int>
+     */
+    public function ledTeamMemberIds(): array
+    {
+        $teamIds = $this->ledTeams()->where('is_active', true)->pluck('id');
+
+        if ($teamIds->isEmpty()) {
+            return [];
+        }
+
+        return Team::query()
+            ->whereIn('id', $teamIds)
+            ->with('users:id')
+            ->get()
+            ->flatMap(fn (Team $team) => $team->users->pluck('id'))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
     }
 
     public function getRoleLabel(): string

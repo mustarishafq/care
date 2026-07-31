@@ -31,6 +31,7 @@ import PageHeader from '@/components/layout/PageHeader';
 import PageContent from '@/components/layout/PageContent';
 import Integrations from '@/pages/Integrations';
 import LookupEditDialog from '@/components/settings/LookupEditDialog';
+import TeamEditDialog from '@/components/settings/TeamEditDialog';
 import SettingsConfigCard from '@/components/settings/SettingsConfigCard';
 import SettingsLookupCard from '@/components/settings/SettingsLookupCard';
 import SettingsSectionIntro from '@/components/settings/SettingsSectionIntro';
@@ -45,6 +46,7 @@ import {
   PRE_RESOLVED_DEFAULT,
   ORDER_SOURCES_DEFAULT,
 } from '@/components/settings/constants';
+import { useTeams } from '@/lib/useTeams';
 import { getPausedStatusNames, getResolvedStatusNames, normalizeSlaSettings, toggleStatusId } from '@/lib/slaSettings';
 import {
   getPreResolvedStatusName,
@@ -73,8 +75,11 @@ const SETTINGS_TABS = new Set(['general', 'lookups', 'automation', 'integrations
 export default function Settings() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { hasPermission } = usePermissions();
+  const { hasPermission, isTeamLead } = usePermissions();
   const canManage = hasPermission('settings.manage');
+  const canManageLookups = canManage || isTeamLead;
+  const canManageTeams = canManage || hasPermission('teams.manage') || isTeamLead;
+  const canCreateTeams = canManage || hasPermission('teams.manage');
   const tabFromUrl = searchParams.get('tab');
   const activeTab = SETTINGS_TABS.has(tabFromUrl) ? tabFromUrl : 'general';
   const setActiveTab = (tab) => {
@@ -101,25 +106,37 @@ export default function Settings() {
   const [lookupLoading, setLookupLoading] = useState(false);
   const [lookupMeta, setLookupMeta] = useState(null);
   const [lookupItems, setLookupItems] = useState([]);
+  const [teamsOpen, setTeamsOpen] = useState(false);
+  const [teamsSaving, setTeamsSaving] = useState(false);
 
   const { data: departments = [], refetch: refetchDepartments } = useDepartments();
+  const { data: teams = [], refetch: refetchTeams, isFetching: teamsLoading } = useTeams();
   const { data: complaintTypes = [], refetch: refetchComplaintTypes } = useComplaintTypes();
   const { data: complaintStatuses = [], refetch: refetchComplaintStatuses } = useComplaintStatuses();
   const { data: couriers = [], refetch: refetchCouriers } = useCouriers();
   const { data: unitsOfMeasurement = [], refetch: refetchUnitsOfMeasurement } = useUnitsOfMeasurement();
   const { data: priorities = [], refetch: refetchPriorities } = usePriorities();
 
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users', 'settings-teams'],
+    queryFn: () => db.entities.User.list(),
+    enabled: canManageTeams,
+    staleTime: 60_000,
+  });
+
   const lookupData = useMemo(() => ({
     departments,
+    teams,
     complaint_types: complaintTypes,
     complaint_statuses: complaintStatuses,
     couriers,
     units_of_measurement: unitsOfMeasurement,
     priorities,
-  }), [departments, complaintTypes, complaintStatuses, couriers, unitsOfMeasurement, priorities]);
+  }), [departments, teams, complaintTypes, complaintStatuses, couriers, unitsOfMeasurement, priorities]);
 
   const lookupRefetchers = {
     departments: refetchDepartments,
+    teams: refetchTeams,
     complaint_types: refetchComplaintTypes,
     complaint_statuses: refetchComplaintStatuses,
     couriers: refetchCouriers,
@@ -386,6 +403,12 @@ export default function Settings() {
   };
 
   const openLookup = async (section) => {
+    if (section.key === 'teams') {
+      setTeamsOpen(true);
+      refetchTeams();
+      return;
+    }
+
     setLookupMeta(section);
     setLookupItems([]);
     setLookupOpen(true);
@@ -405,6 +428,45 @@ export default function Settings() {
       setLookupOpen(false);
     } finally {
       setLookupLoading(false);
+    }
+  };
+
+  const saveTeam = async (payload) => {
+    setTeamsSaving(true);
+    try {
+      if (payload.id) {
+        const body = { ...payload };
+        if (!canCreateTeams) {
+          delete body.department_id;
+        }
+        delete body.id;
+        await db.entities.Team.update(payload.id, body);
+      } else {
+        await db.entities.Team.create(payload);
+      }
+      await refetchTeams();
+      await queryClient.invalidateQueries({ queryKey: ['teams'] });
+      toast.success('Team saved');
+    } catch (err) {
+      toastApiError(err, 'Failed to save team');
+      throw err;
+    } finally {
+      setTeamsSaving(false);
+    }
+  };
+
+  const deactivateTeam = async (team) => {
+    if (!canCreateTeams) return;
+    setTeamsSaving(true);
+    try {
+      await db.entities.Team.delete(team.id);
+      await refetchTeams();
+      await queryClient.invalidateQueries({ queryKey: ['teams'] });
+      toast.success('Team deactivated');
+    } catch (err) {
+      toastApiError(err, 'Failed to deactivate team');
+    } finally {
+      setTeamsSaving(false);
     }
   };
 
@@ -458,7 +520,7 @@ export default function Settings() {
         icon={Settings2}
         title="Settings"
         description="Manage lookup data, automation rules, and system integrations"
-        actions={!canManage ? (
+        actions={!canManage && !canManageLookups ? (
           <Badge variant="outline" className="w-fit gap-1.5 py-1">
             <Lock className="w-3 h-3" />
             View only
@@ -470,9 +532,15 @@ export default function Settings() {
       {!canManage && (
         <Alert className="rounded-2xl border-amber-200/80 bg-amber-50/80 dark:border-amber-800/40 dark:bg-amber-900/20">
           <Lock className="h-4 w-4" />
-          <AlertTitle>Read-only access</AlertTitle>
+          <AlertTitle>{canManageLookups ? 'Limited settings access' : 'Read-only access'}</AlertTitle>
           <AlertDescription>
-            You can review settings but need the <code className="text-xs bg-muted px-1 rounded">settings.manage</code> permission to edit them.
+            {canManageLookups
+              ? 'As a team lead you can manage lookup data and your teams. Other settings tabs remain read-only unless you have settings.manage.'
+              : (
+                <>
+                  You can review settings but need the <code className="text-xs bg-muted px-1 rounded">settings.manage</code> permission to edit them.
+                </>
+              )}
           </AlertDescription>
         </Alert>
       )}
@@ -716,7 +784,7 @@ export default function Settings() {
                 key={section.key}
                 section={section}
                 items={lookupData[section.key] || []}
-                canManage={canManage}
+                canManage={section.key === 'teams' ? canManageTeams : canManageLookups}
                 onEdit={openLookup}
               />
             ))}
@@ -937,6 +1005,19 @@ export default function Settings() {
         saving={saving}
         onSave={saveLookup}
         onItemsChange={setLookupItems}
+      />
+
+      <TeamEditDialog
+        open={teamsOpen}
+        onOpenChange={setTeamsOpen}
+        teams={teams}
+        departments={departments}
+        users={allUsers}
+        loading={teamsLoading && !teams.length}
+        saving={teamsSaving}
+        canCreate={canCreateTeams}
+        onSave={saveTeam}
+        onDeactivate={deactivateTeam}
       />
 
       <Dialog open={ssoOpen} onOpenChange={setSsoOpen}>

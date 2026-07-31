@@ -1,5 +1,5 @@
 import {
-  AlertCircle, Bell, Building2, CircleDot, FileText, Ruler, Truck,
+  AlertCircle, Bell, Building2, CircleDot, FileText, Ruler, Truck, Users,
 } from 'lucide-react';
 
 export { SLA_DEFAULT } from '@/lib/slaSettings';
@@ -9,7 +9,8 @@ export { PRE_RESOLVED_DEFAULT, ORDER_SOURCES_DEFAULT } from '@/lib/preResolvedSe
 export const ROUTING_DEFAULT = { enabled: false, default_department_id: '', default_status_id: '', rules: [] };
 
 export const LOOKUP_SECTIONS = [
-  { key: 'departments', label: 'Departments', description: 'Teams that tickets can be assigned to', icon: Building2, entity: 'Department', queryKey: 'departments' },
+  { key: 'departments', label: 'Departments', description: 'Org units that tickets can be assigned to', icon: Building2, entity: 'Department', queryKey: 'departments' },
+  { key: 'teams', label: 'Teams', description: 'Teams within departments, each with an optional lead', icon: Users, entity: 'Team', queryKey: 'teams', special: true },
   { key: 'complaint_types', label: 'Complaint Types', description: 'Categories customers report issues under', icon: FileText, entity: 'ComplaintType', queryKey: 'complaint_types' },
   { key: 'complaint_statuses', label: 'Complaint Statuses', description: 'Workflow stages a ticket moves through', icon: CircleDot, entity: 'ComplaintStatus', queryKey: 'complaint_statuses' },
   { key: 'couriers', label: 'Couriers', description: 'Shipping carriers used on tickets', icon: Truck, entity: 'Courier', queryKey: 'couriers' },

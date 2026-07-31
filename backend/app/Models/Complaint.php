@@ -28,6 +28,7 @@ class Complaint extends Model
         'status_id',
         'assigned_department_id',
         'assigned_user_id',
+        'created_by_user_id',
         'resolution_notes',
         'sla_deadline',
         'sla_paused_at',
@@ -71,6 +72,11 @@ class Complaint extends Model
     public function assignedUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_user_id');
+    }
+
+    public function createdBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by_user_id');
     }
 
     public function assignedUsers(): BelongsToMany

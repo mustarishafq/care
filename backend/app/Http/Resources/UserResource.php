@@ -32,6 +32,31 @@ class UserResource extends JsonResource
                 'departments',
                 fn () => $this->departments->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
             ),
+            'teams' => TeamResource::collection($this->whenLoaded('teams')),
+            'team_ids' => $this->whenLoaded(
+                'teams',
+                fn () => $this->teams->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
+            ),
+            'led_team_ids' => $this->whenLoaded(
+                'ledTeams',
+                fn () => $this->ledTeams
+                    ->filter(fn ($team) => $team->is_active)
+                    ->pluck('id')
+                    ->map(fn ($id) => (string) $id)
+                    ->values()
+                    ->all(),
+            ),
+            'led_team_member_ids' => $this->when(
+                $this->relationLoaded('ledTeams'),
+                fn () => collect($this->resource->ledTeamMemberIds())
+                    ->map(fn ($id) => (string) $id)
+                    ->values()
+                    ->all(),
+            ),
+            'is_team_lead' => $this->when(
+                $this->relationLoaded('ledTeams'),
+                fn () => $this->resource->isTeamLead(),
+            ),
             'must_change_password' => $this->must_change_password,
             'is_admin' => $this->resource->isAdmin(),
             'permissions' => $permissions === '*' ? Permissions::allKeys() : $permissions,

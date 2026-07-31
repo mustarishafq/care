@@ -126,7 +126,7 @@ class SsoController extends Controller
 
         $token = $user->createToken('sso-token')->plainTextToken;
 
-        $user->load(['departments', 'role']);
+        $user->load(['departments', 'teams', 'ledTeams', 'role']);
         $explicitRedirect = trim((string) ($claims['redirect_to'] ?? ''));
         $redirectTo = $explicitRedirect !== ''
             ? SsoRedirect::sanitize($explicitRedirect, $user->getDefaultPage())

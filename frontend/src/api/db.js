@@ -15,6 +15,7 @@ const ENTITY_MAP = {
   Role: 'roles',
   SystemConfig: 'system-configs',
   Department: 'departments',
+  Team: 'teams',
   ComplaintType: 'complaint-types',
   ComplaintStatus: 'complaint-statuses',
   Courier: 'couriers',

@@ -4,8 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "dev": "concurrently -n api,frontend -c blue,green \"npm run dev:api\" \"npm run dev:frontend\"",
     "dev:full": "node scripts/dev-full.js",
     "dev:frontend": "npm run dev --prefix frontend",
+    "dev:api": "node scripts/serve-backend.js",
     "dev:backend": "node scripts/serve-backend.js",
     "build:frontend": "npm run build --prefix frontend",
     "install:all": "npm install --prefix frontend && composer install --working-dir=backend"
