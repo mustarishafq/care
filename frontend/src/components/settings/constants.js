@@ -5,6 +5,7 @@ import {
 export { SLA_DEFAULT } from '@/lib/slaSettings';
 export { AUTO_CLOSE_DEFAULT, formatAutoCloseDelay } from '@/lib/autoCloseSettings';
 export { PRE_RESOLVED_DEFAULT, ORDER_SOURCES_DEFAULT } from '@/lib/preResolvedSettings';
+export { DUPLICATE_CHECK_DEFAULT } from '@/lib/duplicateCheckSettings';
 
 export const ROUTING_DEFAULT = { enabled: false, default_department_id: '', default_status_id: '', rules: [] };
 

@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
         Route::apiResource('couriers', CourierController::class);
         Route::apiResource('priorities', PriorityController::class);
         Route::apiResource('units-of-measurement', UnitOfMeasurementController::class);
+        Route::post('complaints/check-duplicates', [ComplaintController::class, 'checkDuplicates']);
         Route::apiResource('complaints', ComplaintController::class)->except(['index', 'show']);
         Route::post('complaints/{id}/agents', [ComplaintController::class, 'assignAgent']);
         Route::delete('complaints/{id}/agents/{userId}', [ComplaintController::class, 'removeAgent']);

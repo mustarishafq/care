@@ -45,6 +45,7 @@ import {
   SLA_DEFAULT,
   PRE_RESOLVED_DEFAULT,
   ORDER_SOURCES_DEFAULT,
+  DUPLICATE_CHECK_DEFAULT,
 } from '@/components/settings/constants';
 import { useTeams } from '@/lib/useTeams';
 import { getPausedStatusNames, getResolvedStatusNames, normalizeSlaSettings, toggleStatusId } from '@/lib/slaSettings';
@@ -53,6 +54,16 @@ import {
   normalizeOrderSources,
   normalizePreResolvedSettings,
 } from '@/lib/preResolvedSettings';
+import {
+  duplicateCheckFieldsLabel,
+  duplicateCheckMatchLogicLabel,
+  duplicateCheckModeLabel,
+  DUPLICATE_CHECK_CONFIG_KEY,
+  DUPLICATE_CHECK_FIELDS,
+  DUPLICATE_CHECK_MATCH_LOGICS,
+  DUPLICATE_CHECK_MODES,
+  normalizeDuplicateCheckSettings,
+} from '@/lib/duplicateCheckSettings';
 import {
   getAutoCloseTargetStatusName,
   getAutoCloseTriggerStatusName,
@@ -96,6 +107,8 @@ export default function Settings() {
   const [routingForm, setRoutingForm] = useState(ROUTING_DEFAULT);
   const [preResolvedOpen, setPreResolvedOpen] = useState(false);
   const [preResolvedForm, setPreResolvedForm] = useState(PRE_RESOLVED_DEFAULT);
+  const [duplicateCheckOpen, setDuplicateCheckOpen] = useState(false);
+  const [duplicateCheckForm, setDuplicateCheckForm] = useState(DUPLICATE_CHECK_DEFAULT);
   const [orderSourcesOpen, setOrderSourcesOpen] = useState(false);
   const [orderSourcesForm, setOrderSourcesForm] = useState(ORDER_SOURCES_DEFAULT);
   const [displayFormatForm, setDisplayFormatForm] = useState(DISPLAY_FORMAT_DEFAULT);
@@ -174,6 +187,9 @@ export default function Settings() {
   const getPreResolved = () => normalizePreResolvedSettings(
     configs.find((c) => c.key === 'pre_resolved_complaints')?.json_value,
   );
+  const getDuplicateCheck = () => normalizeDuplicateCheckSettings(
+    configs.find((c) => c.key === DUPLICATE_CHECK_CONFIG_KEY)?.json_value,
+  );
   const getOrderSources = () => normalizeOrderSources(
     configs.find((c) => c.key === 'order_sources')?.json_value,
   );
@@ -199,10 +215,11 @@ export default function Settings() {
   const routing = getRouting();
   const preResolved = getPreResolved();
   const preResolvedStatusName = getPreResolvedStatusName(preResolved, complaintStatuses);
+  const duplicateCheck = getDuplicateCheck();
   const orderSources = getOrderSources();
   const sso = getSso();
   const routingRuleCount = routing.rules.filter((rule) => rule.department_id || rule.status_id).length;
-  const automationActive = [routing.enabled, autoClose.enabled, preResolved.enabled].filter(Boolean).length;
+  const automationActive = [routing.enabled, autoClose.enabled, preResolved.enabled, duplicateCheck.enabled].filter(Boolean).length;
 
   useEffect(() => {
     if (!displayFormatDirty) {
@@ -357,6 +374,41 @@ export default function Settings() {
       });
       toast.success('Pre-resolved complaint settings saved');
       setPreResolvedOpen(false);
+      await queryClient.invalidateQueries({ queryKey: ['complaint_create_form_options'] });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openDuplicateCheck = () => {
+    setDuplicateCheckForm(getDuplicateCheck());
+    setDuplicateCheckOpen(true);
+  };
+
+  const toggleDuplicateCheckField = (fieldKey, checked) => {
+    setDuplicateCheckForm((prev) => {
+      const nextFields = checked
+        ? [...new Set([...prev.fields, fieldKey])]
+        : prev.fields.filter((field) => field !== fieldKey);
+      return {
+        ...prev,
+        fields: nextFields.length ? nextFields : prev.fields,
+      };
+    });
+  };
+
+  const saveDuplicateCheck = async () => {
+    const normalized = normalizeDuplicateCheckSettings(duplicateCheckForm);
+    if (normalized.enabled && !normalized.fields.length) {
+      toast.error('Select at least one field to check for duplicates.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await saveConfig(DUPLICATE_CHECK_CONFIG_KEY, 'Duplicate Complaints', normalized);
+      toast.success('Duplicate complaint settings saved');
+      setDuplicateCheckOpen(false);
       await queryClient.invalidateQueries({ queryKey: ['complaint_create_form_options'] });
     } finally {
       setSaving(false);
@@ -929,6 +981,35 @@ export default function Settings() {
                 },
               ]}
             />
+
+            <SettingsConfigCard
+              title="Duplicate Complaints"
+              description="Warn or block when creating or editing tickets that match existing ones"
+              icon={Copy}
+              enabled={duplicateCheck.enabled}
+              canManage={canManage}
+              onEdit={openDuplicateCheck}
+              rows={[
+                {
+                  label: 'Match on',
+                  value: duplicateCheck.enabled
+                    ? duplicateCheckFieldsLabel(duplicateCheck.fields)
+                    : '—',
+                },
+                {
+                  label: 'Logic',
+                  value: duplicateCheck.enabled
+                    ? duplicateCheckMatchLogicLabel(duplicateCheck.match_logic)
+                    : '—',
+                },
+                {
+                  label: 'When found',
+                  value: duplicateCheck.enabled
+                    ? duplicateCheckModeLabel(duplicateCheck.mode)
+                    : '—',
+                },
+              ]}
+            />
           </div>
         </TabsContent>
 
@@ -1257,6 +1338,79 @@ export default function Settings() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setPreResolvedOpen(false)}>Cancel</Button>
             <Button onClick={savePreResolved} disabled={saving}>{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={duplicateCheckOpen} onOpenChange={setDuplicateCheckOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Copy className="w-4 h-4" />Duplicate Complaints</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-1">
+            <div className="rounded-lg bg-muted/50 border p-3 text-xs text-muted-foreground">
+              When enabled, create and edit forms check for existing tickets using the selected fields and match logic.
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="duplicate-check-enabled" className="text-sm">Enable duplicate checking</Label>
+              <Switch
+                id="duplicate-check-enabled"
+                checked={!!duplicateCheckForm.enabled}
+                onCheckedChange={(checked) => setDuplicateCheckForm((p) => ({ ...p, enabled: checked }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-xs">Match on</Label>
+              {DUPLICATE_CHECK_FIELDS.map((field) => (
+                <label key={field.key} className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={duplicateCheckForm.fields.includes(field.key)}
+                    disabled={!duplicateCheckForm.enabled || (duplicateCheckForm.fields.length === 1 && duplicateCheckForm.fields.includes(field.key))}
+                    onCheckedChange={(checked) => toggleDuplicateCheckField(field.key, !!checked)}
+                  />
+                  {field.label}
+                </label>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Match logic</Label>
+              <Select
+                value={duplicateCheckForm.match_logic || 'or'}
+                onValueChange={(value) => setDuplicateCheckForm((p) => ({ ...p, match_logic: value }))}
+                disabled={!duplicateCheckForm.enabled}
+              >
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DUPLICATE_CHECK_MATCH_LOGICS.map((logic) => (
+                    <SelectItem key={logic.value} value={logic.value}>{logic.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                {duplicateCheckForm.match_logic === 'and'
+                  ? 'All selected fields must match the same existing ticket. Every selected field must also be filled in.'
+                  : 'A ticket is flagged if any one of the selected fields matches.'}
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">When a match is found</Label>
+              <Select
+                value={duplicateCheckForm.mode}
+                onValueChange={(value) => setDuplicateCheckForm((p) => ({ ...p, mode: value }))}
+                disabled={!duplicateCheckForm.enabled}
+              >
+                <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DUPLICATE_CHECK_MODES.map((mode) => (
+                    <SelectItem key={mode.value} value={mode.value}>{mode.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDuplicateCheckOpen(false)}>Cancel</Button>
+            <Button onClick={saveDuplicateCheck} disabled={saving}>{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -165,6 +165,10 @@ export const db = {
     async createFormOptions() {
       return http.get('/complaints/create-form-options');
     },
+
+    async checkDuplicates(payload) {
+      return http.post('/complaints/check-duplicates', payload);
+    },
   },
 
   entities: new Proxy(

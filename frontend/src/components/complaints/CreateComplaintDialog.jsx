@@ -17,12 +17,15 @@ import { useCurrentUser } from '@/lib/useCurrentUser';
 import { Loader2, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { getUserFacingError } from '@/lib/userFacingError';
+import { toastApiError } from '@/lib/toastApi';
 import { offerWhatsappShareToast } from '@/lib/whatsappShareToast';
 import { isValidIsoDate } from '@/lib/dateInput';
 import { DatePicker } from '@/components/ui/date-picker';
 import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
 import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import AffectedProductsEditor, { EMPTY_AFFECTED_PRODUCT } from '@/components/complaints/AffectedProductsEditor';
+import DuplicateComplaintAlert from '@/components/complaints/DuplicateComplaintAlert';
+import { fetchComplaintDuplicates } from '@/lib/complaintDuplicateCheck';
 
 const storageUrl = (path) => {
   if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -79,9 +82,18 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
   const { data: couriers = [] } = useCouriers();
   const { data: priorities = [] } = usePriorities();
   const { data: unitsOfMeasurement = [] } = useUnitsOfMeasurement();
-  const { preResolved, orderSources, isLoading: loadingCreateOptions, error: createOptionsError, refetch: refetchCreateOptions } = useComplaintCreateOptions({ enabled: open });
+  const {
+    preResolved,
+    orderSources,
+    duplicateCheck,
+    isLoading: loadingCreateOptions,
+    error: createOptionsError,
+    refetch: refetchCreateOptions,
+  } = useComplaintCreateOptions({ enabled: open });
   const [form, setForm] = useState(EMPTY_FORM);
   const [invalidFields, setInvalidFields] = useState([]);
+  const [duplicateMatches, setDuplicateMatches] = useState([]);
+  const [duplicateAcknowledged, setDuplicateAcknowledged] = useState(false);
 
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
@@ -92,6 +104,8 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     if (!open) return;
     setUploadError('');
     setInvalidFields([]);
+    setDuplicateMatches([]);
+    setDuplicateAcknowledged(false);
     setForm({
       ...EMPTY_FORM,
       priority_id: String(findIdByName(priorities, 'Medium') || ''),
@@ -107,6 +121,10 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
 
   const update = (key, value) => {
     setInvalidFields((prev) => prev.filter((field) => field !== key));
+    if (['order_number', 'tracking_number', 'customer_phone'].includes(key)) {
+      setDuplicateMatches([]);
+      setDuplicateAcknowledged(false);
+    }
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -220,7 +238,7 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
     update('closure_proof_files', form.closure_proof_files.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async ({ bypassDuplicateCheck = false, forceOverride = false } = {}) => {
     const missing = getMissingComplaintFields(form);
     if (missing.length) {
       setInvalidFields(missing);
@@ -248,6 +266,26 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
       if (preResolved.require_resolution_notes && !form.resolution_notes?.trim()) {
         toast.error('Resolution notes are required for pre-resolved complaints.');
         return;
+      }
+    }
+
+    const acknowledged = forceOverride || duplicateAcknowledged;
+    const shouldCheckDuplicates = duplicateCheck.enabled && !bypassDuplicateCheck && !acknowledged;
+    if (shouldCheckDuplicates) {
+      setSaving(true);
+      try {
+        const { duplicates } = await fetchComplaintDuplicates(form, duplicateCheck);
+        if (duplicates.length) {
+          setDuplicateMatches(duplicates);
+          document.getElementById('complaint-duplicate-alert')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        setDuplicateMatches([]);
+      } catch (err) {
+        toastApiError(err, 'Failed to check for duplicate complaints');
+        return;
+      } finally {
+        setSaving(false);
       }
     }
 
@@ -290,40 +328,62 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
           name: file.name,
         }))
         : undefined,
+      ...(acknowledged && duplicateCheck.mode === 'require_override'
+        ? { duplicate_override: true }
+        : {}),
     };
-    const created = await db.entities.Complaint.create(complaintData);
-    const statusLabel = created.status || (form.pre_resolved ? preResolved.status_name : null);
-    await db.entities.TicketActivity.create({
-      complaint_id: created.id,
-      action_type: 'created',
-      description: form.pre_resolved && statusLabel
-        ? `Ticket ${created.ticket_id || ticketId} logged as ${statusLabel} (already resolved at vendor) by ${user?.full_name || 'Unknown'}`
-        : `Ticket ${created.ticket_id || ticketId} created by ${user?.full_name || 'Unknown'}`,
-      user_id: user?.id,
-    });
-    queryClient.invalidateQueries({ queryKey: ['complaints'] });
-    const sharePayload = {
-      ...created,
-      complaint_type: created.complaint_type ?? complaintTypes.find((t) => String(t.id) === String(form.complaint_type_id))?.name,
-      priority: created.priority ?? priorities.find((p) => String(p.id) === String(form.priority_id))?.name,
-      assigned_department: created.assigned_department,
-      assigned_user_name: created.assigned_user_name ?? user?.full_name,
-      assigned_user_avatar_url: created.assigned_user_avatar_url ?? user?.avatar_url ?? null,
-      customer_name: created.customer_name ?? form.customer_name,
-      order_number: created.order_number ?? form.order_number,
-      order_source: created.order_source ?? form.order_source,
-      purchase_date: created.purchase_date ?? form.purchase_date,
-      tracking_number: created.tracking_number ?? form.tracking_number,
-      status: created.status,
-      affected_products: (created.affected_products ?? []).map((item) => ({
-        ...item,
-        product_name: item.product_name ?? products.find((p) => String(p.id) === String(item.product_id))?.name,
-        unit_of_measurement: item.unit_of_measurement ?? unitsOfMeasurement.find((u) => String(u.id) === String(item.unit_of_measurement_id))?.name,
-      })),
-    };
-    offerWhatsappShareToast(sharePayload, { event: form.pre_resolved ? 'status_changed' : 'created' });
-    setSaving(false);
-    onOpenChange(false);
+
+    try {
+      const created = await db.entities.Complaint.create(complaintData);
+      const statusLabel = created.status || (form.pre_resolved ? preResolved.status_name : null);
+      await db.entities.TicketActivity.create({
+        complaint_id: created.id,
+        action_type: 'created',
+        description: form.pre_resolved && statusLabel
+          ? `Ticket ${created.ticket_id || ticketId} logged as ${statusLabel} (already resolved at vendor) by ${user?.full_name || 'Unknown'}`
+          : `Ticket ${created.ticket_id || ticketId} created by ${user?.full_name || 'Unknown'}`,
+        user_id: user?.id,
+      });
+      queryClient.invalidateQueries({ queryKey: ['complaints'] });
+      const sharePayload = {
+        ...created,
+        complaint_type: created.complaint_type ?? complaintTypes.find((t) => String(t.id) === String(form.complaint_type_id))?.name,
+        priority: created.priority ?? priorities.find((p) => String(p.id) === String(form.priority_id))?.name,
+        assigned_department: created.assigned_department,
+        assigned_user_name: created.assigned_user_name ?? user?.full_name,
+        assigned_user_avatar_url: created.assigned_user_avatar_url ?? user?.avatar_url ?? null,
+        customer_name: created.customer_name ?? form.customer_name,
+        order_number: created.order_number ?? form.order_number,
+        order_source: created.order_source ?? form.order_source,
+        purchase_date: created.purchase_date ?? form.purchase_date,
+        tracking_number: created.tracking_number ?? form.tracking_number,
+        status: created.status,
+        affected_products: (created.affected_products ?? []).map((item) => ({
+          ...item,
+          product_name: item.product_name ?? products.find((p) => String(p.id) === String(item.product_id))?.name,
+          unit_of_measurement: item.unit_of_measurement ?? unitsOfMeasurement.find((u) => String(u.id) === String(item.unit_of_measurement_id))?.name,
+        })),
+      };
+      offerWhatsappShareToast(sharePayload, { event: form.pre_resolved ? 'status_changed' : 'created' });
+      onOpenChange(false);
+    } catch (err) {
+      if (err?.status === 422 && err?.data?.code === 'duplicate_complaints') {
+        setDuplicateMatches(err.data.duplicates || []);
+        setDuplicateAcknowledged(false);
+        document.getElementById('complaint-duplicate-alert')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        toastApiError(err, 'Failed to create complaint');
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDuplicateContinue = () => {
+    if (duplicateCheck.mode === 'hard_block') return;
+    setDuplicateAcknowledged(true);
+    setDuplicateMatches([]);
+    handleSubmit({ bypassDuplicateCheck: true, forceOverride: true });
   };
 
   return (
@@ -334,6 +394,15 @@ export default function CreateComplaintDialog({ open, onOpenChange }) {
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+        <div id="complaint-duplicate-alert">
+          <DuplicateComplaintAlert
+            duplicates={duplicateMatches}
+            mode={duplicateCheck.mode}
+            continuing={saving}
+            onContinue={handleDuplicateContinue}
+            onDismiss={() => setDuplicateMatches([])}
+          />
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div id="complaint-field-customer_name" className="space-y-1.5">
             <Label className="text-xs font-medium">Customer Name *</Label>

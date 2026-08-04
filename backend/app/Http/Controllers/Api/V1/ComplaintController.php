@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ComplaintResource;
 use App\Models\Complaint;
 use App\Services\ComplaintAffectedProductService;
+use App\Services\ComplaintDuplicateCheckService;
 use App\Services\ComplaintNotificationService;
 use App\Services\ComplaintRoutingService;
 use App\Services\OrderSourceService;
@@ -34,6 +35,7 @@ class ComplaintController extends Controller
         private ComplaintRoutingService $complaintRouting,
         private PreResolvedComplaintService $preResolvedComplaints,
         private OrderSourceService $orderSources,
+        private ComplaintDuplicateCheckService $duplicateCheck,
     ) {}
 
     public function createFormOptions(Request $request): JsonResponse
@@ -46,6 +48,35 @@ class ComplaintController extends Controller
         return response()->json([
             'pre_resolved' => $this->preResolvedComplaints->getPublicSettings(),
             'order_sources' => $this->orderSources->getSources(),
+            'duplicate_check' => $this->duplicateCheck->getPublicSettings(),
+        ]);
+    }
+
+    public function checkDuplicates(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->hasPermission('complaints.create') && ! $user->hasPermission('complaints.edit')) {
+            $this->ensurePermission($user, 'complaints.create');
+        }
+
+        $data = $request->validate([
+            'order_number' => ['nullable', 'string', 'max:255'],
+            'tracking_number' => ['nullable', 'string', 'max:255'],
+            'customer_phone' => ['nullable', 'string', 'max:50'],
+            'exclude_id' => ['nullable', 'integer', 'exists:complaints,id'],
+        ]);
+
+        $query = Complaint::query();
+        $this->applyComplaintVisibilityScope($query, $user);
+
+        $duplicates = $this->duplicateCheck->findDuplicates(
+            $data,
+            isset($data['exclude_id']) ? (int) $data['exclude_id'] : null,
+            $query,
+        );
+
+        return response()->json([
+            'duplicates' => $duplicates->values()->all(),
         ]);
     }
 
@@ -83,11 +114,12 @@ class ComplaintController extends Controller
         return ComplaintResource::collection($query->get());
     }
 
-    public function store(Request $request): ComplaintResource
+    public function store(Request $request): ComplaintResource|JsonResponse
     {
         $this->ensurePermission($request->user(), 'complaints.create');
 
         $preResolved = $request->boolean('pre_resolved');
+        $duplicateOverride = $request->boolean('duplicate_override');
 
         $data = $request->validate([
             'customer_name' => ['required', 'string', 'max:255'],
@@ -131,7 +163,15 @@ class ComplaintController extends Controller
             'resolution_notes' => ['nullable', 'string'],
             'sla_deadline' => ['nullable', 'date'],
             'pre_resolved' => ['sometimes', 'boolean'],
+            'duplicate_override' => ['sometimes', 'boolean'],
         ]);
+        unset($data['duplicate_override']);
+
+        $visibilityQuery = Complaint::query();
+        $this->applyComplaintVisibilityScope($visibilityQuery, $request->user());
+        if ($conflict = $this->duplicateCheck->conflictResponseIfBlocked($data, $duplicateOverride, null, $visibilityQuery)) {
+            return $conflict;
+        }
 
         $affectedProducts = ComplaintInput::pullAffectedProducts($data);
 
@@ -210,13 +250,14 @@ class ComplaintController extends Controller
         return new ComplaintResource($complaint);
     }
 
-    public function update(Request $request, string $id): ComplaintResource
+    public function update(Request $request, string $id): ComplaintResource|JsonResponse
     {
         $complaint = Complaint::with('complaintStatus')->findOrFail($id);
         $this->ensureCanViewComplaint($request->user(), $complaint);
 
         $oldStatusName = $complaint->complaintStatus?->name ?? '';
         $oldDepartmentId = $complaint->assigned_department_id;
+        $duplicateOverride = $request->boolean('duplicate_override');
 
         $data = $request->validate([
             'customer_name' => ['sometimes', 'string', 'max:255'],
@@ -265,7 +306,21 @@ class ComplaintController extends Controller
             'resolved_at' => ['nullable', 'date'],
             'delivered_at' => ['nullable', 'date'],
             'closed_at' => ['nullable', 'date'],
+            'duplicate_override' => ['sometimes', 'boolean'],
         ]);
+        unset($data['duplicate_override']);
+
+        $matchInput = $this->duplicateCheck->matchInputForUpdate($complaint, $data);
+        $visibilityQuery = Complaint::query();
+        $this->applyComplaintVisibilityScope($visibilityQuery, $request->user());
+        if ($conflict = $this->duplicateCheck->conflictResponseIfBlocked(
+            $matchInput,
+            $duplicateOverride,
+            (int) $complaint->id,
+            $visibilityQuery,
+        )) {
+            return $conflict;
+        }
 
         if (isset($data['proof_files'])) {
             $data['proof_files'] = StoragePath::normalizeMany($data['proof_files']);

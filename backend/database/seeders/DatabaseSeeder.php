@@ -204,6 +204,16 @@ class DatabaseSeeder extends Seeder
                         ->value('id'),
                 ],
             ],
+            [
+                'key' => 'complaint_duplicate_check',
+                'label' => 'Duplicate Complaints',
+                'json_value' => [
+                    'enabled' => false,
+                    'fields' => ['tracking_number'],
+                    'mode' => 'warn',
+                    'match_logic' => 'or',
+                ],
+            ],
         ];
 
         foreach ($defaultConfigs as $config) {

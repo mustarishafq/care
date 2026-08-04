@@ -21,6 +21,8 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { MAX_PROOF_FILE_BYTES, formatProofFileSize } from '@/lib/proofFiles';
 import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import AffectedProductsEditor, { EMPTY_AFFECTED_PRODUCT, EMPTY_BATCH_ENTRY } from '@/components/complaints/AffectedProductsEditor';
+import DuplicateComplaintAlert from '@/components/complaints/DuplicateComplaintAlert';
+import { fetchComplaintDuplicates } from '@/lib/complaintDuplicateCheck';
 
 const storageUrl = (path) => {
   if (!path) return '';
@@ -133,9 +135,11 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
   const { data: couriers = [] } = useCouriers();
   const { data: priorities = [] } = usePriorities();
   const { data: unitsOfMeasurement = [] } = useUnitsOfMeasurement();
-  const { orderSources } = useComplaintCreateOptions({ enabled: open });
+  const { orderSources, duplicateCheck } = useComplaintCreateOptions({ enabled: open });
   const [form, setForm] = useState(() => (complaint ? complaintToForm(complaint) : null));
   const [invalidFields, setInvalidFields] = useState([]);
+  const [duplicateMatches, setDuplicateMatches] = useState([]);
+  const [duplicateAcknowledged, setDuplicateAcknowledged] = useState(false);
 
   const { data: products = [] } = useQuery({
     queryKey: ['products'],
@@ -146,6 +150,8 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
     if (!open || !complaint) return;
     setUploadError('');
     setInvalidFields([]);
+    setDuplicateMatches([]);
+    setDuplicateAcknowledged(false);
     setForm(complaintToForm(complaint));
   }, [open, complaint]);
 
@@ -153,6 +159,10 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
 
   const update = (key, value) => {
     setInvalidFields((prev) => prev.filter((field) => field !== key));
+    if (['order_number', 'tracking_number', 'customer_phone'].includes(key)) {
+      setDuplicateMatches([]);
+      setDuplicateAcknowledged(false);
+    }
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -216,7 +226,7 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
     update('proof_files', form.proof_files.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async ({ bypassDuplicateCheck = false, forceOverride = false } = {}) => {
     const missing = getMissingComplaintFields(form);
     if (missing.length) {
       setInvalidFields(missing);
@@ -231,6 +241,26 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
     }
 
     setInvalidFields([]);
+
+    const acknowledged = forceOverride || duplicateAcknowledged;
+    const shouldCheckDuplicates = duplicateCheck.enabled && !bypassDuplicateCheck && !acknowledged;
+    if (shouldCheckDuplicates) {
+      setSaving(true);
+      try {
+        const { duplicates } = await fetchComplaintDuplicates(form, duplicateCheck, complaint.id);
+        if (duplicates.length) {
+          setDuplicateMatches(duplicates);
+          document.getElementById('edit-complaint-duplicate-alert')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        setDuplicateMatches([]);
+      } catch (err) {
+        toastApiError(err, 'Failed to check for duplicate complaints');
+        return;
+      } finally {
+        setSaving(false);
+      }
+    }
 
     const affectedProducts = form.affected_products
       .filter((item) => item.product_id)
@@ -258,6 +288,9 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
         tracking_number: form.tracking_number.trim(),
         priority_id: form.priority_id || null,
         proof_files: form.proof_files.map((file) => file.path || file.url).filter(Boolean),
+        ...(acknowledged && duplicateCheck.mode === 'require_override'
+          ? { duplicate_override: true }
+          : {}),
       };
 
       await db.entities.Complaint.update(complaint.id, updates);
@@ -275,10 +308,23 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
       onSaved?.();
       onOpenChange(false);
     } catch (err) {
-      toastApiError(err, 'Failed to update complaint');
+      if (err?.status === 422 && err?.data?.code === 'duplicate_complaints') {
+        setDuplicateMatches(err.data.duplicates || []);
+        setDuplicateAcknowledged(false);
+        document.getElementById('edit-complaint-duplicate-alert')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        toastApiError(err, 'Failed to update complaint');
+      }
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDuplicateContinue = () => {
+    if (duplicateCheck.mode === 'hard_block') return;
+    setDuplicateAcknowledged(true);
+    setDuplicateMatches([]);
+    handleSubmit({ bypassDuplicateCheck: true, forceOverride: true });
   };
 
   return (
@@ -289,6 +335,15 @@ export default function EditComplaintDialog({ complaint, open, onOpenChange, onS
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+          <div id="edit-complaint-duplicate-alert">
+            <DuplicateComplaintAlert
+              duplicates={duplicateMatches}
+              mode={duplicateCheck.mode}
+              continuing={saving}
+              onContinue={handleDuplicateContinue}
+              onDismiss={() => setDuplicateMatches([])}
+            />
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div id="edit-complaint-field-customer_name" className="space-y-1.5">
               <Label className="text-xs font-medium">Customer Name *</Label>

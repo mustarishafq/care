@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { db } from '@/api/db';
+import { DUPLICATE_CHECK_DEFAULT, normalizeDuplicateCheckSettings } from '@/lib/duplicateCheckSettings';
 
 export function useComplaintCreateOptions({ enabled = true } = {}) {
   const { data, isLoading, error, refetch } = useQuery({
@@ -21,9 +22,15 @@ export function useComplaintCreateOptions({ enabled = true } = {}) {
 
   const orderSources = useMemo(() => data?.order_sources ?? [], [data]);
 
+  const duplicateCheck = useMemo(
+    () => normalizeDuplicateCheckSettings(data?.duplicate_check ?? DUPLICATE_CHECK_DEFAULT),
+    [data],
+  );
+
   return {
     preResolved,
     orderSources,
+    duplicateCheck,
     isLoading,
     error,
     refetch,
