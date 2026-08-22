@@ -274,6 +274,14 @@ class TikTokShopController extends Controller
     {
         $this->ensurePermission($request->user(), 'reviews.manage');
 
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(600);
+        }
+        if (function_exists('ini_set')) {
+            @ini_set('max_execution_time', '600');
+        }
+        ignore_user_abort(true);
+
         $connection = TikTokShopConnection::query()
             ->where('is_active', true)
             ->findOrFail($id);

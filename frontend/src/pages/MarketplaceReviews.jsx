@@ -527,10 +527,9 @@ export default function MarketplaceReviews() {
       shop_connection_id: Number(syncShopId),
       page_size: 50,
       fetch_all: true,
+      start_date: syncStartDate || daysAgoIso(7),
+      end_date: syncEndDate || todayIso(),
     };
-
-    if (syncStartDate) payload.start_date = syncStartDate;
-    if (syncEndDate) payload.end_date = syncEndDate;
 
     if (syncRating === 'low') {
       payload.min_rating = 1;
@@ -543,17 +542,10 @@ export default function MarketplaceReviews() {
     setSyncing(true);
     try {
       const result = await db.integrations.Marketplace.syncReviews(payload);
-      await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
-      await queryClient.invalidateQueries({ queryKey: ['marketplace-reviews'] });
-      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      await refetchReviews();
-      const created = result.sync?.created_complaints ?? 0;
-      toast.success(`${result.message}${created ? ` · ${created} complaint(s) auto-created` : ''}`);
+      toast.success(result.message || 'Review sync queued. We will notify you when it finishes.');
       setSyncModalOpen(false);
     } catch (error) {
-      await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
-      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toastApiError(error, 'Failed to sync reviews');
+      toastApiError(error, 'Failed to queue review sync');
     } finally {
       setSyncing(false);
     }
@@ -912,7 +904,7 @@ export default function MarketplaceReviews() {
             <DialogHeader>
               <DialogTitle>Sync from platform</DialogTitle>
               <DialogDescription>
-                Pulls every matching review in the date range (all pages). Existing reviews are updated, not duplicated.
+                Queues the import in the background, including a full year. Existing reviews are updated, not duplicated. You can close this window — we will notify you when it finishes.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
@@ -928,7 +920,7 @@ export default function MarketplaceReviews() {
                 setSyncRating={setSyncRating}
               />
               <p className="text-xs text-muted-foreground">
-                Defaults to last 7 days so replies on older reviews are refreshed.
+                Defaults to last 7 days. A year is split into weekly queue jobs so the browser does not time out.
               </p>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
@@ -944,7 +936,7 @@ export default function MarketplaceReviews() {
                 disabled={syncing || !syncShopId}
               >
                 {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
-                {syncing ? 'Syncing…' : 'Sync all matching'}
+                {syncing ? 'Queueing…' : 'Sync all matching'}
               </Button>
             </DialogFooter>
           </DialogContent>

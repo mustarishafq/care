@@ -53,6 +53,7 @@ class NotificationPayload
             'sla_warning' => ['severity' => 'warning', 'category' => 'system'],
             'low_rating_review' => ['severity' => 'warning', 'category' => 'system'],
             'cookie_expired' => ['severity' => 'critical', 'category' => 'system'],
+            'review_sync' => ['severity' => 'success', 'category' => 'system'],
             'overdue' => ['severity' => 'critical', 'category' => 'system'],
             'approval' => ['severity' => 'info', 'category' => 'approval'],
             'announcement' => ['severity' => 'info', 'category' => 'announcement'],

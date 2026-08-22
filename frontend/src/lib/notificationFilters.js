@@ -15,6 +15,7 @@ export const NOTIFICATION_TYPE_OPTIONS = [
   { value: 'sla_warning', label: 'SLA warning' },
   { value: 'low_rating_review', label: 'Low rating review' },
   { value: 'cookie_expired', label: 'Shop cookie expired' },
+  { value: 'review_sync', label: 'Review sync' },
   { value: 'overdue', label: 'Overdue' },
   { value: 'mention', label: 'Mention' },
   { value: 'general', label: 'General' },

@@ -24,6 +24,7 @@ const TYPE_META = {
   sla_warning: { severity: 'warning', category: 'system', priority: 'high', icon: AlertTriangle },
   low_rating_review: { severity: 'warning', category: 'system', priority: 'high', icon: AlertTriangle },
   cookie_expired: { severity: 'critical', category: 'system', priority: 'critical', icon: Cookie },
+  review_sync: { severity: 'success', category: 'system', priority: 'medium', icon: RefreshCw },
   overdue: { severity: 'critical', category: 'system', priority: 'critical', icon: Clock },
   approval: { severity: 'info', category: 'approval', priority: 'medium', icon: CheckCircle2 },
   announcement: { severity: 'info', category: 'announcement', priority: 'medium', icon: Megaphone },

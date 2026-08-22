@@ -30,6 +30,11 @@ const MESSAGE_REWRITES = [
       'Your shop cookie expired or is invalid. Paste a fresh Seller Center cookie and try again.',
   },
   {
+    test: /failed to fetch|networkerror|load failed|the operation was aborted|err_network|err_connection|err_empty_response/i,
+    message:
+      'The request timed out or the connection dropped. Please try again.',
+  },
+  {
     test: /no .+ cookie|cookie (is )?not configured|cookie saved|seller center cookie is required/i,
     message:
       'No Seller Center cookie is saved for this shop. Add or update the cookie under Marketplace, then try again.',
@@ -67,6 +72,9 @@ function isTechnicalMessage(message) {
     || /\bstatus\s*[:=]?\s*\d{3}\b/i.test(trimmed)
     || /\bECONNREFUSED\b|\bETIMEDOUT\b|\bENOTFOUND\b/i.test(trimmed)
     || /stack trace|exception|sqlstate|pdoexception/i.test(trimmed)
+    || /^failed to fetch$/i.test(trimmed)
+    || /^load failed$/i.test(trimmed)
+    || /^networkerror/i.test(trimmed)
     || /^\s*\{[\s\S]*\}\s*$/.test(trimmed)
     || /<\/?[a-z][\s\S]*>/i.test(trimmed)
     || trimmed.length > 280

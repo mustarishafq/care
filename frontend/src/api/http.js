@@ -126,7 +126,15 @@ async function request(method, path, { body, formData, params } = {}) {
     options.body = JSON.stringify(body);
   }
 
-  const response = await fetch(url.toString(), options);
+  let response;
+  try {
+    response = await fetch(url.toString(), options);
+  } catch (error) {
+    throw new ApiError(
+      getUserFacingError(error, 'The request timed out. Please try again.'),
+      408,
+    );
+  }
   const { data, raw, parseFailed, html } = await readResponseBody(response);
 
   if (!response.ok) {

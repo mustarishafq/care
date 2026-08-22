@@ -10,7 +10,7 @@ use App\Models\MarketplaceProductReview;
 use App\Models\MarketplaceShopConnection;
 use App\Models\TikTokShopConnection;
 use App\Services\Marketplace\MarketplaceReviewSyncService;
-use App\Services\Marketplace\MarketplaceCookieAlertService;
+use App\Services\Marketplace\MarketplaceReviewSyncQueueService;
 use App\Services\TikTokShop\TikTokSellerReviewClient;
 use App\Support\MarketplacePlatform;
 use App\Support\SimpleXlsxWriter;
@@ -26,6 +26,7 @@ class MarketplaceReviewController extends Controller
 
     public function __construct(
         private readonly MarketplaceReviewSyncService $reviewSync,
+        private readonly MarketplaceReviewSyncQueueService $reviewSyncQueue,
     ) {}
 
     public function shops(Request $request): JsonResponse
@@ -301,48 +302,33 @@ class MarketplaceReviewController extends Controller
 
             $startAt = ! empty($validated['start_date'])
                 ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['start_date'])
-                : null;
+                : now()->subDays(7);
             $endAt = ! empty($validated['end_date'])
                 ? \Carbon\Carbon::createFromFormat('Y-m-d', $validated['end_date'])
-                : null;
+                : now();
 
-            $result = $this->reviewSync->syncConnection(
+            $queued = $this->reviewSyncQueue->queueConnection(
                 $connection,
-                $validated['page_size'] ?? 50,
-                $validated['page_token'] ?? null,
-                $validated['product_id'] ?? null,
-                $validated['min_rating'] ?? null,
-                $validated['max_rating'] ?? null,
-                array_key_exists('fetch_all', $validated) ? (bool) $validated['fetch_all'] : true,
                 $startAt,
                 $endAt,
-                notifyLowRatings: false,
+                $validated['page_size'] ?? 50,
+                $validated['min_rating'] ?? null,
+                $validated['max_rating'] ?? null,
+                $request->user()?->id,
             );
         } catch (RuntimeException $exception) {
-            if (isset($connection)) {
-                app(MarketplaceCookieAlertService::class)->recordFailure(
-                    $connection,
-                    $exception,
-                    'reviews',
-                    'marketplace:reviews-sync',
-                    class_basename(static::class),
-                );
-            }
-
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
-        $created = (int) ($result['created'] ?? 0);
-        $updated = (int) ($result['updated'] ?? 0);
-        $message = "Synced {$result['synced']} review(s)";
-        if ($created || $updated) {
-            $message .= " ({$created} new, {$updated} updated)";
-        }
-        $message .= '.';
+        $jobs = (int) $queued['jobs'];
+        $message = $jobs === 1
+            ? "Review sync queued for {$queued['start_date']} → {$queued['end_date']}. You can close this window — we'll notify you when it finishes."
+            : "Review sync queued ({$jobs} weekly batches) for {$queued['start_date']} → {$queued['end_date']}. You can close this window — we'll notify you when it finishes.";
 
         return response()->json([
             'message' => $message,
-            'sync' => $result,
+            'queued' => true,
+            'sync' => $queued,
             'shop_connection_id' => $connection->id,
         ]);
     }
