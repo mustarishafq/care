@@ -32,9 +32,9 @@ trait ScopesComplaintVisibility
             );
 
             if ($visibility === Permissions::COMPLAINT_VISIBILITY_DEPARTMENT) {
-                $departmentIds = $user->departments()->pluck('departments.id');
+                $departmentIds = $user->accessibleDepartmentIds();
 
-                if ($departmentIds->isNotEmpty()) {
+                if ($departmentIds !== []) {
                     $outer->orWhereIn('assigned_department_id', $departmentIds);
                 }
             }
@@ -62,9 +62,9 @@ trait ScopesComplaintVisibility
         }
 
         if ($visibility === Permissions::COMPLAINT_VISIBILITY_DEPARTMENT) {
-            $departmentIds = $user->departments()->pluck('departments.id');
+            $departmentIds = $user->accessibleDepartmentIds();
 
-            if ($complaint->assigned_department_id && $departmentIds->contains($complaint->assigned_department_id)) {
+            if ($complaint->assigned_department_id && in_array((int) $complaint->assigned_department_id, $departmentIds, true)) {
                 return;
             }
         }

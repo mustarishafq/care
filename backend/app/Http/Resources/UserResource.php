@@ -32,6 +32,10 @@ class UserResource extends JsonResource
                 'departments',
                 fn () => $this->departments->pluck('id')->map(fn ($id) => (string) $id)->values()->all(),
             ),
+            'accessible_department_ids' => collect($this->resource->accessibleDepartmentIds())
+                ->map(fn ($id) => (string) $id)
+                ->values()
+                ->all(),
             'teams' => TeamResource::collection($this->whenLoaded('teams')),
             'team_ids' => $this->whenLoaded(
                 'teams',

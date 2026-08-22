@@ -11,13 +11,32 @@ export function useDepartments() {
 
 export function getUserDepartmentIds(user) {
   if (!user) return [];
-  if (user.department_ids?.length) return user.department_ids;
-  if (Array.isArray(user.departments) && user.departments.length) {
-    if (typeof user.departments[0] === 'object') {
-      return user.departments.map((d) => d.id);
+
+  const ids = new Set();
+
+  const add = (value) => {
+    if (value != null && value !== '') ids.add(String(value));
+  };
+
+  if (Array.isArray(user.accessible_department_ids)) {
+    user.accessible_department_ids.forEach(add);
+  }
+  if (Array.isArray(user.department_ids)) {
+    user.department_ids.forEach(add);
+  }
+  if (Array.isArray(user.departments)) {
+    for (const dept of user.departments) {
+      add(typeof dept === 'object' ? dept?.id : dept);
     }
   }
-  return [];
+  if (Array.isArray(user.teams)) {
+    for (const team of user.teams) {
+      if (team?.is_active === false) continue;
+      add(team?.department_id ?? team?.department?.id);
+    }
+  }
+
+  return [...ids];
 }
 
 export function getUserDepartmentNames(user) {

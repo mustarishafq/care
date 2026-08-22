@@ -9,6 +9,7 @@ use App\Models\Department;
 use App\Models\Notification;
 use App\Models\Product;
 use App\Models\Role;
+use App\Models\Team;
 use App\Models\User;
 use App\Services\ComplaintNotificationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -196,6 +197,78 @@ class ComplaintDepartmentNotificationTest extends TestCase
 
         $this->assertDatabaseHas('notifications', [
             'recipient_user_id' => $this->departmentMembers[0]->id,
+            'complaint_id' => $complaint->id,
+            'type' => 'department_assigned',
+        ]);
+    }
+
+    public function test_notifies_team_members_and_leads_even_if_missing_from_department_pivot(): void
+    {
+        $role = Role::query()->first();
+
+        $teamMember = User::factory()->create([
+            'role_id' => $role->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'status' => User::STATUS_ACTIVE,
+        ]);
+        $teamLead = User::factory()->create([
+            'role_id' => $role->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'status' => User::STATUS_ACTIVE,
+        ]);
+
+        $team = Team::create([
+            'name' => 'Warehouse',
+            'department_id' => $this->department->id,
+            'lead_user_id' => $teamLead->id,
+            'is_active' => true,
+        ]);
+        $team->users()->sync([$teamMember->id]);
+
+        $complaint = $this->createComplaint(['assigned_department_id' => $this->department->id]);
+
+        $count = app(ComplaintNotificationService::class)->notifyDepartmentAssigned($complaint, $this->actor);
+
+        $this->assertSame(5, $count);
+
+        foreach ([$teamMember, $teamLead, ...$this->departmentMembers] as $user) {
+            $this->assertDatabaseHas('notifications', [
+                'recipient_user_id' => $user->id,
+                'complaint_id' => $complaint->id,
+                'type' => 'department_assigned',
+            ]);
+        }
+    }
+
+    public function test_skips_inactive_and_pending_department_members(): void
+    {
+        $role = Role::query()->first();
+
+        $inactive = User::factory()->create([
+            'role_id' => $role->id,
+            'approval_status' => User::APPROVAL_APPROVED,
+            'status' => User::STATUS_INACTIVE,
+        ]);
+        $pending = User::factory()->create([
+            'role_id' => $role->id,
+            'approval_status' => User::APPROVAL_PENDING,
+            'status' => User::STATUS_ACTIVE,
+        ]);
+
+        $this->department->users()->syncWithoutDetaching([$inactive->id, $pending->id]);
+
+        $complaint = $this->createComplaint(['assigned_department_id' => $this->department->id]);
+
+        $count = app(ComplaintNotificationService::class)->notifyDepartmentAssigned($complaint, $this->actor);
+
+        $this->assertSame(3, $count);
+        $this->assertDatabaseMissing('notifications', [
+            'recipient_user_id' => $inactive->id,
+            'complaint_id' => $complaint->id,
+            'type' => 'department_assigned',
+        ]);
+        $this->assertDatabaseMissing('notifications', [
+            'recipient_user_id' => $pending->id,
             'complaint_id' => $complaint->id,
             'type' => 'department_assigned',
         ]);

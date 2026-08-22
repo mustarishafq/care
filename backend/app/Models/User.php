@@ -186,4 +186,48 @@ class User extends Authenticatable
         return $this->approval_status === self::APPROVAL_APPROVED
             && $this->status === self::STATUS_ACTIVE;
     }
+
+    /**
+     * Department IDs this user belongs to — explicit membership plus
+     * departments of teams they are on or lead.
+     *
+     * @return list<int>
+     */
+    public function accessibleDepartmentIds(): array
+    {
+        $ids = collect();
+
+        if ($this->relationLoaded('departments')) {
+            $ids = $ids->merge($this->departments->pluck('id'));
+        } else {
+            $ids = $ids->merge($this->departments()->pluck('departments.id'));
+        }
+
+        if ($this->relationLoaded('teams')) {
+            $ids = $ids->merge(
+                $this->teams->where('is_active', true)->pluck('department_id')
+            );
+        } else {
+            $ids = $ids->merge(
+                $this->teams()->where('teams.is_active', true)->pluck('department_id')
+            );
+        }
+
+        if ($this->relationLoaded('ledTeams')) {
+            $ids = $ids->merge(
+                $this->ledTeams->where('is_active', true)->pluck('department_id')
+            );
+        } else {
+            $ids = $ids->merge(
+                $this->ledTeams()->where('is_active', true)->pluck('department_id')
+            );
+        }
+
+        return $ids
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn ($id) => $id > 0)
+            ->unique()
+            ->values()
+            ->all();
+    }
 }

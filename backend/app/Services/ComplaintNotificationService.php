@@ -86,7 +86,7 @@ class ComplaintNotificationService
 
     public function notifyDepartmentAssigned(Complaint $complaint, ?User $actor): int
     {
-        $complaint->loadMissing('assignedDepartment.users');
+        $complaint->loadMissing('assignedDepartment');
         $department = $complaint->assignedDepartment;
 
         if (! $department) {
@@ -97,8 +97,8 @@ class ComplaintNotificationService
         $departmentName = $department->name;
         $count = 0;
 
-        foreach ($department->users as $user) {
-            if ($actor && $user->id === $actor->id) {
+        foreach ($department->notifiableUsers() as $user) {
+            if ($actor && (int) $user->id === (int) $actor->id) {
                 continue;
             }
 
