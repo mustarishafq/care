@@ -1,5 +1,6 @@
 import {
-  AlertCircle, Bell, Building2, CircleDot, FileText, Ruler, Truck, Users,
+  AlertCircle, Bell, Building2, CircleDot, Clock, Database, FileText, GitBranch,
+  MessageSquare, Ruler, Sun, Truck, UserPlus, Users, Webhook,
 } from 'lucide-react';
 
 export { SLA_DEFAULT } from '@/lib/slaSettings';
@@ -8,6 +9,16 @@ export { PRE_RESOLVED_DEFAULT, ORDER_SOURCES_DEFAULT } from '@/lib/preResolvedSe
 export { DUPLICATE_CHECK_DEFAULT } from '@/lib/duplicateCheckSettings';
 
 export const ROUTING_DEFAULT = { enabled: false, default_department_id: '', default_status_id: '', rules: [] };
+
+export const SETTINGS_NAV = [
+  { value: 'general', label: 'General', description: 'Appearance and formats', icon: Sun },
+  { value: 'lookups', label: 'Lookups', description: 'Dropdown values', icon: Database },
+  { value: 'automation', label: 'Automation', description: 'Routing, SLA, workflows', icon: GitBranch },
+  { value: 'integrations', label: 'Integrations', description: 'SSO and webhooks', icon: Webhook },
+  { value: 'notifications', label: 'Notifications', description: 'System event triggers', icon: Bell },
+];
+
+export const SETTINGS_TABS = new Set(SETTINGS_NAV.map((tab) => tab.value));
 
 export const LOOKUP_SECTIONS = [
   { key: 'departments', label: 'Departments', description: 'Org units that tickets can be assigned to', icon: Building2, entity: 'Department', queryKey: 'departments' },
@@ -20,10 +31,10 @@ export const LOOKUP_SECTIONS = [
 ];
 
 export const NOTIFICATION_TRIGGERS = [
-  { event: 'Ticket Assigned', when: 'A complaint is assigned to a user', type: 'ticket_assigned' },
-  { event: 'Department Assigned', when: 'A complaint is assigned to a department — every active, approved member of that department (including team members and leads) is notified, except the person who assigned it', type: 'department_assigned' },
-  { event: 'Status Changed', when: 'Complaint status is updated', type: 'status_changed' },
-  { event: 'SLA Warning', when: '80% of SLA deadline reached', type: 'sla_warning' },
-  { event: 'Overdue', when: 'SLA deadline has passed', type: 'overdue' },
-  { event: 'Internal Note', when: 'A new internal note is added', type: 'mention' },
+  { event: 'Ticket Assigned', when: 'A complaint is assigned to a user', type: 'ticket_assigned', icon: UserPlus },
+  { event: 'Department Assigned', when: 'A complaint is assigned to a department — every active, approved member of that department (including team members and leads) is notified, except the person who assigned it', type: 'department_assigned', icon: Building2 },
+  { event: 'Status Changed', when: 'Complaint status is updated', type: 'status_changed', icon: CircleDot },
+  { event: 'SLA Warning', when: '80% of SLA deadline reached', type: 'sla_warning', icon: Clock },
+  { event: 'Overdue', when: 'SLA deadline has passed', type: 'overdue', icon: AlertCircle },
+  { event: 'Internal Note', when: 'A new internal note is added', type: 'mention', icon: MessageSquare },
 ];

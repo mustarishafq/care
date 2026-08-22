@@ -649,28 +649,17 @@ Pass an explicit `fallback` when the page has a known parent; omit it only when 
 | Variant | Component | Usage |
 |---------|-----------|-------|
 | `icon` (default) | `Button ghost icon h-9 w-9`; Sun/Moon `h-5 w-5` | TopBar, auth pages |
-| `switch` | `Switch checked={isDark}` | Settings, MobileMoreMenu footer |
+| `switch` | `Switch checked={isDark}` | Compact menus (MobileMoreMenu footer) |
 
 **Pre-mount placeholder:** Disabled button or switch (prevents hydration mismatch)
 
 **Auth TopBar toggle classes:** `text-white lg:text-foreground hover:bg-white/10 lg:hover:bg-muted`
 
-### Settings appearance row pattern
+### Settings appearance
 
-```jsx
-<div className="flex items-center justify-between">
-  <div className="flex items-center gap-3">
-    <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-      <Sun className="w-4 h-4 text-primary" />
-    </div>
-    <div>
-      <Label className="text-sm font-medium">Dark Mode</Label>
-      <p className="text-xs text-muted-foreground">Switch between light and dark themes</p>
-    </div>
-  </div>
-  <ThemeToggle variant="switch" />
-</div>
-```
+**Settings page:** `AppearancePicker` — two preview tiles (Light / Dark) with `aria-pressed`, selected state `border-primary ring-2 ring-primary/20`. Theme is **device-local**.
+
+**Compact menus / nested rows:** `SettingsSwitchRow` + `ThemeToggle variant="switch"` (§12.2).
 
 Semantic icon box backgrounds: `primary/10`, `info/10`, `warning/10`.
 
@@ -1936,6 +1925,7 @@ These are **intentional** — do not "fix" to tokens unless explicitly migrating
 | iframe background | `bg-white` | Embedded apps |
 | PageNotFound / UserNotRegisteredError | Full `slate-*` palette | Legacy — migrate when touched |
 | Celebrations widget | `amber-500/600` accents | Seasonal UI |
+| AppearancePicker theme mocks | Fixed light/dark HSL matching core tokens | Must not follow the live theme |
 
 **All new pages and systems:** use semantic tokens only.
 
@@ -2019,7 +2009,7 @@ Filters in collapsible card (mobile collapsed by default):
 
 **Files:** `src/pages/Settings.jsx`, `src/components/settings/*`
 
-Satellite apps (Care, Booking, etc.) use this tabbed settings layout. Patterns also reference §8 (appearance row) and §12.2 (switch-row).
+Satellite apps (Care, Booking, etc.) use this sidebar settings layout. Patterns also reference §8 (appearance) and §12.2 (switch-row).
 
 #### Page shell
 
@@ -2030,28 +2020,30 @@ Satellite apps (Care, Booking, etc.) use this tabbed settings layout. Patterns a
 | Content wrapper | `PageContent` with `space-y-6` |
 | Motion | Page fade via `AppLayout`; stat cards use `StatCard` stagger (§20.1) |
 
-#### Tab navigation
+#### Section navigation
 
-Tabs sit in a **pill rail** above tab content (not mixed with page header).
+URL-driven tabs (`?tab=`) with a **sidebar on `lg+`** and a **horizontal chip rail on mobile**. Component: `SettingsNav`.
 
 | Element | Spec |
 |---------|------|
-| Rail container | `rounded-2xl border border-border bg-muted/30 p-1 overflow-x-auto` |
-| `TabsList` | `h-10 w-full min-w-max justify-start bg-transparent gap-1` |
-| Active trigger | `data-[state=active]:bg-background data-[state=active]:shadow-sm` |
-| Trigger layout | `gap-2`; Lucide icon `w-4 h-4` + label |
-| Mobile | Horizontal scroll; each trigger `flex-1 sm:flex-none` |
+| Page grid | `flex flex-col gap-6 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-8` |
+| Nav card | `rounded-2xl border bg-card p-1 lg:p-2 shadow-sm`; `lg:sticky lg:top-20` |
+| `TabsList` | `h-auto … lg:flex-col lg:items-stretch bg-transparent` |
+| Active trigger | `data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none` |
+| Desktop trigger | Icon box `h-8 w-8 rounded-lg` + label + one-line description + optional count badge |
+| Mobile | Horizontal scroll; icon + label only |
+| Badges | Lookup count, automation-active count, SSO “On” |
 
-**Care default tabs:** General · Lookup Data · Automation · Integrations · Notifications
+**Care default sections:** General · Lookups · Automation · Integrations · Notifications (`SETTINGS_NAV` in `constants.js`)
 
 #### General tab
 
 | Block | Spec |
 |-------|------|
-| Section intro | `SettingsSectionIntro` — `text-base font-semibold` title + `text-sm text-muted-foreground` description (mention appearance **and** display formats) |
-| Appearance card | `Card rounded-2xl border shadow-sm`; `CardHeader` title “Appearance”; body uses `SettingsSwitchRow` + `ThemeToggle variant="switch"` (§12.2). **Device-local** theme only. |
+| Section intro | `SettingsSectionIntro` — optional icon, `text-lg font-semibold` title + `text-sm text-muted-foreground` description (mention appearance **and** display formats) |
+| Overview stats | First; `grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4` of clickable `StatCard` (jump to Lookups / Automation / Integrations); numeric values use §12.7 |
+| Appearance card | `Card rounded-2xl border shadow-sm`; body uses `AppearancePicker` (§8). **Device-local** theme only. |
 | Display & format card | Required — see below |
-| Overview stats | `grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4` of `StatCard` with `index` for entrance stagger; numeric values use §12.7 |
 
 ##### Display & format card (required)
 
@@ -2060,63 +2052,64 @@ Workspace-wide number / money / date settings. Full schema: [DISPLAY_FORMAT_REQU
 | Element | Spec |
 |---------|------|
 | Card | `Card rounded-2xl border shadow-sm` |
-| Header | Title “Display & format” with `CalendarDays` icon; description: workspace-wide (not this device); Save button when `settings.manage` and form dirty |
-| Controls | Locale preset · Currency · Money decimals (0–4) · Date format · Date-time format — `Select` + `Label text-xs text-muted-foreground`, grid `grid-cols-1 sm:grid-cols-2 gap-4` |
-| Preview | `rounded-xl border bg-muted/30 p-3 grid grid-cols-2 lg:grid-cols-4 gap-3` showing live Number / Money / Date / Date-time samples |
+| Header | Title “Display & format” with `CalendarDays` icon; description: workspace-wide (not this device); Save button when `settings.manage` — label “Save” when dirty, “Saved” when clean |
+| Controls | Locale preset · Currency · Money decimals (0–4) · Date format · Date-time format · phone country code — `Select` + `Label text-xs text-muted-foreground`, grid `grid-cols-1 sm:grid-cols-2 gap-4` |
+| Layout | `xl:grid-cols-[minmax(0,1fr)_260px]` — controls left, live preview right |
+| Preview | `rounded-xl border bg-muted/30 p-4` stacked Number / Money / Date / Date-time / Phone samples |
 | Persist | `system_configs` key `display_format`; invalidate query on save |
 | Contrast | Do **not** put theme toggle in this card — Appearance stays separate |
 
-#### Lookup Data tab
+#### Lookups tab
 
 | Element | Spec |
 |---------|------|
 | Intro | `SettingsSectionIntro` explaining lookup purpose |
 | Grid | `grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4` |
-| Cards | `SettingsLookupCard` — clickable when `canManage`; shows count badge + item preview chips |
+| Cards | `SettingsLookupCard` — clickable when `canManage`; large item count (`formatNumber`) + preview chips; chevron affordance |
 | Extra config | `SettingsConfigCard` for non-entity settings (e.g. Order Sources) |
+| Edit dialog | `LookupEditDialog` — full-height form (§11.2): `w-[calc(100vw-1.5rem)]`, `p-0`, icon header, reorder arrows, sticky add composer; statuses use color preset popover + live preview column (`sm:max-w-3xl`) |
+| Order sources | `OrderSourcesDialog` — same chrome as lookup editor for the string list of platforms |
 
 #### Automation & Integrations tabs
 
 | Element | Spec |
 |---------|------|
 | Layout | `grid grid-cols-1 lg:grid-cols-2 gap-4` of `SettingsConfigCard` |
-| Config card | `rounded-2xl border shadow-sm`; `hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30`; icon box `h-8 w-8 rounded-lg bg-primary/10`; Enabled/Disabled badge when applicable; pencil edit affordance |
-| Row lines | Label `text-sm` left, value `text-xs text-muted-foreground` right; optional `Badge secondary` for numeric values |
+| Config card | `rounded-2xl border shadow-sm`; `hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30`; icon box `h-10 w-10 rounded-xl bg-primary/10`; 4px left accent (`bg-primary` when on); On/Off badge with status dot; chevron edit affordance |
+| Row lines | Label `text-sm text-muted-foreground` left, value `text-sm font-medium` right; optional `Badge secondary` for numeric values |
 | Dialogs | Full-height or `max-w-md` form dialogs for edit flows (§11.2) |
 
 #### Notifications tab (settings reference)
 
-Read-only table of system trigger types — **not** the user Notification Center (§15.4).
+Read-only list of system trigger types — **not** the user Notification Center (§15.4). Component: `NotificationTriggersList`.
 
 | Element | Spec |
 |---------|------|
-| Table card | `rounded-2xl border shadow-sm overflow-hidden` |
-| Header row | `bg-muted/40 sticky top-0 z-10`; first column `pl-6`, actions `pr-6` |
-| Type column | `Badge outline text-[10px] font-mono` |
+| List card | `rounded-2xl border shadow-sm overflow-hidden`; `divide-y` rows |
+| Row | Icon box `h-9 w-9` + event name + `Badge outline text-[10px] font-mono` type + description |
 
 #### Shared components
 
 | Component | Purpose |
 |-----------|---------|
+| `SettingsNav` | Sidebar / mobile chip navigation |
+| `AppearancePicker` | Light / Dark theme preview tiles |
 | `SettingsSwitchRow` | Icon box + label + description + control (switch/toggle) |
-| `SettingsSectionIntro` | Tab section title + helper text |
+| `SettingsSectionIntro` | Section title + helper text + optional icon |
 | `SettingsConfigCard` | Automation/integration config summary + edit |
 | `SettingsLookupCard` | Lookup entity preview + edit |
+| `NotificationTriggersList` | Read-only notification event catalog |
 
 ```jsx
-<Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-  <div className="rounded-2xl border border-border bg-muted/30 p-1 overflow-x-auto">
-    <TabsList className="h-10 w-full min-w-max justify-start bg-transparent gap-1">
-      <TabsTrigger value="general" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-        <Sun className="w-4 h-4" /> General
-      </TabsTrigger>
-    </TabsList>
+<Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col gap-6 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-8">
+  <SettingsNav tabs={SETTINGS_NAV} badges={{ lookups: lookupTotal }} />
+  <div className="min-w-0 space-y-6">
+    <TabsContent value="general" className="space-y-6 mt-0">
+      <SettingsSectionIntro title="General" description="…" />
+      <Card className="rounded-2xl">{/* Appearance · AppearancePicker */}</Card>
+      <Card className="rounded-2xl">{/* Display & format · locale / currency / date presets + preview */}</Card>
+    </TabsContent>
   </div>
-  <TabsContent value="general" className="space-y-6 mt-0">
-    <SettingsSectionIntro title="General" description="…" />
-    <Card className="rounded-2xl">{/* Appearance · SettingsSwitchRow */}</Card>
-    <Card className="rounded-2xl">{/* Display & format · locale / currency / date presets + preview */}</Card>
-  </TabsContent>
 </Tabs>
 ```
 
@@ -2146,7 +2139,7 @@ Use `useGoBack("/")` for the handler; do not hardcode `<Link to="/">` for back a
 | TopBar / bottom nav | `h-5 w-5` |
 | Widget header | `w-4 h-4 text-primary` |
 | Empty state | `h-10 w-10` or `w-12 h-12 opacity-20` |
-| Settings icon box | `w-4 h-4` inside `w-9 h-9` box |
+| Settings icon box | `w-4 h-4` inside `w-10 h-10` (`rounded-xl`) or `w-9 h-9` (`rounded-lg`) |
 | Notification item icon box | `w-9 h-9` container |
 | App tile status icons | `h-2.5 w-2.5` |
 | Theme toggle | `h-5 w-5` |
@@ -2257,10 +2250,14 @@ Paths below use the monorepo convention `frontend/src/`. Every EMZI app should h
 | Confirm dialog | `frontend/src/components/ui/confirm-dialog.jsx` |
 | Auth pages | `frontend/src/pages/Login.jsx`, `Register.jsx`, `ForgotPassword.jsx` |
 | Settings | `frontend/src/pages/Settings.jsx` |
+| Settings nav | `frontend/src/components/settings/SettingsNav.jsx` |
+| Settings appearance picker | `frontend/src/components/settings/AppearancePicker.jsx` |
 | Settings switch row | `frontend/src/components/settings/SettingsSwitchRow.jsx` |
 | Settings section intro | `frontend/src/components/settings/SettingsSectionIntro.jsx` |
 | Settings config card | `frontend/src/components/settings/SettingsConfigCard.jsx` |
 | Settings lookup card | `frontend/src/components/settings/SettingsLookupCard.jsx` |
+| Settings order sources | `frontend/src/components/settings/OrderSourcesDialog.jsx` |
+| Settings notification triggers | `frontend/src/components/settings/NotificationTriggersList.jsx` |
 | Mobile hook | `frontend/src/hooks/use-mobile.jsx` |
 
 ### 29.2 Nexus Brain hub only (optional in satellite apps)

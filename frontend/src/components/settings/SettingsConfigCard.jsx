@@ -1,7 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Pencil } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function SettingsConfigCard({
@@ -20,40 +20,52 @@ export default function SettingsConfigCard({
   return (
     <Card
       className={cn(
-        'rounded-2xl border border-border shadow-sm transition-all duration-300 group',
+        'relative rounded-2xl border border-border shadow-sm transition-all duration-300 group overflow-hidden',
         'hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30',
         clickable && 'cursor-pointer',
         className,
       )}
       onClick={() => clickable && onEdit()}
     >
+      {enabled !== undefined && (
+        <span
+          className={cn(
+            'absolute inset-y-0 left-0 w-1',
+            enabled ? 'bg-primary' : 'bg-muted-foreground/25',
+          )}
+        />
+      )}
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
-          <div className="space-y-1 min-w-0">
-            <CardTitle className="text-base flex items-center gap-2">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Icon className="w-4 h-4" />
-              </span>
-              <span className="truncate">{title}</span>
-            </CardTitle>
-            {description && <CardDescription className="text-xs">{description}</CardDescription>}
+          <div className="flex items-start gap-3 min-w-0">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Icon className="w-5 h-5" />
+            </span>
+            <div className="min-w-0 space-y-1">
+              <CardTitle className="text-base truncate">{title}</CardTitle>
+              {description && <CardDescription className="text-xs">{description}</CardDescription>}
+            </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0">
             {enabled !== undefined && (
-              <Badge variant={enabled ? 'default' : 'secondary'} className="text-[10px]">
-                {enabled ? 'Enabled' : 'Disabled'}
+              <Badge
+                variant={enabled ? 'default' : 'secondary'}
+                className="text-[10px] gap-1"
+              >
+                <span className={cn('h-1.5 w-1.5 rounded-full', enabled ? 'bg-primary-foreground' : 'bg-muted-foreground')} />
+                {enabled ? 'On' : 'Off'}
               </Badge>
             )}
             {onEdit && (
               <Button
                 size="icon"
                 variant="ghost"
-                className="h-7 w-7 opacity-60 group-hover:opacity-100"
+                className="h-8 w-8 text-muted-foreground opacity-70 group-hover:opacity-100 group-hover:text-primary"
                 onClick={(e) => { e.stopPropagation(); onEdit(); }}
                 disabled={!canManage}
-                aria-label={`Edit ${title}`}
+                aria-label={`${canManage ? 'Edit' : 'View'} ${title}`}
               >
-                <Pencil className="w-3.5 h-3.5" />
+                <ChevronRight className="w-4 h-4" />
               </Button>
             )}
           </div>
@@ -66,11 +78,11 @@ export default function SettingsConfigCard({
             key={row.label}
             className="flex justify-between items-center gap-3 py-2 border-b border-border/70 last:border-0"
           >
-            <span className="text-sm text-foreground">{row.label}</span>
+            <span className="text-sm text-muted-foreground">{row.label}</span>
             {row.badge ? (
               <Badge variant="secondary" className="text-xs shrink-0 tabular-nums">{row.value}</Badge>
             ) : (
-              <span className="text-xs text-muted-foreground text-right truncate max-w-[55%]">{row.value}</span>
+              <span className="text-sm font-medium text-right truncate max-w-[55%]">{row.value}</span>
             )}
           </div>
         ))}

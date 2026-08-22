@@ -120,7 +120,7 @@ Expose one module (e.g. `lib/displayFormat.js`) and a React hook/provider that l
    - Currency decimals (0–4)
    - Date format (preset select)
    - Date-time format (preset select)
-3. Live **preview** row: sample number, money, date, date-time using current form values.
+3. Live **preview** panel: sample number, money, date, date-time, and phone using current form values.
 4. Save button (respect `settings.manage`); toast on success.
 5. Dark mode / theme stays separate (personal device preference).
 

@@ -21,7 +21,7 @@ export default function SettingsSwitchRow({
       <div className="flex items-center gap-3 min-w-0">
         <div
           className={cn(
-            'w-9 h-9 rounded-lg flex items-center justify-center shrink-0',
+            'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
             TONE_STYLES[iconTone] ?? TONE_STYLES.primary,
           )}
         >

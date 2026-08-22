@@ -35,9 +35,12 @@ export function StatusColumnPreview({ name, color, className = '' }) {
 export function StatusColorPreviewPanel({ items = [] }) {
   if (!items.length) {
     return (
-      <p className="text-xs text-muted-foreground text-center py-4">
-        Add statuses to see how colors will appear.
-      </p>
+      <div className="flex flex-col items-center justify-center text-center py-8">
+        <p className="text-sm font-medium">No statuses to preview</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Add statuses to see how colors will appear.
+        </p>
+      </div>
     );
   }
 

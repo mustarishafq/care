@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Check, ChevronsUpDown, Loader2, Plus, Search, Users, X } from 'lucide-react';
+import { Check, ChevronsUpDown, Loader2, Plus, Search, Trash2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const EMPTY_FORM = {
@@ -160,20 +160,29 @@ export default function TeamEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Teams
-          </DialogTitle>
+      <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-2xl max-h-[90vh] p-0 gap-0 overflow-hidden flex flex-col rounded-xl sm:rounded-2xl">
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 pr-12 shrink-0 border-b border-border/70 text-left">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Users className="w-5 h-5" />
+            </span>
+            <div className="min-w-0 space-y-1">
+              <DialogTitle>{editing ? (editing.id ? 'Edit team' : 'New team') : 'Teams'}</DialogTitle>
+              <DialogDescription>
+                {editing
+                  ? 'Set the department, lead, and members for this team.'
+                  : 'Teams sit inside a department and can have an optional lead.'}
+              </DialogDescription>
+            </div>
+          </div>
         </DialogHeader>
 
         {loading ? (
-          <div className="flex items-center justify-center py-12 text-muted-foreground gap-2">
+          <div className="flex items-center justify-center py-16 text-sm text-muted-foreground gap-2">
             <Loader2 className="w-4 h-4 animate-spin" /> Loading teams…
           </div>
         ) : editing ? (
-          <div className="space-y-4 overflow-y-auto pr-1 flex-1 min-h-0">
+          <div className="space-y-4 overflow-y-auto px-4 sm:px-6 py-4 flex-1 min-h-0">
             <div className="space-y-2">
               <Label>Team name</Label>
               <Input
@@ -292,9 +301,9 @@ export default function TeamEditDialog({
                   className="pl-8 h-9"
                 />
               </div>
-              <div className="max-h-48 overflow-y-auto rounded-md border p-2 space-y-1.5">
+              <div className="max-h-48 overflow-y-auto rounded-xl border p-2 space-y-1">
                 {filteredMemberUsers.map((u) => (
-                  <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <label key={u.id} className="flex items-center gap-2 text-sm cursor-pointer rounded-lg px-2 py-1.5 hover:bg-muted/50">
                     <Checkbox
                       checked={editing.member_ids.includes(String(u.id))}
                       onCheckedChange={() => toggleMember(u.id)}
@@ -311,10 +320,10 @@ export default function TeamEditDialog({
             </div>
           </div>
         ) : (
-          <div className="space-y-3 overflow-y-auto flex-1 min-h-0">
+          <div className="space-y-3 overflow-y-auto flex-1 min-h-0 px-4 sm:px-6 py-4">
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -323,23 +332,31 @@ export default function TeamEditDialog({
                 />
               </div>
               {canCreate && (
-                <Button size="sm" onClick={startCreate} className="gap-1.5 shrink-0">
-                  <Plus className="w-3.5 h-3.5" /> Add
+                <Button size="sm" onClick={startCreate} className="gap-1.5 shrink-0 h-9">
+                  <Plus className="w-4 h-4" /> Add
                 </Button>
               )}
             </div>
             {visibleTeams.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-8 text-center">No teams yet.</p>
+              <div className="flex flex-col items-center justify-center text-center py-12">
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-muted text-muted-foreground mb-3">
+                  <Users className="w-5 h-5" />
+                </span>
+                <p className="text-sm font-medium">No teams yet</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {canCreate ? 'Create a team to group agents inside a department.' : 'No teams match this search.'}
+                </p>
+              </div>
             ) : (
               <ul className="space-y-2">
                 {visibleTeams.map((team) => (
                   <li
                     key={team.id}
-                    className="flex items-start justify-between gap-3 rounded-lg border p-3 hover:bg-muted/40"
+                    className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card p-3 shadow-sm hover:border-primary/30 transition-colors"
                   >
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{team.name}</p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
                         {team.department || departmentName(team.department_id)}
                         {team.lead?.full_name ? ` · Lead: ${team.lead.full_name}` : ''}
                         {(team.member_ids?.length || team.members?.length)
@@ -348,15 +365,16 @@ export default function TeamEditDialog({
                       </p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <Button size="sm" variant="ghost" onClick={() => startEdit(team)}>Edit</Button>
+                      <Button size="sm" variant="ghost" className="h-8" onClick={() => startEdit(team)}>Edit</Button>
                       {canCreate && (
                         <Button
                           size="icon"
                           variant="ghost"
-                          className="h-8 w-8 text-destructive"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
                           onClick={() => onDeactivate?.(team)}
+                          aria-label={`Deactivate ${team.name}`}
                         >
-                          <X className="w-3.5 h-3.5" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       )}
                     </div>
@@ -367,7 +385,7 @@ export default function TeamEditDialog({
           </div>
         )}
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="px-4 sm:px-6 py-4 shrink-0 border-t border-border/70 bg-background flex-row justify-end gap-2">
           {editing ? (
             <>
               <Button

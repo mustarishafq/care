@@ -13,13 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  Bell, Clock, Database, GitBranch, Link2, Loader2, Eye, EyeOff, Copy, Check,
-  Shield, Settings2, Webhook, Lock, Sun, ClipboardCheck, ShoppingBag, CalendarDays,
+  Clock, Database, GitBranch, Link2, Loader2, Eye, EyeOff, Copy, Check,
+  Shield, Settings2, Lock, ClipboardCheck, ShoppingBag, CalendarDays,
 } from 'lucide-react';
-import ThemeToggle from '@/components/theme/ThemeToggle';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { toastApiError } from '@/lib/toastApi';
@@ -35,13 +34,17 @@ import TeamEditDialog from '@/components/settings/TeamEditDialog';
 import SettingsConfigCard from '@/components/settings/SettingsConfigCard';
 import SettingsLookupCard from '@/components/settings/SettingsLookupCard';
 import SettingsSectionIntro from '@/components/settings/SettingsSectionIntro';
-import SettingsSwitchRow from '@/components/settings/SettingsSwitchRow';
+import SettingsNav from '@/components/settings/SettingsNav';
+import AppearancePicker from '@/components/settings/AppearancePicker';
+import NotificationTriggersList from '@/components/settings/NotificationTriggersList';
+import OrderSourcesDialog from '@/components/settings/OrderSourcesDialog';
 import {
   AUTO_CLOSE_DEFAULT,
   formatAutoCloseDelay,
   LOOKUP_SECTIONS,
-  NOTIFICATION_TRIGGERS,
   ROUTING_DEFAULT,
+  SETTINGS_NAV,
+  SETTINGS_TABS,
   SLA_DEFAULT,
   PRE_RESOLVED_DEFAULT,
   ORDER_SOURCES_DEFAULT,
@@ -80,8 +83,6 @@ import {
   createDisplayFormatters,
   normalizeDisplayFormat,
 } from '@/lib/displayFormat';
-
-const SETTINGS_TABS = new Set(['general', 'lookups', 'automation', 'integrations', 'notifications']);
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -416,10 +417,7 @@ export default function Settings() {
   };
 
   const openOrderSources = () => {
-    const saved = getOrderSources();
-    setOrderSourcesForm({
-      sources: saved.sources.length ? saved.sources : [''],
-    });
+    setOrderSourcesForm(getOrderSources());
     setOrderSourcesOpen(true);
   };
 
@@ -571,7 +569,7 @@ export default function Settings() {
       <PageHeader
         icon={Settings2}
         title="Settings"
-        description="Manage lookup data, automation rules, and system integrations"
+        description="Workspace appearance, lookup data, automation, and integrations"
         actions={!canManage && !canManageLookups ? (
           <Badge variant="outline" className="w-fit gap-1.5 py-1">
             <Lock className="w-3 h-3" />
@@ -587,7 +585,7 @@ export default function Settings() {
           <AlertTitle>{canManageLookups ? 'Limited settings access' : 'Read-only access'}</AlertTitle>
           <AlertDescription>
             {canManageLookups
-              ? 'As a team lead you can manage lookup data and your teams. Other settings tabs remain read-only unless you have settings.manage.'
+              ? 'As a team lead you can manage lookup data and your teams. Other sections remain read-only unless you have settings.manage.'
               : (
                 <>
                   You can review settings but need the <code className="text-xs bg-muted px-1 rounded">settings.manage</code> permission to edit them.
@@ -597,51 +595,42 @@ export default function Settings() {
         </Alert>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="w-fit max-w-full rounded-2xl border border-border bg-muted/30 p-1 overflow-x-auto">
-          <TabsList className="h-10 w-auto justify-start bg-transparent gap-1">
-            <TabsTrigger value="general" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Sun className="w-4 h-4" />
-              General
-            </TabsTrigger>
-            <TabsTrigger value="lookups" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Database className="w-4 h-4" />
-              Lookup Data
-            </TabsTrigger>
-            <TabsTrigger value="automation" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <GitBranch className="w-4 h-4" />
-              Automation
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Webhook className="w-4 h-4" />
-              Integrations
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2 data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Bell className="w-4 h-4" />
-              Notifications
-            </TabsTrigger>
-          </TabsList>
-        </div>
+      <Tabs
+        value={activeTab}
+        onValueChange={setActiveTab}
+        className="flex flex-col gap-6 lg:grid lg:grid-cols-[240px_minmax(0,1fr)] lg:items-start lg:gap-8"
+      >
+        <SettingsNav
+          tabs={SETTINGS_NAV}
+          badges={{
+            lookups: lookupTotal,
+            automation: automationActive,
+            integrations: sso.enabled ? 'On' : undefined,
+          }}
+        />
 
+        <div className="min-w-0 space-y-6">
         <TabsContent value="general" className="space-y-6 mt-0">
           <SettingsSectionIntro
             title="General"
-            description="Appearance, display formats, and a quick overview of your workspace configuration."
+            description="Appearance is local to this device. Display formats apply across the workspace."
+            icon={SETTINGS_NAV.find((tab) => tab.value === 'general')?.icon}
           />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+            <StatCard label="Lookup items" value={lookupTotal} icon={Database} index={0} onClick={() => setActiveTab('lookups')} />
+            <StatCard label="Automation active" value={automationActive} icon={GitBranch} color="blue" index={1} onClick={() => setActiveTab('automation')} />
+            <StatCard label="Routing rules" value={routingRuleCount} icon={Shield} color="purple" index={2} onClick={() => setActiveTab('automation')} />
+            <StatCard label="SSO" value={sso.enabled ? 'On' : 'Off'} icon={Link2} color={sso.enabled ? 'success' : 'primary'} index={3} format="none" onClick={() => setActiveTab('integrations')} />
+          </div>
 
           <Card className="rounded-2xl border border-border shadow-sm">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Appearance</CardTitle>
-              <p className="text-sm text-muted-foreground">Personalize how Care looks on your device.</p>
+              <p className="text-sm text-muted-foreground">Choose how Care looks on this device. Theme is not shared with other users.</p>
             </CardHeader>
             <CardContent>
-              <SettingsSwitchRow
-                icon={Sun}
-                title="Dark Mode"
-                description="Switch between light and dark themes"
-              >
-                <ThemeToggle variant="switch" />
-              </SettingsSwitchRow>
+              <AppearancePicker />
             </CardContent>
           </Card>
 
@@ -655,7 +644,8 @@ export default function Settings() {
                   </CardTitle>
                   <p className="text-sm text-muted-foreground mt-1">
                     Workspace-wide number, money, date, and phone formats used across Care.
-                  </p>                </div>
+                  </p>
+                </div>
                 {canManage && (
                   <Button
                     size="sm"
@@ -663,13 +653,14 @@ export default function Settings() {
                     disabled={saving || !displayFormatDirty}
                   >
                     {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                    Save
+                    {displayFormatDirty ? 'Save' : 'Saved'}
                   </Button>
                 )}
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <CardContent>
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_260px] gap-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-xs text-muted-foreground">Number style (locale)</Label>
                   <Select
@@ -790,45 +781,33 @@ export default function Settings() {
                     Marketplace numbers are stored as international format, e.g. +60139989571.
                   </p>
                 </div>
-              </div>
+                </div>
 
-              <div className="rounded-xl border border-border bg-muted/30 p-3 grid grid-cols-2 lg:grid-cols-5 gap-3 text-sm">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Number</p>
-                  <p className="font-medium tabular-nums mt-0.5">{displayFormatPreview.formatNumber(12139)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Money</p>
-                  <p className="font-medium tabular-nums mt-0.5">{displayFormatPreview.formatMoney(1000)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Date</p>
-                  <p className="font-medium mt-0.5">{displayFormatPreview.formatDate(previewNow)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Date &amp; time</p>
-                  <p className="font-medium mt-0.5">{displayFormatPreview.formatDateTime(previewNow)}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Phone</p>
-                  <p className="font-medium tabular-nums mt-0.5">{displayFormatPreview.formatPhone('0139989571')}</p>
+                <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3 h-fit xl:sticky xl:top-20">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Live preview</p>
+                  {[
+                    { label: 'Number', value: displayFormatPreview.formatNumber(12139) },
+                    { label: 'Money', value: displayFormatPreview.formatMoney(1000) },
+                    { label: 'Date', value: displayFormatPreview.formatDate(previewNow) },
+                    { label: 'Date & time', value: displayFormatPreview.formatDateTime(previewNow) },
+                    { label: 'Phone', value: displayFormatPreview.formatPhone('0139989571') },
+                  ].map((row) => (
+                    <div key={row.label} className="flex items-baseline justify-between gap-3 border-b border-border/60 pb-2 last:border-0 last:pb-0">
+                      <p className="text-xs text-muted-foreground">{row.label}</p>
+                      <p className="text-sm font-medium tabular-nums text-right">{row.value}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Lookup items" value={lookupTotal} icon={Database} index={0} />
-            <StatCard label="Automation active" value={automationActive} icon={GitBranch} color="blue" index={1} />
-            <StatCard label="Routing rules" value={routingRuleCount} icon={Shield} color="purple" index={2} />
-            <StatCard label="SSO" value={sso.enabled ? 'On' : 'Off'} icon={Link2} color={sso.enabled ? 'success' : 'primary'} index={3} format="none" />
-          </div>
         </TabsContent>
 
         <TabsContent value="lookups" className="space-y-6 mt-0">
           <SettingsSectionIntro
-            title="Lookup Data"
+            title="Lookups"
             description="Dropdown values used across tickets, filters, and reports. Click a card to edit."
+            icon={SETTINGS_NAV.find((tab) => tab.value === 'lookups')?.icon}
           />
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {LOOKUP_SECTIONS.map((section) => (
@@ -863,6 +842,7 @@ export default function Settings() {
           <SettingsSectionIntro
             title="Automation"
             description="Routing rules, SLA targets, and automatic ticket workflows."
+            icon={SETTINGS_NAV.find((tab) => tab.value === 'automation')?.icon}
           />
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SettingsConfigCard
@@ -1017,9 +997,9 @@ export default function Settings() {
           <SettingsSectionIntro
             title="Integrations"
             description="Authentication and connections to external systems."
+            icon={SETTINGS_NAV.find((tab) => tab.value === 'integrations')?.icon}
           />
-          <div className="max-w-xl">
-            <SettingsConfigCard
+          <SettingsConfigCard
               title="Nexus SSO"
               description="Single sign-on from Nexus using signed JWT tokens"
               icon={Link2}
@@ -1032,7 +1012,6 @@ export default function Settings() {
                 { label: 'Endpoint', value: `${window.location.origin}/sso/nexus` },
               ]}
             />
-          </div>
           <div className="space-y-3">
             <div>
               <h3 className="text-base font-semibold tracking-tight">Webhooks</h3>
@@ -1046,34 +1025,13 @@ export default function Settings() {
 
         <TabsContent value="notifications" className="space-y-6 mt-0">
           <SettingsSectionIntro
-            title="Notification Triggers"
+            title="Notification triggers"
             description="System events that generate in-app notifications for agents."
+            icon={SETTINGS_NAV.find((tab) => tab.value === 'notifications')?.icon}
           />
-          <Card className="rounded-2xl border border-border shadow-sm overflow-hidden">
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader className="bg-muted/40 sticky top-0 z-10">
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="pl-6">Event</TableHead>
-                    <TableHead>When it fires</TableHead>
-                    <TableHead className="w-32 pr-6">Type</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {NOTIFICATION_TRIGGERS.map((trigger) => (
-                    <TableRow key={trigger.type} className="hover:bg-muted/40">
-                      <TableCell className="pl-6 font-medium text-sm">{trigger.event}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{trigger.when}</TableCell>
-                      <TableCell className="pr-6">
-                        <Badge variant="outline" className="text-[10px] font-mono">{trigger.type}</Badge>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <NotificationTriggersList />
         </TabsContent>
+        </div>
       </Tabs>
       </PageContent>
 
@@ -1415,58 +1373,14 @@ export default function Settings() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={orderSourcesOpen} onOpenChange={setOrderSourcesOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2"><ShoppingBag className="w-4 h-4" />Order Sources</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3 py-1">
-            <p className="text-xs text-muted-foreground">
-              Manage platform names shown in the create complaint form. Add Shopee, TikTok, or any channel you use.
-            </p>
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {orderSourcesForm.sources.map((source, index) => (
-                <div key={`order-source-${index}`} className="flex items-center gap-2">
-                  <Input
-                    value={source}
-                    onChange={(e) => setOrderSourcesForm((prev) => ({
-                      ...prev,
-                      sources: prev.sources.map((item, i) => (i === index ? e.target.value : item)),
-                    }))}
-                    placeholder="e.g. Shopee"
-                    className="h-8 text-sm"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0"
-                    onClick={() => setOrderSourcesForm((prev) => ({
-                      ...prev,
-                      sources: prev.sources.filter((_, i) => i !== index),
-                    }))}
-                    disabled={orderSourcesForm.sources.length <= 1}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setOrderSourcesForm((prev) => ({ ...prev, sources: [...prev.sources, ''] }))}
-            >
-              Add source
-            </Button>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOrderSourcesOpen(false)}>Cancel</Button>
-            <Button onClick={saveOrderSources} disabled={saving}>{saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}Save</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <OrderSourcesDialog
+        open={orderSourcesOpen}
+        onOpenChange={setOrderSourcesOpen}
+        sources={orderSourcesForm.sources}
+        onSourcesChange={(sources) => setOrderSourcesForm({ sources })}
+        saving={saving}
+        onSave={saveOrderSources}
+      />
 
       <Dialog open={slaOpen} onOpenChange={setSlaOpen}>
         <DialogContent className="max-w-md max-h-[90vh] flex flex-col gap-0 p-0 overflow-hidden">
