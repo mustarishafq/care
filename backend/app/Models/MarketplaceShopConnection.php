@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Marketplace\MarketplaceCookieAlertService;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -71,10 +72,16 @@ class MarketplaceShopConnection extends Model
 
     public function clearConnectionError(): void
     {
+        $hadError = filled($this->connection_error);
+
         $this->update([
             'connection_error' => null,
             'token_refresh_failed_at' => null,
         ]);
+
+        if ($hadError) {
+            app(MarketplaceCookieAlertService::class)->resolveForShop($this);
+        }
     }
 
     public function usesSellerCookie(): bool

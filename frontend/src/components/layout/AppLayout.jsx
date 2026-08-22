@@ -7,6 +7,7 @@ import { motion } from 'framer-motion';
 import TopBar from './TopBar';
 import BottomNav from './BottomNav';
 import ForcePasswordChange from '@/components/auth/ForcePasswordChange';
+import CookieHealthBanner from '@/components/marketplace/CookieHealthBanner';
 import { usePermissions } from '@/lib/usePermissions';
 import { useNotifications } from '@/lib/useNotifications';
 import { pageTransitionMotion } from '@/lib/motion';
@@ -51,6 +52,7 @@ export default function AppLayout() {
         )}
       >
         <div className="max-w-[1600px] mx-auto w-full p-4 sm:p-6">
+          <CookieHealthBanner />
           <motion.div key={location.pathname} {...pageTransitionMotion}>
             <Outlet />
           </motion.div>

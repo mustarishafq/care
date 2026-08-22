@@ -8,6 +8,7 @@ use App\Http\Resources\MarketplaceOrderResource;
 use App\Models\MarketplaceOrder;
 use App\Models\MarketplaceShopConnection;
 use App\Services\DisplayFormatService;
+use App\Services\Marketplace\MarketplaceCookieAlertService;
 use App\Services\Marketplace\MarketplaceOrderSyncService;
 use App\Support\MarketplacePlatform;
 use App\Support\SimpleXlsxWriter;
@@ -340,6 +341,16 @@ class MarketplaceOrderController extends Controller
                 array_key_exists('fetch_phones', $validated) ? (bool) $validated['fetch_phones'] : false,
             );
         } catch (RuntimeException $exception) {
+            if (isset($connection)) {
+                app(MarketplaceCookieAlertService::class)->recordFailure(
+                    $connection,
+                    $exception,
+                    'orders',
+                    'marketplace:sync-orders',
+                    class_basename(static::class),
+                );
+            }
+
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 
@@ -421,6 +432,16 @@ class MarketplaceOrderController extends Controller
                 $endAt,
             );
         } catch (RuntimeException $exception) {
+            if (isset($connection)) {
+                app(MarketplaceCookieAlertService::class)->recordFailure(
+                    $connection,
+                    $exception,
+                    'phones',
+                    'marketplace:reveal-order-phones',
+                    class_basename(static::class),
+                );
+            }
+
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 

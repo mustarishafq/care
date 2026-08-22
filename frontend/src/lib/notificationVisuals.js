@@ -13,6 +13,7 @@ import {
   Shield,
   UserPlus,
   Wallet,
+  Cookie,
 } from 'lucide-react';
 
 const TYPE_META = {
@@ -22,6 +23,7 @@ const TYPE_META = {
   mention: { severity: 'info', category: 'task', priority: 'medium', icon: AtSign },
   sla_warning: { severity: 'warning', category: 'system', priority: 'high', icon: AlertTriangle },
   low_rating_review: { severity: 'warning', category: 'system', priority: 'high', icon: AlertTriangle },
+  cookie_expired: { severity: 'critical', category: 'system', priority: 'critical', icon: Cookie },
   overdue: { severity: 'critical', category: 'system', priority: 'critical', icon: Clock },
   approval: { severity: 'info', category: 'approval', priority: 'medium', icon: CheckCircle2 },
   announcement: { severity: 'info', category: 'announcement', priority: 'medium', icon: Megaphone },
@@ -150,5 +152,6 @@ export function isCriticalNotification(notification) {
   return normalized.severity === 'critical'
     || normalized.severity === 'error'
     || normalized.priority === 'critical'
-    || normalized.type === 'overdue';
+    || normalized.type === 'overdue'
+    || normalized.type === 'cookie_expired';
 }

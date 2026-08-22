@@ -10,6 +10,7 @@ use App\Models\MarketplaceProductReview;
 use App\Models\MarketplaceShopConnection;
 use App\Models\TikTokShopConnection;
 use App\Services\Marketplace\MarketplaceReviewSyncService;
+use App\Services\Marketplace\MarketplaceCookieAlertService;
 use App\Services\TikTokShop\TikTokSellerReviewClient;
 use App\Support\MarketplacePlatform;
 use App\Support\SimpleXlsxWriter;
@@ -315,8 +316,19 @@ class MarketplaceReviewController extends Controller
                 array_key_exists('fetch_all', $validated) ? (bool) $validated['fetch_all'] : true,
                 $startAt,
                 $endAt,
+                notifyLowRatings: false,
             );
         } catch (RuntimeException $exception) {
+            if (isset($connection)) {
+                app(MarketplaceCookieAlertService::class)->recordFailure(
+                    $connection,
+                    $exception,
+                    'reviews',
+                    'marketplace:reviews-sync',
+                    class_basename(static::class),
+                );
+            }
+
             return response()->json(['message' => $exception->getMessage()], 422);
         }
 

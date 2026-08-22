@@ -42,6 +42,15 @@ class MarketplacePlatform
         return in_array($platform, self::all(), true);
     }
 
+    public static function frontendShopPath(string $platform): string
+    {
+        return match ($platform) {
+            self::TIKTOK_SHOP => '/marketplace/tiktok-shop',
+            self::SHOPEE => '/marketplace/shopee',
+            default => '/marketplace',
+        };
+    }
+
     public static function oauthCallbackUrl(string $platform): ?string
     {
         return match ($platform) {

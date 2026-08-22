@@ -23,6 +23,7 @@ import StatCard from '@/components/dashboard/StatCard';
 import { toast } from 'sonner';
 import { toastApiError } from '@/lib/toastApi';
 import { usePermissions } from '@/lib/usePermissions';
+import { ShopCookieCard, ShopCookieStatusBadge } from '@/components/marketplace/ShopCookieStatus';
 import { format } from 'date-fns';
 
 const PLATFORM = 'shopee';
@@ -40,6 +41,7 @@ export default function Shopee({ embedded = false } = {}) {
   const { hasPermission } = usePermissions();
   const canManage = hasPermission('marketplace.manage');
   const [searchParams, setSearchParams] = useSearchParams();
+  const highlightedShopId = searchParams.get('shop');
   const [activeTab, setActiveTab] = useState('shops');
   const [selectedShopId, setSelectedShopId] = useState('');
   const [productOffset, setProductOffset] = useState(0);
@@ -194,6 +196,7 @@ export default function Shopee({ embedded = false } = {}) {
       setCookieShopForm((prev) => ({ ...prev, shop_name: '', shop_id: '', cookie: '' }));
       await refetchConnections();
       await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Shop cookie saved');
     } catch (error) {
       toastApiError(error, 'Failed to save shop cookie');
@@ -214,6 +217,7 @@ export default function Shopee({ embedded = false } = {}) {
       setCookieDrafts((prev) => ({ ...prev, [id]: '' }));
       await refetchConnections();
       await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toast.success('Shop cookie updated');
     } catch (error) {
       toastApiError(error, 'Failed to update shop cookie');
@@ -392,7 +396,7 @@ export default function Shopee({ embedded = false } = {}) {
               ) : (
                 <div className="space-y-3">
                   {connections.map((shop) => (
-                    <div key={shop.id} className="rounded-lg border p-3 space-y-3">
+                    <ShopCookieCard key={shop.id} shop={shop} highlighted={String(highlightedShopId) === String(shop.id)}>
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
@@ -401,17 +405,13 @@ export default function Shopee({ embedded = false } = {}) {
                             <Badge variant="secondary">
                               {shop.auth_mode === 'seller_cookie' ? 'Cookie' : 'OAuth'}
                             </Badge>
-                            {shop.has_seller_cookie && <Badge variant="outline" className="text-emerald-700">Cookie OK</Badge>}
-                            {shop.connection_error && <Badge variant="destructive">Issue</Badge>}
+                            <ShopCookieStatusBadge shop={shop} />
                           </div>
                           <p className="text-xs text-muted-foreground mt-1">
                             ID {shop.shop_id}
                             {shop.last_synced_at && ` · Last sync ${format(new Date(shop.last_synced_at), 'dd MMM yyyy HH:mm')}`}
                             {shop.cookie_updated_at && ` · Cookie ${format(new Date(shop.cookie_updated_at), 'dd MMM yyyy HH:mm')}`}
                           </p>
-                          {shop.connection_error && (
-                            <p className="text-xs text-destructive mt-1">{shop.connection_error}</p>
-                          )}
                         </div>
                         {canManage && (
                           <div className="flex items-center gap-2">
@@ -441,7 +441,7 @@ export default function Shopee({ embedded = false } = {}) {
                           </Button>
                         </div>
                       )}
-                    </div>
+                    </ShopCookieCard>
                   ))}
                 </div>
               )}

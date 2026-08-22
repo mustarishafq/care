@@ -26,6 +26,7 @@ import StatCard from '@/components/dashboard/StatCard';
 import ProofImageGallery from '@/components/complaints/ProofImageGallery';
 import { toast } from 'sonner';
 import { toastApiError } from '@/lib/toastApi';
+import { shopCookieLabel, shopCookieStatus } from '@/lib/shopCookieHealth';
 import { usePermissions } from '@/lib/usePermissions';
 import { useDisplayFormat } from '@/lib/DisplayFormatProvider';
 import { format } from 'date-fns';
@@ -290,6 +291,11 @@ function SyncFields({
             {shops.map((shop) => (
               <SelectItem key={shop.id} value={String(shop.id)}>
                 {platformLabel(shop.platform)} — {shop.shop_name || shop.shop_id}
+                {shopCookieStatus(shop) === 'expired' || shopCookieStatus(shop) === 'missing'
+                  ? ' · cookie expired'
+                  : shopCookieStatus(shop) === 'aging'
+                    ? ' · cookie aging'
+                    : ''}
               </SelectItem>
             ))}
           </SelectContent>
@@ -539,11 +545,14 @@ export default function MarketplaceReviews() {
       const result = await db.integrations.Marketplace.syncReviews(payload);
       await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
       await queryClient.invalidateQueries({ queryKey: ['marketplace-reviews'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       await refetchReviews();
       const created = result.sync?.created_complaints ?? 0;
       toast.success(`${result.message}${created ? ` · ${created} complaint(s) auto-created` : ''}`);
       setSyncModalOpen(false);
     } catch (error) {
+      await queryClient.invalidateQueries({ queryKey: ['marketplace-shops'] });
+      await queryClient.invalidateQueries({ queryKey: ['notifications'] });
       toastApiError(error, 'Failed to sync reviews');
     } finally {
       setSyncing(false);
@@ -634,6 +643,7 @@ export default function MarketplaceReviews() {
               {filteredShops.map((shop) => (
                 <SelectItem key={shop.id} value={String(shop.id)}>
                   {shop.shop_name || shop.shop_id}
+                  {shopCookieLabel(shop) && shopCookieStatus(shop) !== 'ok' ? ` · ${shopCookieLabel(shop)}` : ''}
                 </SelectItem>
               ))}
             </SelectContent>

@@ -96,6 +96,7 @@ class MarketplaceReviewSyncService
             }
             $connection->fill($payload);
             $connection->save();
+            app(MarketplaceCookieAlertService::class)->resolveForShop($connection);
 
             return $connection->fresh();
         }
@@ -174,6 +175,7 @@ class MarketplaceReviewSyncService
             }
             $connection->fill($payload);
             $connection->save();
+            app(MarketplaceCookieAlertService::class)->resolveForShop($connection);
 
             return $connection->fresh();
         }
@@ -229,6 +231,7 @@ class MarketplaceReviewSyncService
         bool $fetchAll = true,
         ?Carbon $startAt = null,
         ?Carbon $endAt = null,
+        bool $notifyLowRatings = true,
     ): array {
         $lookbackDays = (int) app(MarketplacePlatformConfigService::class)
             ->getSetting(MarketplacePlatform::TIKTOK_SHOP, 'review_lookback_days', 30);
@@ -353,7 +356,7 @@ class MarketplaceReviewSyncService
                         $createdComplaints++;
                     }
 
-                    $this->notifyLowRatingIfNeeded($review);
+                    $this->notifyLowRatingIfNeeded($review, $notifyLowRatings);
                 }
 
                 $nextPage = $result['next_page'] ?? null;
@@ -372,6 +375,10 @@ class MarketplaceReviewSyncService
 
                 $page = (int) $nextPage;
             }
+        }
+
+        if ($connection->connection_error) {
+            $connection->clearConnectionError();
         }
 
         return [
@@ -562,6 +569,7 @@ class MarketplaceReviewSyncService
         bool $fetchAll = true,
         ?Carbon $startAt = null,
         ?Carbon $endAt = null,
+        bool $notifyLowRatings = true,
     ): array {
         if ($connection->platform === MarketplacePlatform::TIKTOK_SHOP) {
             /** @var TikTokShopConnection $tiktokConnection */
@@ -577,6 +585,7 @@ class MarketplaceReviewSyncService
                 $fetchAll,
                 $startAt,
                 $endAt,
+                $notifyLowRatings,
             );
         }
 
@@ -594,6 +603,7 @@ class MarketplaceReviewSyncService
                 $fetchAll,
                 $startAt,
                 $endAt,
+                $notifyLowRatings,
             );
         }
 
@@ -665,6 +675,7 @@ class MarketplaceReviewSyncService
         bool $fetchAll = true,
         ?Carbon $startAt = null,
         ?Carbon $endAt = null,
+        bool $notifyLowRatings = true,
     ): array {
         if (ShopeeSellerReviewClient::isCookieAuth($connection)) {
             return $this->syncShopeeCookieReviews(
@@ -677,6 +688,7 @@ class MarketplaceReviewSyncService
                 $fetchAll,
                 $startAt,
                 $endAt,
+                $notifyLowRatings,
             );
         }
 
@@ -709,7 +721,11 @@ class MarketplaceReviewSyncService
                 $createdComplaints++;
             }
 
-            $this->notifyLowRatingIfNeeded($review);
+            $this->notifyLowRatingIfNeeded($review, $notifyLowRatings);
+        }
+
+        if ($connection->connection_error) {
+            $connection->clearConnectionError();
         }
 
         return [
@@ -734,6 +750,7 @@ class MarketplaceReviewSyncService
         bool $fetchAll = true,
         ?Carbon $startAt = null,
         ?Carbon $endAt = null,
+        bool $notifyLowRatings = true,
     ): array {
         $lookbackDays = (int) app(MarketplacePlatformConfigService::class)
             ->getSetting(MarketplacePlatform::SHOPEE, 'review_lookback_days', 30);
@@ -806,7 +823,7 @@ class MarketplaceReviewSyncService
                         $createdComplaints++;
                     }
 
-                    $this->notifyLowRatingIfNeeded($review);
+                    $this->notifyLowRatingIfNeeded($review, $notifyLowRatings);
                 }
 
                 // If this window still has more than one page, split the time range and retry.
@@ -819,6 +836,10 @@ class MarketplaceReviewSyncService
         }
 
         $connection->update(['last_synced_at' => now()]);
+
+        if ($connection->connection_error) {
+            $connection->clearConnectionError();
+        }
 
         return [
             'synced' => $synced,
@@ -1035,8 +1056,12 @@ class MarketplaceReviewSyncService
         return [];
     }
 
-    private function notifyLowRatingIfNeeded(MarketplaceProductReview $review): void
+    private function notifyLowRatingIfNeeded(MarketplaceProductReview $review, bool $enabled = true): void
     {
+        if (! $enabled) {
+            return;
+        }
+
         app(LowRatingReviewAlertService::class)->notifyForReview($review);
     }
 
